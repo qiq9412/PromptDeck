@@ -1,0 +1,52 @@
+==========================================================================
+[0] 平台硬性要求（静态检查）
+  [PASS] Dockerfile 在项目根目录
+  [PASS] ms_deploy.json：sdk_type=docker  docker
+  [PASS] ms_deploy.json：port=7860  7860
+  [PASS] 启动命令监听 0.0.0.0
+  [PASS] 启动端口为 7860
+  [PASS] 未使用平台禁用的 8080 端口
+  [PASS] EXPOSE 7860
+  [PASS] 未读取平台保留请求头（入站 Authorization / X-modelscope- / X-studio-）
+  [PASS] 依赖仅运行必需（无 streamlit / 无 websocket-client）
+  [PASS] 持久化：容器内库路径指向 /mnt/workspace
+  [PASS] 容器内库路径可用环境变量覆盖
+  [PASS] 页面接口调用全为相对路径（与部署前缀无关）  相对 13 处 / 绝对残留 []
+  [PASS] 页面导航链接为相对路径
+  [PASS] 首页跳转为相对路径
+
+[1] 按容器入口方式启动产物（0.0.0.0:7860）
+  [PASS] 服务在 7860 启动成功
+
+[2] 起子路径反代 /studio/app -> 后端 /（模拟平台前缀）
+  [PASS] 反代就绪
+
+[3] 经前缀访问（模拟创空间线上）
+    GET /studio/app/ -> 307 Location='foundation1_models.html'
+  [PASS] 首页 307 跳转到相对地址  (307, 'foundation1_models.html')
+  [PASS] 经前缀能打开模型列表页  status=200
+    GET /studio/app/api/srv -> 200 共 17 行
+  [PASS] 经前缀能读服务器接口  rows=17
+    GET /studio/app/api/mdl -> 200 共 20 行
+  [PASS] 经前缀能读模型接口  rows=20
+
+[4] 经前缀写入：新增平台/模型 -> 回读 -> 删除
+  [PASS] 经前缀新增服务器成功（201）  status=201 {"ok":true,"id":43}
+  [PASS] 经前缀新增模型成功（201）  status=201 {"ok":true,"id":34}
+  [PASS] 新模型已落库且可回读  [{'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824', 'type': '对话', 'inPrice': '1.5', 'outPrice': '3', 'unit': 'K', 'url': ''}]
+  [PASS] 回读字段与写入一致（类型/单价/单位/归属平台）  {'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824', 'type': '对话', 'inPrice': '1.5', 'outPrice': '3', 'unit': 'K', 'url': ''}
+  [PASS] 回读条数 == 原条数 + 1  21 vs 21
+  [PASS] 经前缀修改模型成功（PUT 被反代透传）  status=200 {"ok":true,"updated":1}
+  [PASS] 修改按主键落库且没新增行  [{'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824-改', 'type': '对话', 'inPrice': '4.135', 'outPrice': '0.0005', 'unit': 'K', 'url': ''}]
+  [PASS] 改后名称生效  MS校验模型-1790565824-改
+  [PASS] 计费按原文保存（4.135 / 0.0005 未被四舍五入）  ('4.135', '0.0005')
+  [PASS] PUT 缺 id -> 400  status=400
+  [PASS] 经前缀删除模型成功  status=200
+  [PASS] 删除后条数回落  20
+
+[5] 产物清洁度
+  [PASS] 不含开发期脚本 / 旧 Streamlit 版  ['.gitignore', '.pd_modelscope_pack', 'db.py', 'Dockerfile', 'ms_deploy.json', 'README.md', 'requirements.txt', 'server.py', 'start.sh', 'data\\prompt_test_DB.db', 'data\\seed.sqlite', 'static\\foundation1_models.html', 'static\\list_server.html', 'static\\model_add.html', 'static\\new_server.html', 'static\\prompt.html']
+  [PASS] 无超过 100MB 的文件（平台要求，否则需 Git LFS）  最大 69.5 KB
+
+==========================================================================
+结果：全部通过

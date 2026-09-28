@@ -1,0 +1,524 @@
+==============================================================================
+PromptDeck · 原型零改动回归校验（static/ vs 原型）
+==============================================================================
+
+■ foundation1_models.html
+  1) 字段/风格/排版/CSS 零改动
+  [PASS] <style> 段与 body 结构（<script> 之前）逐字节一致  len 36418 vs 36418
+  [PASS] </script> 之后（文件尾）逐字节一致
+  2) 控件只补交互：<script> 内的改动
+     改动行数：82（新增 57 / 删除 25）
+       -var models = [
+       -  { id:1,  platform:"OpenAI",            cUrl:"https://openai.com",              model:"gpt-4o",                 type:"多模态",   inPrice:18.00, outPrice:72.00, unit:"K" },
+       -  { id:2,  platform:"OpenAI",            cUrl:"https://openai.com",              model:"gpt-4o-mini",            type:"文本生成", inPrice:1.08,  outPrice:4.32, unit:"百万" },
+       -  { id:3,  platform:"Anthropic Claude",  cUrl:"https://www.anthropic.com",       model:"claude-3-5-sonnet",      type:"多模态",   inPrice:21.60, outPrice:108.00, unit:"K" },
+       -  { id:4,  platform:"Google Gemini",     cUrl:"https://about.google",            model:"gemini-1.5-pro",         type:"多模态",   inPrice:9.00,  outPrice:36.00, unit:"K" },
+       -  { id:5,  platform:"DeepSeek 深度求索",  cUrl:"https://www.deepseek.com",        model:"deepseek-chat",          type:"文本生成", inPrice:1.00,  outPrice:2.00, unit:"百万" },
+       -  { id:6,  platform:"DeepSeek 深度求索",  cUrl:"https://www.deepseek.com",        model:"deepseek-reasoner",      type:"推理模型", inPrice:4.00,  outPrice:16.00, unit:"万" },
+       -  { id:7,  platform:"通义千问 Qwen",      cUrl:"https://www.aliyun.com",          model:"qwen-max",               type:"文本生成", inPrice:20.00, outPrice:60.00, unit:"K" },
+       -  { id:8,  platform:"通义千问 Qwen",      cUrl:"https://www.aliyun.com",          model:"qwen-vl-max",            type:"多模态",   inPrice:16.00, outPrice:48.00, unit:"K" },
+       -  { id:9,  platform:"文心一言 ERNIE",     cUrl:"https://www.baidu.com",           model:"ernie-4.0-8k",           type:"文本生成", inPrice:30.00, outPrice:90.00, unit:"K" },
+       -  { id:10, platform:"智谱 GLM",          cUrl:"https://www.zhipuai.cn",          model:"glm-4-plus",             type:"文本生成", inPrice:50.00, outPrice:50.00, unit:"K" },
+       -  { id:11, platform:"智谱 GLM",          cUrl:"https://www.zhipuai.cn",          model:"embedding-3",            type:"向量嵌入", inPrice:0.50,  outPrice:0.00, unit:"百万" },
+       -  { id:12, platform:"Kimi 月之暗面",      cUrl:"https://www.moonshot.cn",         model:"moonshot-v1-128k",       type:"文本生成", inPrice:60.00, outPrice:60.00, unit:"K" },
+       -  { id:13, platform:"讯飞星火 Spark",     cUrl:"https://www.xfyun.cn",            model:"spark-max",              type:"文本生成", inPrice:30.00, outPrice:30.00, unit:"K" },
+       -  { id:14, platform:"腾讯混元 Hunyuan",   cUrl:"https://www.tencent.com",         model:"hunyuan-turbo",          type:"文本生成", inPrice:15.00, outPrice:50.00, unit:"K" },
+       -  { id:15, platform:"火山方舟 Ark",       cUrl:"https://www.volcengine.com",      model:"doubao-pro-32k",         type:"文本生成", inPrice:0.80,  outPrice:2.00, unit:"百万" },
+       -  { id:16, platform:"火山方舟 Ark",       cUrl:"https://www.volcengine.com",      model:"doubao-vision-pro",      type:"多模态",   inPrice:3.00,  outPrice:9.00, unit:"万" },
+       -  { id:17, platform:"百川智能 Baichuan",  cUrl:"https://www.baichuan-ai.com",     model:"Baichuan4-Turbo",        type:"文本生成", inPrice:15.00, outPrice:15.00, unit:"K" },
+       -  { id:18, platform:"硅基流动 SiliconFlow", cUrl:"https://www.siliconflow.cn",    model:"Qwen2.5-72B-Instruct",   type:"文本生成", inPrice:4.13,  outPrice:4.13, unit:"十万" }
+       -];
+       +var models = [];
+       -initCombo("comboPlatform", "fPlatform", uniqueOf("platform"));
+       -initCombo("comboType",     "fType",     uniqueOf("type"));
+       +/* 下拉选项改为取后端数据（srv.plat_name / mdl.mdl_type），随数据一起在 boot() 里初始化 */
+       -  var n = selectedIds().length;
+       +  var ids = selectedIds();
+       +  var n   = ids.length;
+       +  apiMdlDelete(ids);                       /* 数据层接线：落库 */
+       +  apiMdlUpdate(m);                         /* 数据层接线：落库 */
+       -/* ================= 启动 ================= */
+       -render();
+       +/* ================= 启动：数据来自后端 /api/mdl ================= */
+       +function apiMdlDelete(ids){
+       +  return fetch("/api/mdl", {
+       +    method: "DELETE",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({ ids: ids })
+       +  });
+       +}
+       +
+       +/* 修改一条模型：PUT 落库；成功后回读列表，让跨表联出来的平台名 / 平台主页同步刷新。
+       +   回读后不重新 initCombo（下拉只允许初始化一次，重复初始化会挂两套监听）。 */
+       +function apiMdlUpdate(m){
+       +  return fetch("/api/mdl", {
+       +    method: "PUT",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({
+       +      id:        m.id,
+       +      plat_name: m.platform,
+       +      mdl_name:  m.model,
+       +      mdl_type:  m.type,
+       +      in_price:  m.inPrice,
+       +      out_price: m.outPrice,
+       +      unit:      m.unit,
+       +      url:       m.url
+       +    })
+       +  }).then(function(r){ return r.json(); }).then(function(res){
+       +    if (!res || !res.ok){ toast("保存修改失败：" + ((res && res.error) || "未知错误"), "warn"); return; }
+       +    fetch("/api/mdl").then(function(r){ return r.json(); }).then(function(rows){
+       +      models = rows;
+       +      computeView();
+       +      render();
+       +    });
+       +  }).catch(function(){
+       +    toast("保存修改失败，请确认服务已启动", "warn");
+       +  });
+       +}
+       +
+       +function boot(){
+       +  fetch("/api/mdl").then(function(r){ return r.json(); }).then(function(rows){
+       +    models   = rows;
+       +    view     = models.slice();
+       +    selected = {};
+       +    initCombo("comboPlatform", "fPlatform", uniqueOf("platform"));
+       +    initCombo("comboType",     "fType",     uniqueOf("type"));
+       +    render();
+       +  }).catch(function(){
+       +    toast("加载模型列表失败，请确认服务已启动", "warn");
+       +  });
+       +}
+       +
+       +boot();
+  [PASS] 改动行数非零（确有接线）
+  3) 必填校验原样保留
+      本页原型不含必填/格式校验（校验在 model_add.html，见该项）
+  4) 接线标记
+  [PASS] 含 var models = [];
+  [PASS] 含 fetch("/api/mdl")
+  [PASS] 含 apiMdlDelete(ids);
+  [PASS] 含 apiMdlUpdate(m);
+  [PASS] 含 initCombo("comboPlatform", "fPlatform", uniqueOf("platform"));
+  [PASS] 含 function initEditCombo(
+  [PASS] 含 kind:"multi"
+  [PASS] 含 kind:"select"
+  [PASS] 含 bindEditNumber(
+  [PASS] 无残留 PD.value
+  [PASS] 无残留 isStreamlitMessage
+  [PASS] 无残留 pUrl
+  [PASS] 无残留 id:1,
+  [PASS] 无残留 streamlit:
+  [PASS] 无残留 model_detail.html
+  [PASS] 无残留 editFieldEl(
+  5) JS 语法 node --check
+  [PASS] 语法通过
+
+■ model_add.html
+  1) 字段/风格/排版/CSS 零改动
+  [PASS] <style> 段与 body 结构（<script> 之前）逐字节一致  len 32985 vs 32985
+  [PASS] </script> 之后（文件尾）逐字节一致
+  2) 控件只补交互：<script> 内的改动
+     改动行数：17（新增 17 / 删除 0）
+       +
+       +  /* 数据层接线：落库后返回「模型列表」（平台若是新的，后端会自动补一条 srv） */
+       +  fetch("/api/mdl", {
+       +    method: "POST",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({
+       +      plat_name: document.getElementById("platform").value.trim(),
+       +      mdl_name:  document.getElementById("modelName").value.trim(),
+       +      mdl_type:  document.getElementById("modelType").value.trim(),
+       +      in_price:  document.getElementById("inPrice").value.trim(),
+       +      out_price: document.getElementById("outPrice").value.trim(),
+       +      unit:      document.getElementById("unit").value.trim(),
+       +      url:       $modelUrl.value.trim()
+       +    })
+       +  }).then(function(){
+       +    setTimeout(function(){ window.location.href = "foundation1_models.html"; }, 700);
+       +  });
+  [PASS] 改动行数非零（确有接线）
+  3) 必填校验原样保留
+  [PASS] 必填字段清单 逐字节一致
+  [PASS] 网址校验 checkUrl 逐字节一致
+  [PASS] 计费框数字限制 bindNumber 逐字节一致
+  4) 接线标记
+  [PASS] 含 fetch("/api/mdl", {
+  [PASS] 含 plat_name: document.getElementById("platform")
+  [PASS] 含 REQ_FIELDS
+  [PASS] 含 function checkUrl(el)
+  [PASS] 含 function bindNumber(el)
+  [PASS] 无残留 PD.value
+  [PASS] 无残留 isStreamlitMessage
+  [PASS] 无残留 streamlit:
+  5) JS 语法 node --check
+  [PASS] 语法通过
+
+■ list_server.html
+  1) 字段/风格/排版/CSS 零改动
+  [PASS] <style> 段与 body 结构（<script> 之前）逐字节一致  len 29966 vs 29966
+  [PASS] </script> 之后（文件尾）逐字节一致
+  2) 控件只补交互：<script> 内的改动
+     改动行数：73（新增 56 / 删除 17）
+       -var servers = [
+       -  { id:1,  platform:"OpenAI",        company:"OpenAI, Inc.",                              api:"https://api.openai.com/v1",                        pUrl:"https://openai.com",                    cUrl:"https://openai.com" },
+       -  { id:2,  platform:"Anthropic Claude", company:"Anthropic PBC",                           api:"https://api.anthropic.com/v1",                     pUrl:"https://www.anthropic.com",             cUrl:"https://www.anthropic.com" },
+       -  { id:3,  platform:"Google Gemini",  company:"Google LLC",                                api:"https://generativelanguage.googleapis.com/v1beta", pUrl:"https://ai.google.dev",                 cUrl:"https://about.google" },
+       -  { id:4,  platform:"DeepSeek 深度求索", company:"杭州深度求索人工智能基础技术研究有限公司",  api:"https://api.deepseek.com/v1",                     pUrl:"https://www.deepseek.com",              cUrl:"https://www.deepseek.com" },
+       -  { id:5,  platform:"通义千问 Qwen",   company:"阿里巴巴集团",                               api:"https://dashscope.aliyuncs.com/api/v1",            pUrl:"https://tongyi.aliyun.com",             cUrl:"https://www.aliyun.com" },
+       -  { id:6,  platform:"文心一言 ERNIE",  company:"北京百度网讯科技有限公司",                    api:"https://qianfan.baidubce.com/v2",                  pUrl:"https://yiyan.baidu.com",               cUrl:"https://www.baidu.com" },
+       -  { id:7,  platform:"智谱 GLM",        company:"北京智谱华章科技有限公司",                    api:"https://open.bigmodel.cn/api/paas/v4",             pUrl:"https://www.zhipuai.cn",                cUrl:"https://www.zhipuai.cn" },
+       -  { id:8,  platform:"Kimi 月之暗面",    company:"北京月之暗面科技有限公司",                    api:"https://api.moonshot.cn/v1",                       pUrl:"https://www.moonshot.cn",               cUrl:"https://www.moonshot.cn" },
+       -  { id:9,  platform:"讯飞星火 Spark",   company:"科大讯飞股份有限公司",                        api:"https://spark-api-open.xf-yun.com/v1",             pUrl:"https://xinghuo.xfyun.cn",              cUrl:"https://www.xfyun.cn" },
+       -  { id:10, platform:"腾讯混元 Hunyuan", company:"深圳市腾讯计算机系统有限公司",                 api:"https://api.hunyuan.cloud.tencent.com/v1",         pUrl:"https://cloud.tencent.com/product/hunyuan", cUrl:"https://www.tencent.com" },
+       -  { id:11, platform:"火山方舟 Ark",     company:"北京火山引擎科技有限公司",                    api:"https://ark.cn-beijing.volces.com/api/v3",         pUrl:"https://www.volcengine.com/product/ark", cUrl:"https://www.volcengine.com" },
+       -  { id:12, platform:"百川智能 Baichuan", company:"北京百川智能科技有限公司",                    api:"https://api.baichuan-ai.com/v1",                   pUrl:"https://www.baichuan-ai.com",           cUrl:"https://www.baichuan-ai.com" }
+       -];
+       +var servers = [];
+       -  var n = selectedIds().length;
+       +  var ids = selectedIds();
+       +  var n   = ids.length;
+       +  apiSrvDelete(ids);                       /* 数据层接线：落库 */
+       +  apiSrvUpdate(s);                         /* 数据层接线：落库 */
+       -/* ================= 启动 ================= */
+       -render();
+       +/* ================= 启动：数据来自后端 /api/srv ================= */
+       +function apiSrvDelete(ids){
+       +  return fetch("/api/srv", {
+       +    method: "DELETE",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({ ids: ids })
+       +  });
+       +}
+       +
+       +/* 修改一台服务器：PUT 落库；成功后回读列表，让关联模型的平台名 / 主页链接同步刷新。 */
+       +function apiSrvUpdate(s){
+       +  return fetch("/api/srv", {
+       +    method: "PUT",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({
+       +      id:        s.id,
+       +      plat_name: s.platform,
+       +      comp_name: s.company,
+       +      base_url:  s.api,
+       +      home_url:  s.cUrl
+       +    })
+       +  }).then(function(r){ return r.json(); }).then(function(res){
+       +    if (!res || !res.ok){ toast("保存修改失败：" + ((res && res.error) || "未知错误"), "warn"); return; }
+       +    fetch("/api/srv").then(function(r){ return r.json(); }).then(function(rows){
+       +      servers = rows;
+       +      var kwP = $qPlatform.value.trim().toLowerCase();
+       +      var kwC = $qCompany.value.trim().toLowerCase();
+       +      view = servers.filter(function(x){
+       +        var okP = !kwP || x.platform.toLowerCase().indexOf(kwP) > -1;
+       +        var okC = !kwC || x.company.toLowerCase().indexOf(kwC) > -1;
+       +        return okP && okC;
+       +      });
+       +      render();
+       +    });
+       +  }).catch(function(){
+       +    toast("保存修改失败，请确认服务已启动", "warn");
+       +  });
+       +}
+       +
+       +function boot(){
+       +  fetch("/api/srv").then(function(r){ return r.json(); }).then(function(rows){
+       +    servers  = rows;
+       +    view     = servers.slice();
+       +    selected = {};
+       +    render();
+       +  }).catch(function(){
+       +    toast("加载服务器列表失败，请确认服务已启动", "warn");
+       +  });
+       +}
+       +
+       +boot();
+  [PASS] 改动行数非零（确有接线）
+  3) 必填校验原样保留
+      本页原型不含必填/格式校验（校验在 model_add.html，见该项）
+  4) 接线标记
+  [PASS] 含 var servers = [];
+  [PASS] 含 fetch("/api/srv")
+  [PASS] 含 apiSrvDelete(ids);
+  [PASS] 含 apiSrvUpdate(s);
+  [PASS] 含 function initEditCombo(
+  [PASS] 含 kind:"combo"
+  [PASS] 含 class="combo"
+  [PASS] 含 inputmode="url"
+  [PASS] 无残留 PD.value
+  [PASS] 无残留 isStreamlitMessage
+  [PASS] 无残留 pUrl
+  [PASS] 无残留 id:1,
+  [PASS] 无残留 streamlit:
+  [PASS] 无残留 editFieldEl(
+  5) JS 语法 node --check
+  [PASS] 语法通过
+
+■ new_server.html
+  1) 字段/风格/排版/CSS 零改动
+  [PASS] <style> 段与 body 结构（<script> 之前）逐字节一致  len 28902 vs 28902
+  [PASS] </script> 之后（文件尾）逐字节一致
+  2) 控件只补交互：<script> 内的改动
+     改动行数：16（新增 14 / 删除 2）
+       -  toast("服务器已保存，正在返回列表…", "ok");
+       -  setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
+       +  /* 数据层接线：先落库，再返回列表 */
+       +  fetch("/api/srv", {
+       +    method: "POST",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({
+       +      plat_name: $platform.value.trim(),
+       +      comp_name: document.getElementById("company").value.trim(),
+       +      base_url:  $baseUrl.value.trim(),
+       +      home_url:  $homeUrl.value.trim()
+       +    })
+       +  }).then(function(){
+       +    toast("服务器已保存，正在返回列表…", "ok");
+       +    setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
+       +  });
+  [PASS] 改动行数非零（确有接线）
+  3) 必填校验原样保留
+  [PASS] 网址校验 checkUrl 逐字节一致
+  4) 接线标记
+  [PASS] 含 fetch("/api/srv", {
+  [PASS] 含 plat_name: $platform.value.trim()
+  [PASS] 含 checkUrl($baseUrl)
+  [PASS] 无残留 PD.value
+  [PASS] 无残留 isStreamlitMessage
+  [PASS] 无残留 streamlit:
+  5) JS 语法 node --check
+  [PASS] 语法通过
+
+■ prompt.html
+  1) 字段/风格/排版/CSS 零改动
+  [PASS] <style> 段与 body 结构（<script> 之前）逐字节一致  len 47824 vs 47824
+  [PASS] </script> 之后（文件尾）逐字节一致
+  2) 控件只补交互：<script> 内的改动
+     改动行数：193（新增 169 / 删除 24）
+       +/* 三个下拉的选项由后端数据注入后再初始化（HTML 未改动，只换数据来源） */
+       +var comboServer, comboModelType, comboModel;
+       +
+       +function initCombos(){
+       +
+       -var comboServer = initCombo("comboServer", function(it){
+       +comboServer = initCombo("comboServer", function(it){
+       -var comboModelType = initCombo("comboModelType", function(it){
+       +comboModelType = initCombo("comboModelType", function(it){
+       -var comboModel = initCombo("comboModel", function(it){
+       +comboModel = initCombo("comboModel", function(it){
+       +}
+       +
+       +/* 数据层接线：调试改为调用后端 /api/chat（由后端转发给真实模型）。
+       +   这里只负责「发请求 / 回填结果」，不碰任何 DOM 结构、class 与样式。 */
+       +var pdRunning = false;
+       +
+       +/* 多轮时按「第 N 轮」依次展示每一轮的模型回答（后端是按轮次依次调用的）；
+       +   单轮时直接就是回答原文。tail 用于把失败信息接在已拿到的回答后面。 */
+       +function pdRenderAnswers(answers, tail){
+       +  if (!answers || !answers.length) return tail || "";
+       +  if (answers.length === 1) return answers[0] + (tail ? "\n\n" + tail : "");
+       +  var parts = [];
+       +  for (var i = 0; i < answers.length; i++){
+       +    parts.push("【第 " + (i + 1) + " 轮】\n" + answers[i]);
+       +  }
+       +  var s = parts.join("\n\n");
+       +  return tail ? s + "\n\n" + tail : s;
+       +}
+       +
+       +/* 按原型口径回填三项指标：tokens 用模型返回的真实 usage（多轮为各轮之和），
+       +   费用 = tokens/1000 × 库内单价；金额不做四舍五入（fmtNum 只消掉浮点误差尾巴）。 */
+       +function pdFillMetrics(inTokens, outTokens){
+       +  document.getElementById("uIn").textContent    = fmtTokens(inTokens) + " tokens";
+       +  document.getElementById("uOut").textContent   = fmtTokens(outTokens) + " tokens";
+       +  document.getElementById("uTotal").textContent = fmtTokens(inTokens + outTokens) + " tokens";
+       +  document.getElementById("mIn").textContent    = "¥" + fmtNum(inTokens  / 1000 * currentModel.inPrice);
+       +  document.getElementById("mOut").textContent   = "¥" + fmtNum(outTokens / 1000 * currentModel.outPrice);
+       +  document.getElementById("mTotal").textContent = "¥" + fmtNum((inTokens  / 1000 * currentModel.inPrice)
+       +                                                            + (outTokens / 1000 * currentModel.outPrice));
+       +}
+       +
+       -  var inTokens = estTokens(sys) + estTokens(userAll);
+       -  var outText =
+       -    "（模拟输出 · " + currentModel.name + "）\n\n" +
+       -    "已按服务器 " + currentServer.name + "（" + currentServer.base + "）发起一次调试请求。\n" +
+       -    "会话轮次：" + (1 + rounds) + " 轮    " +
+       -    "系统提示词 " + sys.length + " 字符 ｜ 用户提示词 " + user.length + " 字符\n\n" +
+       -    "这里是模型的示例回复内容，用于演示调试结果的展示效果。接入真实服务后，此区域将显示模型的实际返回文本。";
+       -  var outTokens = estTokens(outText);
+       -
+       -  var inCost  = inTokens  / 1000 * currentModel.inPrice;
+       -  var outCost = outTokens / 1000 * currentModel.outPrice;
+       -
+       -  $modelOut.value = outText;
+       -  document.getElementById("uIn").textContent    = fmtTokens(inTokens) + " tokens";
+       -  document.getElementById("uOut").textContent   = fmtTokens(outTokens) + " tokens";
+       -  document.getElementById("uTotal").textContent = fmtTokens(inTokens + outTokens) + " tokens";
+       -  document.getElementById("mIn").textContent    = "¥" + fmtNum(inCost);
+       -  document.getElementById("mOut").textContent   = "¥" + fmtNum(outCost);
+       -  document.getElementById("mTotal").textContent = "¥" + fmtNum(inCost + outCost);
+       -
+       -  toast("调试完成", "ok");
+       +  /* 数据层接线：发起一次真实调用（后端转发给模型），输出区显示模型的实际返回文本。
+       +     点击后先把输出区置为「正在链接模型」占位，避免上一轮答案一直挂到新返回到达 */
+       +  if (pdRunning){ toast("正在调用模型，请稍候…", "warn"); return; }
+       +
+       +  var roundTexts = [user];
+       +  if ($multi.checked){
+       +    var $roundTas = $rounds.querySelectorAll("textarea");
+       +    for (var ri = 0; ri < $roundTas.length; ri++) roundTexts.push($roundTas[ri].value);
+       +  }
+       +
+       +  pdRunning = true;
+       +  $modelOut.value = "正在链接模型";
+       +  toast("正在调用模型…", "ok");
+       +
+       +  fetch("/api/chat", {
+       +    method: "POST",
+       +    headers: { "Content-Type": "application/json" },
+       +    body: JSON.stringify({
+       +      base_url: currentServer.base,
+       +      api_key:  $apiKey.value.trim(),
+       +      model:    currentModel.name,
+       +      system:   sys,
+       +      rounds:   roundTexts
+       +    })
+       +  }).then(function(r){ return r.json(); }).then(function(res){
+       +    pdRunning = false;
+       +    if (!res || !res.ok){
+       +      var failMsg = "（第 " + ((res && res.round) || 1) + " 轮调用失败）" + ((res && res.error) || "未知错误");
+       +      $modelOut.value = pdRenderAnswers(res && res.answers, failMsg);
+       +      pdFillMetrics(0, 0);
+       +      toast("模型调用失败", "warn");
+       +      return;
+       +    }
+       +    $modelOut.value = pdRenderAnswers(res.answers, "");
+       +    pdFillMetrics(res.prompt_tokens || 0, res.completion_tokens || 0);
+       +    toast("调试完成", "ok");
+       +  }).catch(function(err){
+       +    pdRunning = false;
+       +    $modelOut.value = "（调用失败）" + err;
+       +    pdFillMetrics(0, 0);
+       +    toast("模型调用失败", "warn");
+       +  });
+       +
+       +/* ================= 数据层：下拉选项来自后端 ================= */
+       +/* 口径：只把「下拉里的 mock 选项」这份数据换成库里的数据，页面 HTML 与 CSS 一字未动；
+       +   接口不可用时保留原型自带的选项，页面仍按原型可用。 */
+       +var TYPE_ORDER = ["文本生成", "多模态", "推理模型", "向量嵌入"];
+       +
+       +function pdEsc(s){
+       +  return String(s === null || s === undefined ? "" : s)
+       +    .replace(/&/g, "&amp;")
+       +    .replace(/</g, "&lt;")
+       +    .replace(/>/g, "&gt;")
+       +    .replace(/"/g, "&quot;")
+       +    .replace(/'/g, "&#39;");
+       +}
+       +
+       +/* 计费单价写进 data-in / data-out 时按库里的原文（原样保留小数位数，不四舍五入） */
+       +function priceAttr(v){
+       +  if (v === null || v === undefined) return "";
+       +  return String(v).trim();
+       +}
+       +
+       +/* 按原型 combo-item 的属性顺序生成选项节点 */
+       +function comboItemHtml(attrs, text){
+       +  var s = "";
+       +  for (var i = 0; i < attrs.length; i++){
+       +    s += " " + attrs[i][0] + "=" + JSON.stringify(pdEsc(attrs[i][1]));
+       +  }
+       +  return "<div class=\"combo-item\"" + s + " role=\"option\">" + pdEsc(text) + "</div>";
+       +}
+       +
+       +function setMenu(menuId, html){
+       +  if (html) document.getElementById(menuId).innerHTML = html;
+       +}
+       +
+       +/* 服务器下拉：平台 / 官方名 -> data-value，Base_url -> data-base（取自 srv 表） */
+       +function fillServerMenu(servers){
+       +  setMenu("menuServer", servers.map(function(s){
+       +    return comboItemHtml([["data-value", s.platform], ["data-base", s.api]], s.platform);
+       +  }).join(""));
+       +}
+       +
+       +/* 模型类型下拉：取自 mdl 表的去重类型；原型原有的 4 类按原型顺序排在前面 */
+       +function fillTypeMenu(models){
+       +  var seen = {}, types = [];
+       +  models.forEach(function(m){
+       +    if (m.type && !seen[m.type]){ seen[m.type] = 1; types.push(m.type); }
+       +  });
+       +  types.sort(function(a, b){
+       +    var ia = TYPE_ORDER.indexOf(a), ib = TYPE_ORDER.indexOf(b);
+       +    return (ia < 0 ? TYPE_ORDER.length : ia) - (ib < 0 ? TYPE_ORDER.length : ib);
+       +  });
+       +  setMenu("menuModelType", types.map(function(t){
+       +    return comboItemHtml([["data-value", t], ["data-type", t]], t);
+       +  }).join(""));
+       +}
+       +
+       +/* 模型下拉：模型名 + 归属服务器 + 类型 + 输入/输出计费 + 单位（取自 mdl 表） */
+       +function fillModelMenu(models){
+       +  setMenu("menuModel", models.map(function(m){
+       +    return comboItemHtml([
+       +      ["data-value",  m.model],
+       +      ["data-type",   m.type],
+       +      ["data-server", m.platform],
+       +      ["data-in",     priceAttr(m.inPrice)],
+       +      ["data-out",    priceAttr(m.outPrice)],
+       +      ["data-unit",   m.unit]
+       +    ], m.model);
+       +  }).join(""));
+       +}
+       +
+       +function boot(){
+       +  Promise.all([
+       +    fetch("/api/srv").then(function(r){ return r.json(); }),
+       +    fetch("/api/mdl").then(function(r){ return r.json(); })
+       +  ]).then(function(res){
+       +    var servers = res[0] || [], models = res[1] || [];
+       +    fillServerMenu(servers);
+       +    fillModelMenu(models);
+       +    fillTypeMenu(models);
+       +    initCombos();
+       +  }).catch(function(){
+       +    initCombos();
+       +    toast("加载服务器 / 模型失败，请确认服务已启动", "warn");
+       +  });
+       +}
+       +
+       +boot();
+       +
+  [PASS] 改动行数非零（确有接线）
+  3) 必填校验原样保留
+  [PASS] 调试按钮必填校验（系统提示词 / API_key） 逐字节一致
+  4) 接线标记
+  [PASS] 含 fetch("/api/srv")
+  [PASS] 含 fetch("/api/mdl")
+  [PASS] 含 fillServerMenu(servers);
+  [PASS] 含 fillModelMenu(models);
+  [PASS] 含 fillTypeMenu(models);
+  [PASS] 含 function initCombos()
+  [PASS] 含 initCombos();
+  [PASS] 含 var comboServer, comboModelType, comboModel;
+  [PASS] 含 fetch("/api/chat"
+  [PASS] 含 function pdFillMetrics(
+  [PASS] 含 pdRunning
+  [PASS] 含 function pdRenderAnswers(
+  [PASS] 无残留 PD.value
+  [PASS] 无残留 isStreamlitMessage
+  [PASS] 无残留 streamlit:
+  [PASS] 无残留 （模拟输出
+  [PASS] 无残留 estTokens(outText)
+  [PASS] 无残留 toFixed(4)
+  [PASS] 无残留 num2(
+  5) JS 语法 node --check
+  [PASS] 语法通过
+
+==============================================================================
+服务端校验口径：
+  [PASS] server.py 无必填校验（无 required/checkRequired）
+  [PASS] server.py 无网址格式校验
+  说明：db.create_srv / db.create_mdl 直接落库，仅做 空串->NULL、字符串->数值 的类型归一。
+        /api/chat 也只做「组装 messages -> 转发 -> 归一返回」，不复现前端的必填校验。
+
+==============================================================================
+结果：全部通过

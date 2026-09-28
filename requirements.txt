@@ -1,0 +1,13 @@
+# 运行应用所需（Starlette 版）
+starlette>=0.37
+uvicorn>=0.27
+
+# 可选：仅 verify_ui.py（真实浏览器端到端校验）需要，另需本机装有 Edge
+websocket-client>=1.6
+
+# ---------------------------------------------------------------
+# 说明
+#   app.py / build_components.py / comp/ 是早前「Streamlit + 原型 iframe 内嵌」那一版，
+#   已被 server.py + build_static.py + static/ 取代（见 SKILL：promptdeck-page-builder 第六节）。
+#   若要跑旧版，需要额外安装 streamlit>=1.36。
+# ---------------------------------------------------------------

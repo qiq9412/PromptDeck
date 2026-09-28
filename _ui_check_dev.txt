@@ -1,0 +1,239 @@
+==========================================================================
+[1] 打开「模型列表」（库内 mdl 共 20 条）
+    {'rows': 20, '测试行': 0, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 20 条记录', 'comboP': 15, 'comboT': 6}
+  [PASS] 列表行数 == 库内 mdl 行数  page=20 db=20
+  [PASS] meta-bar 计数已更新  共 20 条记录
+  [PASS] 平台下拉项数 == 库内去重平台数  page=15 db=15
+  [PASS] 类型下拉项数 == 库内去重类型数  page=6 db=6
+
+[2] 平台列外链口径：href 应等于该平台主页（srv.home_url）
+    [{"t":"OpenAI","href":"https://openai.com"},{"t":"OpenAI","href":"https://openai.com"},{"t":"Anthropic Claude","href":"https://www.anthropic.com"}]
+  [PASS] 首行平台外链 == home_url  https://openai.com vs ['https://openai.com']
+
+[3] 点「添加模型」-> 填表并保存（平台 UI复现平台-1790563600）
+  [PASS] 已进入新增模型页  /model_add.html
+    多选类型回填值: '对话'
+  [PASS] 只读多选类型可写入（对话）  对话
+
+[4] 保存后自动回到列表
+  [PASS] 已回到模型列表  /foundation1_models.html
+    {'rows': 21, '测试行': 1, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 21 条记录', 'comboP': 16, 'comboT': 6}
+  [PASS] 列表出现新模型  UI复现A-1790563600
+  [PASS] 行数 +1  page=21
+  [PASS] 已落库 mdl  [{'id': 34, 'srv_id': 43, 'mdl_name': 'UI复现A-1790563600', 'mdl_type': '对话', 'in_price': '9.99', 'out_price': '19.99', 'unit': 'K', 'url': None, 'plat_name': 'UI复现平台-1790563600', 'home_url': None}]
+  [PASS] 类型存为「对话」  对话
+  [PASS] 输入计费存为 9.99  9.99
+  [PASS] 输出计费存为 19.99  19.99
+  [PASS] 单位存为默认 K  K
+  [PASS] 新平台已自动补进 srv（满足外键）  [{'id': 43, 'plat_name': 'UI复现平台-1790563600', 'base_url': None, 'comp_name': None, 'home_url': None}]
+
+[5] 再存一条 UI复现B-1790563600
+    {'rows': 22, '测试行': 2, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 22 条记录', 'comboP': 16, 'comboT': 6}
+  [PASS] 两条测试模型都在列表  {'rows': 22, '测试行': 2, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 22 条记录', 'comboP': 16, 'comboT': 6}
+  [PASS] 行数 +2  page=22
+
+[6] 勾选两条测试记录 -> 批量删除
+  [PASS] 勾选到 2 条  2
+  [PASS] 删除确认弹窗已打开  mask show
+
+[7] 删除后核对
+    {'rows': 20, '测试行': 0, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 20 条记录', 'comboP': 16, 'comboT': 6}
+  [PASS] 列表已无测试行  {'rows': 20, '测试行': 0, 'first': 'OpenAIgpt-4o多模态18.00/ K72.00/ K修改', 'meta': '共 20 条记录', 'comboP': 16, 'comboT': 6}
+  [PASS] 行数回落  now=20 was=20
+  [PASS] 库内已无测试模型
+
+[8] 导航烟测：进「服务器列表」应拿到后端数据
+    {"rows":18,"meta":"共 18 条记录","path":"/list_server.html"}
+  [PASS] 服务器列表拿到后端数据  page=18 db=18
+
+[8] 打开「提示词构造」：三个下拉的选项应完全来自库内数据
+    页面: servers=18 models=20 types=6
+    库内: srv=18 mdl=20 类型=['文本生成', '多模态', '推理模型', '向量嵌入', '对话、视频', '对话']
+  [PASS] 服务器下拉项数 == 库内 srv 行数  page=18 db=18
+  [PASS] 模型下拉项数 == 库内 mdl 行数  page=20 db=20
+  [PASS] 类型下拉 == 库内去重 mdl_type  ['文本生成', '多模态', '推理模型', '向量嵌入', '对话、视频', '对话'] vs ['文本生成', '多模态', '推理模型', '向量嵌入', '对话、视频', '对话']
+  [PASS] 首项服务器 data-value/data-base == 库内首行  {'v': 'OpenAI', 'b': 'https://api.openai.com/v1'}
+  [PASS] 首项模型 data-* 全来自库内（类型/归属/计费/单位）  {'v': 'gpt-4o', 'tp': '多模态', 'srv': 'OpenAI', 'i': '18.00', 'o': '72.00', 'u': 'K'}
+
+[9] 选服务器「OpenAI」-> Base_url 自动填充 + 模型/类型下拉收窄
+  [PASS] Base_url 自动填成该服务器的 base_url  https://api.openai.com/v1
+  [PASS] 模型下拉只剩该服务器下的模型  ['gpt-4o', 'gpt-4o-mini'] vs ['gpt-4o', 'gpt-4o-mini']
+  [PASS] 类型下拉只剩该服务器下存在的类型  ['文本生成', '多模态'] vs ['文本生成', '多模态']
+
+[10] 选模型类型「文本生成」-> 模型下拉再按类型收窄
+  [PASS] 模型下拉只剩该类型  ['gpt-4o-mini'] vs ['gpt-4o-mini']
+
+[11] 选模型「gpt-4o-mini」-> 费用标签取库内计费
+    {"inTag": "¥1.08", "outTag": "¥4.32", "unitIn": "/ 百万", "unitOut": "/ 百万", "hidden": false, "modelVal": "gpt-4o-mini"}
+  [PASS] 费用标签已显示  {'inTag': '¥1.08', 'outTag': '¥4.32', 'unitIn': '/ 百万', 'unitOut': '/ 百万', 'hidden': False, 'modelVal': 'gpt-4o-mini'}
+  [PASS] 输入计费标签 == in_price 原文（不四舍五入）  ¥1.08
+  [PASS] 输出计费标签 == out_price 原文（不四舍五入）  ¥4.32
+  [PASS] 单位标签 == unit  / 百万
+
+[12] 必填校验原样（未填系统提示词 / API_key 时应被拦下）
+    sysPrompt.class='pb-textarea pb-ta-lg is-invalid'  apiKey.class='is-invalid'
+  [PASS] 系统提示词为空 -> 进告警态  pb-textarea pb-ta-lg is-invalid
+  [PASS] API_key 为空 -> 进告警态  is-invalid
+  [PASS] 被拦下：模型输出仍为空
+  [PASS] 被拦下：指标仍为 0 tokens  0 tokens / 0 tokens
+
+[13] 真实调用：新建测试服务器（base_url -> 本地 mock 模型服务）与测试模型
+    测试服务器 UI复现模型平台-1790563600 -> http://127.0.0.1:8791/v1
+    测试模型   UI复现模型-1790563600（in 1.0 / out 2.0 / 单位 K）
+  [PASS] Base_url 自动填成 mock 地址  http://127.0.0.1:8791/v1
+  [PASS] 已选中测试模型  UI复现模型-1790563600
+    点击瞬间输出区: '正在链接模型'
+    输出: '你好，我是本地模拟模型的真实返回内容。'
+    tokens: 12 tokens / 34 tokens / 46 tokens
+    费用:   ¥0.012 / ¥0.068 / ¥0.08
+  [PASS] 点击调试后输出区立即显示「正在链接模型」  '正在链接模型'
+  [PASS] 输出区显示的就是模型返回的文本  '你好，我是本地模拟模型的真实返回内容。'
+  [PASS] 输入 tokens == 模型返回的 usage  12 tokens
+  [PASS] 输出 tokens == 模型返回的 usage  34 tokens
+  [PASS] 总 tokens == usage 之和  46 tokens
+  [PASS] 输入费用 == tokens/1000 × 库内 in_price  ¥0.012 vs ¥0.012
+  [PASS] 输出费用 == tokens/1000 × 库内 out_price  ¥0.068 vs ¥0.068
+  [PASS] 总费用 == 输入 + 输出  ¥0.08 vs ¥0.08
+  [PASS] 费用不四舍五入（不是 .toFixed(4) 口径）  ¥0.012 / ¥0.068
+
+[13b] mock 端收到的请求（证明真的发了一次 HTTP）
+    path=/v1/chat/completions  auth=Bearer sk-mock-verify-key
+    body={"model": "UI复现模型-1790563600", "messages": [{"role": "system", "content": "你是一个小猫咪"}, {"role": "user", "content": "你好"}], "stream": false}
+  [PASS] 恰好收到 1 次调用  1
+  [PASS] 请求打在 {base_url}/chat/completions  /v1/chat/completions
+  [PASS] Bearer API_key 已透传  Bearer sk-mock-verify-key
+  [PASS] model 透传为所选模型  UI复现模型-1790563600
+  [PASS] stream=false
+  [PASS] messages = 系统提示词 + 用户提示词  [{'role': 'system', 'content': '你是一个小猫咪'}, {'role': 'user', 'content': '你好'}]
+  [PASS] 系统提示词内容正确  你是一个小猫咪
+  [PASS] 用户提示词内容正确  你好
+
+[13c] 错误链路：服务端不替模型服务做校验，失败如实回传
+    连不上的地址 -> {"ok": false, "error": "模型服务返回 HTTP 502：upstream connect failed: 由于目标计算机积极拒绝，无法连接。 (os error 10061)\n", "answers": [], "round": 1}
+  [PASS] 连不上时 ok=false 且带可读错误  {'ok': False, 'error': '模型服务返回 HTTP 502：upstream connect failed: 由于目标计算机积极拒绝，无法连接。 (os error 10061)\n', 'answers': [], 'round': 1}
+    错误 key     -> {"ok": false, "error": "模型服务返回 HTTP 401：{\"error\": {\"message\": \"Invalid API key provided.\"}}", "answers": [], "round": 1}
+  [PASS] 错误 key 不被服务端拦截，由模型服务回 401  {'ok': False, 'error': '模型服务返回 HTTP 401：{"error": {"message": "Invalid API key provided."}}', 'answers': [], 'round': 1}
+  [PASS] 错误 key 时后端确实把请求发到了模型服务  1
+
+[13d] 推理模型兜底：正式回答为空时取 reasoning_content
+    -> {"ok": true, "text": "（思考内容）我先想一下再回答……", "answers": ["（思考内容）我先想一下再回答……"], "model": "mock-reasoning-only", "prompt_tokens": 12, "completion_tokens": 34}
+  [PASS] content 为空时回退到 reasoning_content  {'ok': True, 'text': '（思考内容）我先想一下再回答……', 'answers': ['（思考内容）我先想一下再回答……'], 'model': 'mock-reasoning-only', 'prompt_tokens': 12, 'completion_tokens': 34}
+
+[14] 掩码开关 / 多轮会话 / 清空用户提示词 / 复制
+    {"eye": {"before": "password", "after": "text", "cls": "pb-eye is-on", "openHidden": true, "offHidden": false}, "roundsToggle": 1, "roundsHidden": false, "roundsAdd": 2, "labels": ["第 1 轮", "第 2 轮", "第 3 轮"], "addBtnHidden": false, "cleared": true}
+  [PASS] 眼睛开关：password -> text  {'before': 'password', 'after': 'text', 'cls': 'pb-eye is-on', 'openHidden': True, 'offHidden': False}
+  [PASS] 眼睛图标切换
+  [PASS] 勾选多轮会话 -> 出现 1 轮  1
+  [PASS] 多轮区已展开
+  [PASS] 「添加一轮」-> 共 2 轮  2
+  [PASS] 轮次编号与占位正确  ['第 1 轮', '第 2 轮', '第 3 轮']
+  [PASS] 清空用户提示词生效
+  [PASS] 复制按钮有反馈（出现 toast）  3
+
+[15] 模型列表：末尾多一列「操作」，每行一个「修改」按钮
+    {'lastTh': '操作', 'cols': 7, 'rows': 21, 'opTd': 21, 'opBtn': 21}
+  [PASS] 表头最后一列是「操作」  操作
+  [PASS] 表头 7 列（原 6 列 + 操作）  7
+  [PASS] 每行都有操作列单元格  21/21
+  [PASS] 每行都有「修改」按钮  21/21
+
+[16] 模型列表：点「修改」-> 弹窗带出原值 -> 改 名称/计费(4.135, 0.0005)/网址 -> 保存
+    {"mask": "mask show", "title": "修改模型 · UI复现改前-1790563600", "platform": "UI复现平台-1790563600", "model": "UI复现改前-1790563600", "type": "对话", "inPrice": "1.00", "outPrice": "2.00", "unit": "K", "url": "https://example.com/ui/old-1790563600"}
+  [PASS] 修改弹窗已打开  mask show
+  [PASS] 弹窗标题带出该模型名  修改模型 · UI复现改前-1790563600
+  [PASS] 弹窗带出原值（名/类型/计费/单位/网址）  {'mask': 'mask show', 'title': '修改模型 · UI复现改前-1790563600', 'platform': 'UI复现平台-1790563600', 'model': 'UI复现改前-1790563600', 'type': '对话', 'inPrice': '1.00', 'outPrice': '2.00', 'unit': 'K', 'url': 'https://example.com/ui/old-1790563600'}
+  [PASS] 保存后弹窗关闭  mask
+  [PASS] 修改已落库（能按新名称查到）  1
+  [PASS] 计费原文保留：in_price == '4.135'（未四舍五入）  4.135
+  [PASS] 计费原文保留：out_price == '0.0005'（未四舍五入）  0.0005
+  [PASS] 网址已更新  https://example.com/ui/new-1790563600
+  [PASS] 未改动的单位保持不变  K
+  [PASS] 修改是 UPDATE 不是新增（旧名已不存在）  UI复现改前-1790563600
+    {"href": "https://example.com/ui/new-1790563600", "target": "_blank", "hasTag": true, "inTxt": "4.135", "outTxt": "0.0005", "platIsLink": true, "platHref": null}
+  [PASS] 列表输入计费显示库内原文 4.135  4.135
+  [PASS] 列表输出计费显示库内原文 0.0005  0.0005
+
+[17] 模型名称外链指向「新增模型」里填的网址（未填则降级为纯文字）
+  [PASS] 模型名称是超链接  True
+  [PASS] href == 库内 url（不再指向不存在的 model_detail.html）  https://example.com/ui/new-1790563600
+  [PASS] 不再出现 model_detail.html 这种打不开的地址  https://example.com/ui/new-1790563600
+  [PASS] 外链新窗口打开  _blank
+  [PASS] 没填网址时不给 href（不会点到空链接）
+  [PASS] 平台列仍渲染为链接元素（既有外链口径未被动过）  True
+
+[18] 服务器列表：末尾「操作」列 + 「修改」落库
+    {'lastTh': '操作', 'cols': 5, 'rows': 20, 'opTd': 20, 'opBtn': 20}
+  [PASS] 服务器列表表头最后一列是「操作」  操作
+  [PASS] 表头 5 列（原 4 列 + 操作）  5
+  [PASS] 服务器每行都有「修改」按钮  20/20
+    {"mask": "mask show", "title": "修改服务器 · UI复现服务器-1790563600", "platform": "UI复现服务器-1790563600", "company": "UI复现公司", "api": "https://api.example.com/v1", "cUrl": "https://www.example.com"}
+  [PASS] 服务器修改弹窗已打开  mask show
+  [PASS] 弹窗带出原值（平台/公司/api/首页）  {'mask': 'mask show', 'title': '修改服务器 · UI复现服务器-1790563600', 'platform': 'UI复现服务器-1790563600', 'company': 'UI复现公司', 'api': 'https://api.example.com/v1', 'cUrl': 'https://www.example.com'}
+  [PASS] 服务器修改已落库  1
+  [PASS] base_url 已更新  https://api.example.com/v2
+  [PASS] 公司名已更新  UI复现公司改后
+  [PASS] 公司首页网址已更新  https://www.example.com/new
+  [PASS] 服务器修改也是 UPDATE（旧名已不存在）  UI复现服务器-1790563600
+    {"platform": "UI复现服务器改后-1790563600", "company": "UI复现公司改后", "api": "https://api.example.com/v2", "companyHref": "https://www.example.com/new"}
+  [PASS] 列表显示新平台名  UI复现服务器改后-1790563600
+  [PASS] 列表显示新 base_url  https://api.example.com/v2
+  [PASS] 公司名外链 == 新公司首页  https://www.example.com/new
+
+[19] 新增服务器：base_url 格式锁定（非网址不许保存，裸域名自动补协议头）
+    {"cls": "is-invalid", "val": "not a url"}
+  [PASS] 非法 base_url 进告警态  is-invalid
+  [PASS] 被拦下：仍停留在新增服务器页（没有跳回列表）  /new_server.html
+  [PASS] 被拦下：库内没有写入这条服务器  UI复现网址锁-1790563600
+    裸域名补全后 base_url = https://example.com/v1
+  [PASS] 裸域名自动补 https://  https://example.com/v1
+  [PASS] 合法网址保存成功并跳回服务器列表  /list_server.html
+  [PASS] 库内已写入该服务器  1
+  [PASS] 落库的 base_url 是补全后的网址  https://example.com/v1
+
+[20] 提示词构造：多轮会话按轮次依次调用，逐轮各产出一条回答
+  [PASS] 已选中 mock 服务器  http://127.0.0.1:8791/v1
+  [PASS] 已选中 mock 模型  UI复现模型-1790563600
+    输出: '【第 1 轮】\n你好，我是本地模拟模型的真实返回内容。\n\n【第 2 轮】\n你好，我是本地模拟模型的真实返回内容。·第 2 轮'
+    tokens: 92 tokens   费用: ¥0.024 / ¥0.136 / ¥0.16
+  [PASS] 输出里有【第 1 轮】  【第 1 轮】
+你好，我是本地模拟模型的真实返回内容。
+
+【第 2 轮】
+你好，我是本地模拟模型的真实返回内容。·第 2 轮
+  [PASS] 输出里有【第 2 轮】（不再只有一次回答）  【第 1 轮】
+你好，我是本地模拟模型的真实返回内容。
+
+【第 2 轮】
+你好，我是本地模拟模型的真实返回内容。·第 2 轮
+  [PASS] 两轮回答文本各一条  【第 1 轮】
+你好，我是本地模拟模型的真实返回内容。
+
+【第 2 轮】
+你好，我是本地模拟模型的真实返回内容。·第 2 轮
+  [PASS] 第 2 轮内容是模型对第 2 轮的回复  【第 1 轮】
+你好，我是本地模拟模型的真实返回内容。
+
+【第 2 轮】
+你好，我是本地模拟模型的真实返回内容。·第 2 轮
+  [PASS] tokens 为两轮之和  92 tokens
+  [PASS] 费用按两轮 tokens 合计  ¥0.024
+  [PASS] mock 端恰好收到 2 次调用（一轮一次）  2
+    第 1 次请求 roles=['system', 'user']
+    第 2 次请求 roles=['system', 'user', 'assistant', 'user']
+  [PASS] 第 1 次：system + user(第 1 轮)  ['system', 'user']
+  [PASS] 第 2 次：带上第 1 轮的 assistant 回复（真多轮上下文）  ['system', 'user', 'assistant', 'user']
+  [PASS] 第 1 轮提问内容正确  第一问
+  [PASS] 上一轮回答被当作上下文回传  你好，我是本地模拟模型的真实返回内容。
+  [PASS] 第 2 轮提问内容正确  第二问
+
+[21] 提示词构造：计费单价按库内原文展示（4 位小数不被压成 2 位）
+    {"inTag": "¥4.135", "outTag": "¥0.0005", "unitIn": "/ K", "unitOut": "/ K", "hidden": false, "modelVal": "UI复现改后-1790563600"}
+  [PASS] 输入计费标签 == ¥4.135（原文，不四舍五入）  ¥4.135
+  [PASS] 输出计费标签 == ¥0.0005（原文，不四舍五入）  ¥0.0005
+
+[22] 控制台异常
+  [PASS] 页面无 JS 异常  count=0
+
+==========================================================================
+结果：全部通过
+(清理测试数据：模型 3 行 / 平台 4 行)
