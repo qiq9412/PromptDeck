@@ -13,7 +13,7 @@
     python -m uvicorn server:app --port 8502
 
 数据：
-    SQLite，库名 prompt_test_DB（data/prompt_test_DB.db），表 srv / mdl，见 db.py。
+    SQLite，落盘为 data/prompt_test_DB_twe.db，表 srv / mdl，见 db.py。
     启动时自动建表（幂等）；表为空时灌入原型表格里的演示数据。
 
 接口：

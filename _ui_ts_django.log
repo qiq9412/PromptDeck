@@ -1,0 +1,9 @@
+[01/Oct/2026 00:29:05] "GET /api/health HTTP/1.1" 200 2
+[01/Oct/2026 00:29:06] "GET /Table_Structure_Extraction.html HTTP/1.1" 200 89384
+[01/Oct/2026 00:29:06] "GET /api/schema HTTP/1.1" 200 3215
+Not Found: /favicon.ico
+[01/Oct/2026 00:29:06] "GET /favicon.ico HTTP/1.1" 404 4048
+[01/Oct/2026 00:29:12] "POST /api/schema/desc HTTP/1.1" 200 888
+[01/Oct/2026 00:29:15] "POST /api/schema/desc HTTP/1.1" 200 1242
+[01/Oct/2026 00:29:18] "POST /api/schema/connect HTTP/1.1" 200 241
+[01/Oct/2026 00:29:23] "POST /api/schema HTTP/1.1" 200 579

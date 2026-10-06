@@ -1,0 +1,79 @@
+==============================================================================
+PromptDeck · 「提示词测试」页端到端校验（真实 Edge + CDP）
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+应用：http://127.0.0.1:8503（本脚本自起）  判定 mock：http://127.0.0.1:8792/v1
+==============================================================================
+  [PASS] 自起的应用实例已就绪  http://127.0.0.1:8503
+
+■ [1] 方案下拉的真源 = 后端 /api/tp
+  [PASS] POST /api/tp 造出临时方案  {'ok': True, 'id': 75, 'result': 'created'}
+  [PASS] 方案已落 tst_plan（带外键 srv_id）  srv_id=86
+  [PASS] Edge devtools 已就绪  port=9351
+    页面：http://127.0.0.1:8503/prompt_test.html
+  [PASS] 左栏方案下拉已由 /api/tp 渲染出选项  选项数=1 空态=''
+  [PASS] 能在下拉里选中刚建的方案  UI校验调试方案-786305
+  [PASS] 左栏回显模型 = 方案里的模型  ui-check-model-786305（文本生成）
+  [PASS] 左栏回显提示词含系统提示词  【系统提示词】 你是 UI 校验用的助手，只回答被问到的问题。  【用户提示词】 占位用户提示词
+  [PASS] 选好方案后右栏解锁（不再置灰）  is-locked=False
+
+■ [2][3] 开始调试：逐题真发 /api/chat + /api/judge
+  [PASS] 点「开始调试」后进度条出现（仍在跑）  正在调试 0/0 / 0%
+  [PASS] 进度条走到 100%  正在调试 3/3（已完成）
+  [PASS] 进度条文案显示 3/3  正在调试 3/3（已完成）
+  [PASS] 列表 3 行都在  行数=3
+  [PASS] 每道题都真发了一次模型调用（3 次 /api/chat）  实测 3 次：['/v1/chat/completions', '/v1/chat/completions', '/v1/chat/completions']
+  [PASS] 模型调用打到 {base_url}/chat/completions  ['/v1/chat/completions']
+  [PASS] 模型调用带的是方案的 API_key  ['Bearer sk-ui-check-786305']
+  [PASS] 模型调用带的是方案的模型名  ['ui-check-model-786305']
+  [PASS] 模型调用是 stream=false 的同步请求
+  [PASS] 模型调用带上了方案的系统提示词 + 题目当用户提示词  system='你是 UI 校验用的助手，只回答被问到的问题。'
+  [PASS] 每道题一条消息（system + user），没有多带上下文  [2]
+  [PASS] 模型答案列显示模型返回的原文  1='模型回答：问题一：一句话说明用途' / 2='模型回答：问题二：翻译一句话'
+  [PASS] 模型答案列不再是「暂无测试反馈」占位  [('1', False), ('2', False), ('3', False)]
+  [PASS] 有标准答案的两道题各发了一次判定请求（没标准答案的不发）  实测 2 次
+  [PASS] 判定请求里带上了标准答案与模型答案
+  [PASS] 判定请求用的是判定模型（deepseek-v4-pro）  ['deepseek-v4-pro']
+  [PASS] 判定请求带的是库里的判定密钥（不是方案密钥）  ['sk-••••••••4a88']
+  [PASS] 判断列：答案一致的判「对」  AI 判定：对
+  [PASS] 判断列：答案不一致的判「错」  AI 判定：错
+  [PASS] 判断列：没有标准答案的留「未判定」  AI 判定：未判定
+  [PASS] 统计：总数量 = 3  3
+  [PASS] 统计：AI 正确 1 / 错误 1  right=1 wrong=1
+  [PASS] 统计：准确率 = 1/3 -> 33%  33%
+
+■ [5] 人工改判一道题
+  [PASS] 改判后该行单选落在「对」上  {'checked': True, 'judge': '对', 'statFix': '1', 'statAcc': '67%'}
+  [PASS] 统计：人工矫正错误数量 +1  statFix=1
+  [PASS] 统计：准确率随人工改判变成 67%  67%
+
+■ [6] 保存结果 -> tst_rec + tst_rec_dtl
+  [PASS] tst_rec 写入 1 条记录  实测 1 条
+  [PASS] tst_rec.plan_id 指向本次调试的方案  plan_id=75
+  [PASS] tst_rec.q_cnt = 3  q_cnt=3
+  [PASS] tst_rec.err_cnt = 1（AI 判错 1 道）  err_cnt=1
+  [PASS] tst_rec.fix_cnt = 1（人工矫正 1 道）  fix_cnt=1
+  [PASS] tst_rec.acc_rate = 66.67（与页面 67% 同口径）  acc_rate=66.67
+  [PASS] tst_rec.api_key_id 指向该方案自己的那把密钥  api_key_id=51
+  [PASS] tst_rec.test_time 已写入  2026-10-01 00:38:39
+  [PASS] tst_rec_dtl 写入 3 条逐题明细  实测 3 条
+  [PASS] 明细 1：问题 / 标准答案 / 模型输出 逐项对上  问题一：一句话说明用途 | 模型回答：问题一：一句话说明用途 | 模型回答：问题一：一句话说明用途
+  [PASS] 明细 1：AI 判定 right / 未人工改判  right / 0
+  [PASS] 明细 2：AI 判定 wrong 且被人工改判（is_man_fix=1）  wrong / 1
+  [PASS] 明细 3：没有标准答案 -> 判定为空、未改判  std='' ai=None fix=0
+  [PASS] 明细 3：模型输出仍然落了库  模型回答：问题三：还没有标准答案
+  [PASS] GET /api/rec 能读回这条记录  条数=1
+
+■ [7] JS 异常
+    页面 error：[]；CDP 捕获异常：0 条
+  [PASS] 无页面 JS 异常
+
+■ [8] 收尾：库回到基线
+  [PASS] srv 回到基线  17 -> 17
+  [PASS] mdl 回到基线  16 -> 16
+  [PASS] tst_plan 回到基线  0 -> 0
+  [PASS] tst_rec 回到基线  0 -> 0
+  [PASS] tst_rec_dtl 回到基线  0 -> 0
+  [PASS] 判定密钥仍在库里（本轮没动它）
+
+==============================================================================
+结果：全部通过

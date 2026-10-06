@@ -1,0 +1,79 @@
+==============================================================================
+PromptDeck · 「测试结果列表」页端到端校验（真实 Edge + CDP）
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+应用：http://127.0.0.1:8504（本脚本自起）  本页无后端，夹具走 localStorage
+口径：只截**折叠态** —— 问题前 30 字 + 「…」（所有题一律截）；展开后问题 / 标准答案 / 模型输出一律全文
+==============================================================================
+  [PASS] 自起的应用实例已就绪  http://127.0.0.1:8504
+  [PASS] Edge devtools 已就绪  port=9352
+
+■ [1] 打开页面并灌入夹具（localStorage: pd_test_results）
+    页面：http://127.0.0.1:8504/prompt_test_results_list.html
+  [PASS] 夹具已写进 pd_test_results  {'n': 1, 'rawLen': 581}
+
+■ [2] 点操作列「查看」→ 弹窗打开 → 展开明细
+  [PASS] 列表页渲染出夹具那一行  dataRows=1
+  [PASS] 点「查看」后弹窗打开  {'dataRows': 1, 'maskShown': True, 'listHidden': True, 'qCount': 5}
+  [PASS] 明细默认折叠（第二十一轮口径不变）  {'dataRows': 1, 'maskShown': True, 'listHidden': True, 'qCount': 5}
+  [PASS] 明细里 5 道题都在  qCount=5
+  [PASS] 点「展开明细」后列表出现、按钮变「收起明细」  {'listHidden': False, 'label': '收起明细'}
+
+■ [3] 折叠态：问题截到 30 字（展开区仍 hidden）
+  [PASS] 折叠态快照拿到 5 条  实际 5 条
+  [PASS] P1 问题 截到 30 字 + 「…」  len(got)=31 len(want)=31 / 尾部 '【Q尾】' 已消失=True
+  [PASS] P1 折叠态 .q-more 仍 hidden  True
+  [PASS] P1 有展开按钮
+  [PASS] P1 问题的 data-full 存的是全文  len(full)=34
+
+■ [4] 点 P1「展开」→ 问题回全文、标准答案 / 模型输出 全文
+  [PASS] P1 展开后 问题 = 全文  len(got)=34 len(want)=34 / 尾部 '【Q尾】' 在=True
+  [PASS] P1 展开后 标准答案 = 全文  len(got)=34 len(want)=34 / 尾部 '【A尾】' 在=True
+  [PASS] P1 展开后 模型输出 = 全文  len(got)=34 len(want)=34 / 尾部 '【O尾】' 在=True
+  [PASS] P1 展开后 .q-more 已显示、按钮变「收起」  {'q': '问题ああああああああああああああああああああああああああああ【Q尾】', 'label': '收起', 'moreHidden': False, 'lines': [{'k': '标准答案', 'v': '答案いいいいいいいいいいいいいいいいいいいいいいいいいいいい【A尾】'}, {'k': '模型输出', 'v': '输出うううううううううううううううううううううううううううう【O尾】'}]}
+
+■ [5] 再点「收起」→ 问题回到截断版（双向切换）
+  [PASS] P1 收起后 问题 又截到 30 字 + 「…」  len(got)=31 len(want)=31 / 尾部 '【Q尾】' 已消失=True
+  [PASS] P1 收起后 .q-more 又 hidden、按钮变「展开」  {'q': '问题ああああああああああああああああああああああああああああ…', 'label': '展开', 'moreHidden': True, 'lines': [{'k': '标准答案', 'v': '答案いいいいいいいいいいいいいいいいいいいいいいいいいいいい【A尾】'}, {'k': '模型输出', 'v': '输出うううううううううううううううううううううううううううう【O尾】'}]}
+
+■ [6] 边界：恰好 30 字 → 原样显示、不加省略号
+  [PASS] P2 折叠态 问题 = 原样 30 字  len(got)=30 len(want)=30
+  [PASS] P2 折叠态 问题 不含省略号  '问题かかかかかかかかかかかかかかかかかかかかかかかかかかかか'
+  [PASS] P2 展开后 问题 仍是 30 字全文  len(got)=30 len(want)=30
+  [PASS] P2 展开后 标准答案 = 30 字全文  len(got)=30 len(want)=30
+  [PASS] P2 展开后 模型输出 = 30 字全文  len(got)=30 len(want)=30
+  [PASS] P2 两态都不含省略号
+
+■ [7] 不足 30 字 → 原样显示（两态一致）
+  [PASS] P3 折叠态 问题 = 短文本  len(got)=3 len(want)=3
+  [PASS] P3 展开后 问题 = 短文本  len(got)=3 len(want)=3
+  [PASS] P3 展开后 标准答案 = 短文本  len(got)=3 len(want)=3
+  [PASS] P3 展开后 模型输出 = 短文本  len(got)=3 len(want)=3
+
+■ [8] 空问题 + 无标准答案
+  [PASS] P4 折叠态 空问题仍显示「（空问题）」  len(got)=5 len(want)=5
+  [PASS] P4 无标准答案的那题不渲染「标准答案」行  行=[('模型输出', '输出うううううううううう')]
+  [PASS] P4 模型输出 = 全文  len(got)=34 len(want)=34 / 尾部 '【O尾】' 在=True
+
+■ [9] 无展开入口（标准答案与模型输出都为空）→ 同样截 30 字，但没有展开按钮
+  [PASS] P5 没有展开按钮  {'q': '无答ささささささささささささささささささささささささささささ…', 'full': '无答ささささささささささささささささささささささささささささ【B尾】', 'hasToggle': False, 'moreHidden': None}
+  [PASS] P5 折叠态 .q-more 不存在  {'q': '无答ささささささささささささささささささささささささささささ…', 'full': '无答ささささささささささささささささささささささささささささ【B尾】', 'hasToggle': False, 'moreHidden': None}
+  [PASS] P5 问题 仍截到 30 字 + 「…」（一律截）  len(got)=31 len(want)=31 / 尾部 '【B尾】' 已消失=True
+  [PASS] P5 data-full 里仍留着全文（将来若给它加展开入口可直接回全文）  len(full)=34
+  [PASS] P5 点不出展开（无 [data-qtoggle]）
+
+■ [10] JS 异常
+    页面 error：[]
+  [PASS] 无页面 JS 异常  []
+
+■ [11] 收尾：库表计数回到基线（本页不写库）
+  [PASS] srv 回到基线  17 -> 17
+  [PASS] mdl 回到基线  16 -> 16
+  [PASS] tst_plan 回到基线  0 -> 0
+  [PASS] tst_plan_prompt 回到基线  0 -> 0
+  [PASS] tst_api_key 回到基线  1 -> 1
+  [PASS] tst_rec 回到基线  0 -> 0
+  [PASS] tst_rec_dtl 回到基线  0 -> 0
+
+==============================================================================
+结果：全部通过
+==============================================================================

@@ -751,6 +751,11 @@
     box-shadow:0 0 0 4px rgba(216,69,44,.12);
   }
 
+  /* 模型输出 · 链接模型失败态（09-29 新增：红字 + 复用上面的告警描边/底色） */
+  .pb-textarea.is-error{
+    color:var(--orange);border-color:#F0B9A4;background:var(--orange-soft);
+  }
+
   /* 调试 / 清空 按钮行（精致小按钮，整组靠右） */
   .pb-run-row{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
   .pb-run{flex:0 0 auto;width:auto;height:38px;padding:0 18px;gap:6px;font-size:13.5px;letter-spacing:.2px;}
@@ -779,6 +784,28 @@
   @media (max-width:900px){
     .pb-block-body{padding:16px;}
     .pb-block-head{padding:14px 16px;}
+  }
+
+  /* ---------- 保存提示词方案弹窗（09-29 新增） ---------- */
+  #saveMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #saveMask .modal{max-width:600px;margin:auto 0;}
+  .save-body{display:flex;flex-direction:column;gap:16px;margin-top:18px;}
+  .save-view{
+    display:flex;flex-direction:column;gap:10px;
+    padding:16px;border:1px solid var(--line);border-radius:var(--r-md);background:#FDFCFA;
+  }
+  .sv-row{display:flex;align-items:flex-start;gap:12px;font-size:12.8px;font-weight:600;color:var(--text-2);}
+  .sv-row .sv-k{flex:0 0 76px;color:var(--text-3);font-weight:800;letter-spacing:.2px;}
+  .sv-row .sv-v{flex:1 1 auto;min-width:0;color:var(--ink);word-break:break-word;}
+  .sv-row .sv-v.mono{font-family:var(--mono);font-size:12px;font-weight:500;color:#7A6A58;}
+  .sv-row .sv-v.box{
+    max-height:112px;overflow:auto;white-space:pre-wrap;
+    background:#fff;border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:9px 11px;font-size:12.5px;line-height:1.7;
+  }
+  .sv-row .sv-v.empty{color:var(--text-3);font-weight:600;}
+  @media (max-width:900px){
+    .sv-row .sv-k{flex:0 0 64px;}
   }
 </style>
 </head>
@@ -863,6 +890,39 @@
           <li><a href="foundation1_models.html">模型列表</a></li>
           <li><a href="model_add.html">新增模型</a></li>
         </ul>
+      </div>
+      <!-- 一级：提示词复核（二级：提示词测试 / 提示词方案 / 测试结果列表） -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M6.4 2.6h3.2M5.6 2.6H4.4a1.2 1.2 0 0 0-1.2 1.2v9a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2v-9a1.2 1.2 0 0 0-1.2-1.2h-1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M5.7 7.7 L7.1 9.1 L10.3 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>提示词复核</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="prompt_test.html">提示词测试</a></li>
+          <li><a href="prompt_scheme.html">提示词方案</a></li>
+          <li><a href="prompt_test_results_list.html">测试结果列表</a></li>
+        </ul>
+      </div>
+      <!-- 一级：数据库表结构提取 -->
+      <div class="nav-group">
+        <a class="nav-item" href="Table_Structure_Extraction.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <ellipse cx="8" cy="4.1" rx="5.3" ry="2.1" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M2.7 4.1v7.8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1V4.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M2.7 8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>数据库表结构提取</span>
+        </a>
       </div>
     </nav>
 
@@ -1062,6 +1122,13 @@
               </svg>
               调试
             </button>
+            <button type="button" class="btn btn-ghost pb-clear" id="btnSave">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3.2 2.4h7l3.6 3.6v7.6a1.2 1.2 0 0 1-1.2 1.2H3.2A1.2 1.2 0 0 1 2 13.6V3.6a1.2 1.2 0 0 1 1.2-1.2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                <path d="M5.4 2.4v3.4h5.2V2.4M5.4 13.6V9.2h5.2v4.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              保存
+            </button>
             <button type="button" class="btn btn-ghost pb-clear" id="btnClearUser">
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.8 4.4h10.4M6.6 4.4V3.2h2.8v1.2M4.4 4.4l.7 8.6h5.8l.7-8.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               清空用户提示词
@@ -1107,6 +1174,34 @@
       </section>
 
     </main>
+  </div>
+</div>
+
+<!-- ========== 保存提示词方案弹窗 ========== -->
+<div class="mask" id="saveMask" role="dialog" aria-modal="true" aria-labelledby="saveTitle">
+  <div class="modal">
+    <h3 id="saveTitle">保存提示词方案</h3>
+    <p>保存后可在「提示词测试」页左侧的方案下拉框中直接选用，无需重新配置服务器与模型。</p>
+    <div class="save-body">
+      <div class="field">
+        <label for="saveName">方案命名<i class="req">*</i></label>
+        <input type="text" id="saveName" placeholder="如：商品文案生成 · 正式版" autocomplete="off" />
+        <span class="field-hint">命名与已有方案重复时会覆盖该方案</span>
+      </div>
+      <div class="save-view">
+        <div class="sv-row"><span class="sv-k">服务器</span><span class="sv-v" id="svServer">—</span></div>
+        <div class="sv-row"><span class="sv-k">请求地址</span><span class="sv-v mono" id="svBase">—</span></div>
+        <div class="sv-row"><span class="sv-k">模型</span><span class="sv-v" id="svModel">—</span></div>
+        <div class="sv-row"><span class="sv-k">模型类型</span><span class="sv-v" id="svType">—</span></div>
+        <div class="sv-row"><span class="sv-k">API_key</span><span class="sv-v mono" id="svApiKey">—</span></div>
+        <div class="sv-row"><span class="sv-k">系统提示词</span><span class="sv-v box" id="svSys">—</span></div>
+        <div class="sv-row"><span class="sv-k">用户提示词</span><span class="sv-v box" id="svUser">—</span></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="saveCancel">取消</button>
+      <button type="button" class="btn btn-add" id="saveConfirm">保存方案</button>
+    </div>
   </div>
 </div>
 
@@ -1528,7 +1623,8 @@ document.getElementById("btnRun").addEventListener("click", function(){
   }
 
   /* 数据层接线：发起一次真实调用（后端转发给模型），输出区显示模型的实际返回文本。
-     点击后先把输出区置为「正在链接模型」占位，避免上一轮答案一直挂到新返回到达 */
+     点击后先把输出区置为「正在链接模型」占位，避免上一轮答案一直挂到新返回到达；
+     链接失败时输出框整体转红字（.is-error）并写明失败原因，三项费用指标清零。 */
   if (pdRunning){ toast("正在调用模型，请稍候…", "warn"); return; }
 
   var roundTexts = [user];
@@ -1538,6 +1634,7 @@ document.getElementById("btnRun").addEventListener("click", function(){
   }
 
   pdRunning = true;
+  $modelOut.classList.remove("is-error");
   $modelOut.value = "正在链接模型";
   toast("正在调用模型…", "ok");
 
@@ -1554,28 +1651,378 @@ document.getElementById("btnRun").addEventListener("click", function(){
   }).then(function(r){ return r.json(); }).then(function(res){
     pdRunning = false;
     if (!res || !res.ok){
-      var failMsg = "（第 " + ((res && res.round) || 1) + " 轮调用失败）" + ((res && res.error) || "未知错误");
+      /* 已拿到的轮次照常展示，失败信息接在后面（与原型 pbFailText 同口径） */
+      var failMsg = "链接模型失败\n\n原因：（第 " + ((res && res.round) || 1) + " 轮调用失败）"
+                  + ((res && res.error) || "未知错误");
       $modelOut.value = pdRenderAnswers(res && res.answers, failMsg);
+      $modelOut.classList.add("is-error");
       pdFillMetrics(0, 0);
       toast("模型调用失败", "warn");
       return;
     }
     $modelOut.value = pdRenderAnswers(res.answers, "");
+    $modelOut.classList.remove("is-error");
     pdFillMetrics(res.prompt_tokens || 0, res.completion_tokens || 0);
     toast("调试完成", "ok");
   }).catch(function(err){
     pdRunning = false;
-    $modelOut.value = "（调用失败）" + err;
+    $modelOut.value = "链接模型失败\n\n原因：" + err;
+    $modelOut.classList.add("is-error");
     pdFillMetrics(0, 0);
     toast("模型调用失败", "warn");
   });
 });
 
-/* ================= 侧边栏 ================= */
+/* ================= 保存提示词方案（09-29 口径变更） =================
+   点「保存」先弹「保存提示词方案」弹窗，输入方案命名后，把本次调试用到的
+   服务器 / 模型 / 提示词全部内容整份存进本地存储。
+   存储键 pd_prompt_schemes 与 prompt_test.html 共用（该页左栏「选择提示词方案」下拉读它）。
+   方案结构：{ id, name, server, base, model, modelType, sys, user:[…], multi, apiKey, savedAt }
+   ★ apiKey 明文随方案一起存库；列表侧一律遮掩展示、不提供查看入口（第十八轮）。 */
+var PD_SCHEME_KEY = "pd_prompt_schemes";
+
+function pdReadSchemes(){
+  try{
+    var raw = window.localStorage.getItem(PD_SCHEME_KEY);
+    if (!raw) return [];
+    var arr = JSON.parse(raw);
+    return (arr && typeof arr.length === "number") ? arr : [];
+  } catch (e){ return []; }
+}
+function pdWriteSchemes(list){
+  try{ window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(list)); return true; }
+  catch (e){ return false; }
+}
+
+/* 本次调试的全部用户提示词（多轮时把追加轮次一起收集） */
+function collectUserPrompts(){
+  var out = [$userPrompt.value];
+  if ($multi.checked){
+    var tas = $rounds.querySelectorAll("textarea");
+    for (var i = 0; i < tas.length; i++) out.push(tas[i].value);
+  }
+  return out;
+}
+
+var $saveMask = document.getElementById("saveMask");
+var $saveName = document.getElementById("saveName");
+var $svServer = document.getElementById("svServer");
+var $svBase   = document.getElementById("svBase");
+var $svModel  = document.getElementById("svModel");
+var $svType   = document.getElementById("svType");
+var $svApiKey = document.getElementById("svApiKey");
+var $svSys    = document.getElementById("svSys");
+var $svUser   = document.getElementById("svUser");
+
+function svSet(el, text, isMono){
+  var t = (text === null || text === undefined) ? "" : String(text);
+  el.textContent = t ? t : "—";
+  el.classList.toggle("empty", !t);
+  if (isMono) el.classList.add("mono");
+}
+
+function openSaveModal(){
+  if (!currentServer){ toast("请先选择服务器", "warn"); return; }
+  if (!currentModel){ toast("请先选择模型", "warn"); return; }
+  if (!$sysPrompt.value.trim()){
+    $sysPrompt.classList.add("is-invalid");
+    toast("系统提示词 为必填项", "warn");
+    $sysPrompt.focus();
+    return;
+  }
+  var sysTxt = $sysPrompt.value.trim();
+  var us = collectUserPrompts().filter(function(s){ return String(s || "").trim(); });
+  svSet($svServer, currentServer.name);
+  svSet($svBase,   currentServer.base, true);
+  svSet($svModel,  currentModel.name);
+  svSet($svType,   currentModelType || currentModel.el.getAttribute("data-type") || "");
+  /* API_key 回显：只给遮掩形态，明文不会出现在弹窗里（第十八轮口径） */
+  svSet($svApiKey, pbMaskKey($apiKey.value.trim()));
+  svSet($svSys,    sysTxt);
+  svSet($svUser,   us.length ? us.join("\n—— 下一轮 ——\n") : "");
+  /* 编辑流（第二十二轮）：自动带出原方案名，用户可直接保存覆盖；改名也认（按 id 覆盖） */
+  $saveName.value = pdEditId ? pdEditName : "";
+  $saveMask.classList.add("show");
+  $saveName.focus();
+}
+function closeSaveModal(){ $saveMask.classList.remove("show"); }
+
+document.getElementById("btnSave").addEventListener("click", openSaveModal);
+document.getElementById("saveCancel").addEventListener("click", closeSaveModal);
+$saveMask.addEventListener("click", function(e){ if (e.target === $saveMask) closeSaveModal(); });
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeSaveModal(); });
+
+document.getElementById("saveConfirm").addEventListener("click", function(){
+  var name = $saveName.value.trim();
+  if (!name){ toast("请先填写方案命名", "warn"); $saveName.focus(); return; }
+
+  /* 覆盖目标（第十八轮）：
+     ① 从「提示词方案」页点「修改」跳过来的 —— 按 pdEditId 精确覆盖那一份，
+        连方案名一起改（用户在构造页把名字改了也认，不再受同名限制）；
+     ② 其余情况 —— 沿用原口径：同名即覆盖，否则新增。 */
+  var targetId = pdEditId;
+  var list = pdReadSchemes(), mx = 0, i;
+  for (i = 0; i < list.length; i++){
+    var n = Number(list[i] && list[i].id);
+    if (n > mx) mx = n;
+  }
+  var item = {
+    id: targetId ? Number(targetId) : (mx + 1),
+    name: name,
+    server:    currentServer ? currentServer.name : "",
+    base:      currentServer ? currentServer.base : "",
+    model:     currentModel  ? currentModel.name  : "",
+    modelType: currentModelType || (currentModel ? (currentModel.el.getAttribute("data-type") || "") : ""),
+    sys:   $sysPrompt.value,
+    user:  collectUserPrompts(),
+    multi: !!$multi.checked,
+    apiKey: $apiKey.value.trim(),      /* ★ API_key 随方案一起存 */
+    savedAt: new Date().toISOString()
+  };
+
+  var hit = -1;
+  if (targetId){
+    for (i = 0; i < list.length; i++){
+      if (list[i] && Number(list[i].id) === Number(targetId)){ hit = i; break; }
+    }
+    /* 目标被删了（极端情况）→ 退化成同名覆盖 / 新增，不报错 */
+  }
+  if (hit < 0){
+    for (i = 0; i < list.length; i++){
+      if (list[i] && String(list[i].name) === name){ hit = i; break; }
+    }
+    if (hit > -1) item.id = Number(list[hit].id) || item.id;
+  }
+  if (hit > -1) list[hit] = item;
+  else list.push(item);
+
+  /* 本地存储镜像：真源是服务端 tp 表，这里仍写一份到本地，让「提示词测试」页
+     左栏下拉继续可用（下一轮把它也接上就可以删掉这一段）。 */
+  pdWriteSchemes(list);
+  closeSaveModal();
+  toast("正在保存提示词方案「" + name + "」…", "ok");
+
+  /* ★ 第二次迭代：把这一份方案 POST 到服务端 tp 表，成功后再跳「提示词方案」列表页。
+     覆盖口径（编辑流按 id 覆盖 / 其余同名覆盖）由服务端复用原型逻辑判定，因此
+     非编辑流刻意不带 id —— 本地算出来的 mx+1 只是本地镜像的下标，不是库里的主键。 */
+  var postBody = {};
+  for (var pk in item){ postBody[pk] = item[pk]; }
+  if (!targetId){ delete postBody.id; }
+
+  fetch("/api/tp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(postBody)
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok) throw new Error((res && res.error) || "服务端未返回 ok");
+
+    /* 用服务端返回的主键回写本地镜像，避免两处 id 对不上 */
+    if (res.id){
+      var arr = pdReadSchemes();
+      for (var z = 0; z < arr.length; z++){
+        if (arr[z] && String(arr[z].name) === name) arr[z].id = res.id;
+      }
+      pdWriteSchemes(arr);
+    }
+    pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+
+    var okMsg = (res.result === "updated")
+      ? "已覆盖提示词方案「" + name + "」，相关测试结果已同步"
+      : (res.result === "overwritten"
+          ? "已覆盖同名方案「" + name + "」"
+          : "已保存提示词方案「" + name + "」，可到「提示词测试」页选用");
+    toast(okMsg, "ok");
+    setTimeout(function(){ window.location.href = "prompt_scheme.html"; }, 600);
+  }).catch(function(err){
+    toast("保存失败：" + err, "warn");
+  });
+});
+
+/* ================= 从「提示词方案」页点「修改」跳进来的回填（第十八轮） =================
+   入口形如 prompt.html?pdSchemeId=7&pdEntry=prompt.html。
+   口径（四道保险，见 prompt_scheme.html 的 pdGotoEdit 注释）：
+     · 内容以 sessionStorage 的 pd_edit_snapshot 为准（构造页不读库，避免读到自己改过的中间态）；
+     · 认领后立刻清掉快照 / pdEditScheme / 方案库里的 pendingEdit，并 removeItem('pd_edit_scheme')，
+       最后把 ?pdEditOff=1 挂回地址栏 —— 这样刷新（F5）不会重复预填，也不会二次覆盖；
+     · 预填顺序：服务器 → 模型类型 → 模型 → 文案 → API_key，每步都等前一步的联动跑完再写，
+       否则「切换服务器会清空模型」的既有逻辑会把刚填好的值抹掉。 */
+var PD_EDIT_SNAP_KEY = "pd_edit_snapshot";
+var PD_EDIT_SID_KEY  = "pd_edit_scheme";
+var pdEditId    = null;      /* 本次要覆盖的方案 id；null = 走原来的同名覆盖 / 新增 */
+var pdEditAck   = false;     /* 本次是否由「修改」跳转而来（决定提示文案） */
+var pdEditName  = "";        /* 编辑流的方案名：保存弹窗自动带出（第二十二轮） */
+
+/* API_key 遮掩：明文只在存储里，页面上任何位置都只给遮挡形态 */
+function pbMaskKey(k){
+  var v = String(k || "").trim();
+  if (!v) return "";
+  if (v.length <= 8) return "sk-" + new Array(Math.max(v.length, 4) + 1).join("·");
+  return v.slice(0, 3) + "-" + new Array(9).join("·") + v.slice(-4);
+}
+
+/* 把用户提示词数组填进「用户提示词」区：第 1 轮进固定框，其余轮次补成多个 round 框 */
+function pbFillUserPrompts(us){
+  var arr = (us && typeof us.length === "number") ? us : [];
+  var extra = $rounds.querySelectorAll("textarea");
+  for (var k = 0; k < extra.length; k++) extra[k].parentNode.remove();
+
+  var first = arr.length ? String(arr[0] || "") : "";
+  var rest  = [];
+  for (var i = 1; i < arr.length; i++){
+    if (String(arr[i] || "").trim()) rest.push(String(arr[i]));
+  }
+  $userPrompt.value = first;
+
+  if (rest.length){                                  /* 多轮：勾上开关并逐轮补框 */
+    $multi.checked = true;
+    $multi.dispatchEvent(new Event("change", { bubbles:true }));
+    /* ⚠️ change 处理函数在开关打开时会**自动补一个** round 框（见 $multi.addEventListener），
+       所以这里从「已有框数」出发，只补差额，否则会多留一个空框（第十八轮踩坑）。 */
+    while ($rounds.querySelectorAll("textarea").length < rest.length){
+      var b = document.getElementById("btnAddRound");
+      if (!b || b.hidden) break;
+      b.click();
+    }
+    var boxes = $rounds.querySelectorAll("textarea");
+    for (var m = 0; m < rest.length && m < boxes.length; m++) boxes[m].value = rest[m];
+    $rounds.hidden = false;
+  } else if (arr.length <= 1){                       /* 单轮：不强行勾多轮 */
+    if ($multi.checked){
+      $multi.checked = false;
+      $multi.dispatchEvent(new Event("change", { bubbles:true }));
+    }
+  }
+}
+
+/* 按 data-value 在下拉里选中一项（找不到就只填输入框，保持可见不报错） */
+function pbPickCombo(combo, value){
+  if (!value) return false;
+  for (var i = 0; i < combo.items.length; i++){
+    var it = combo.items[i];
+    if (it.getAttribute("data-value") === value){
+      it.dispatchEvent(new MouseEvent("mousedown", { bubbles:true, cancelable:true }));
+      return true;
+    }
+  }
+  var input = combo.root.querySelector("input");
+  if (input) input.value = value;
+  return false;
+}
+
+function pdClearEditEntry(){
+  try{
+    window.sessionStorage.removeItem(PD_EDIT_SNAP_KEY);
+    window.sessionStorage.removeItem(PD_EDIT_SID_KEY);
+    window.localStorage.removeItem(PD_EDIT_SID_KEY);
+    window.localStorage.removeItem("pd_retest_scheme");
+    window.localStorage.removeItem("pd_retest_flag");
+  }catch (e){}
+  if (pdEditId !== null){
+    try{
+      var arr = JSON.parse(window.localStorage.getItem(PD_SCHEME_KEY) || "[]");
+      if (arr && typeof arr.length === "number"){
+        var hit = false;
+        for (var i = 0; i < arr.length; i++){
+          if (Number(arr[i] && arr[i].id) === Number(pdEditId) && arr[i] && arr[i].pendingEdit){
+            delete arr[i].pendingEdit; hit = true;
+          }
+        }
+        if (hit) window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(arr));
+      }
+    }catch (e){}
+  }
+  /* 把入口参数摘掉：刷新页面不再重复预填（构造页自己的参数，不影响别的页面） */
+  try{
+    if (window.history && window.history.replaceState){
+      window.history.replaceState(null, "", "prompt.html?pdEditOff=1");
+    }
+  }catch (e){}
+}
+
+(function(){
+  var params = null;
+  try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
+  if (!params) return;
+  if (params.get("pdEditOff")) return;               /* 刷新：入口已消费过，不再重复预填 */
+
+  var sid = params.get("pdSchemeId") || "";
+  var snap = null;
+  try{ snap = JSON.parse(window.sessionStorage.getItem(PD_EDIT_SNAP_KEY) || "null"); }catch (e){ snap = null; }
+
+  /* 快照里的 id 与 URL 上的 id 不一致（比如用户又绕了一圈）→ 以快照为准 */
+  var id = Number((snap && snap.id) || sid || 0) || null;
+  if (id === null) return;
+
+  var src = snap || (function(){                      /* 快照没了就从库里兜一次 */
+    var arr = pdReadSchemes();
+    for (var i = 0; i < arr.length; i++){ if (Number(arr[i] && arr[i].id) === id) return arr[i]; }
+    return null;
+  })();
+  if (!src) return;
+  if (!snap && !src.pendingEdit) return;              /* 库兜底也必须带 pendingEdit 标记，防误覆盖 */
+
+  pdEditId  = id;
+  pdEditAck = true;
+  pdEditName = String(src.name || "");
+
+  /* ---- 逐项预填：id 相同串 → 服务器 → 模型类型 → 模型 → 文案 → 密钥 ---- */
+  var sidBox = document.getElementById("schemeId");
+  if (sidBox) sidBox.value = String(id);
+
+  if (src.server) pbPickCombo(comboServer, String(src.server));
+  if (src.modelType) pbPickCombo(comboModelType, String(src.modelType));
+  if (src.model) pbPickCombo(comboModel, String(src.model));
+
+  if (!$baseUrl.value && src.base) $baseUrl.value = String(src.base);   /* 兜底：Base_url 未被联动写上 */
+
+  var sBox = document.getElementById("sysName");
+  if (sBox) sBox.value = String(src.name || "");
+  $sysPrompt.value = String(src.sys || "");
+  pbFillUserPrompts(src.user);
+  if (src.apiKey) $apiKey.value = String(src.apiKey);
+
+  pdClearEditEntry();
+  toast("已从「提示词方案」带入「" + (src.name || "未命名方案") + "」，保存将覆盖该方案", "ok");
+})();
+
+/* ================= 侧边栏 =================
+   口径：一级菜单的展开 / 关闭只由「点击一级菜单名称」触发；点击二级菜单只做跳页与高亮，
+   不改任何一级菜单的开合状态。一级菜单一旦被点，就把**整栏**的开合快照存进 localStorage，
+   跳页时逐项还原 —— 所以换页面时侧栏不动，也不会被新页面的默认值改掉。 */
+var NAV_OPEN_KEY = "pd_nav_open";
+function navGroupName(g){
+  var el = g.querySelector(".nav-item > span:not(.ic)");
+  return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+}
+function navReadOpen(){
+  try { return JSON.parse(localStorage.getItem(NAV_OPEN_KEY)) || {}; } catch(e){ return {}; }
+}
+function navWriteOpen(map){
+  try { localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(map)); } catch(e){}
+}
+/* 整栏开合快照：一级菜单被点后记下全部组的开合，跳页时逐项还原 */
+function navSnapshot(){
+  var map = {}, gs = document.querySelectorAll(".nav-group");
+  for (var i = 0; i < gs.length; i++){
+    var k = navGroupName(gs[i]);
+    if (k) map[k] = gs[i].classList.contains("open");
+  }
+  return map;
+}
+/* 载入：库里有记录的组按记录还原；没记录过的组保留本页默认（当前页所在组默认展开） */
+var navOpenMap = navReadOpen();
+document.querySelectorAll(".nav-group").forEach(function(g){
+  var k = navGroupName(g);
+  if (k && Object.prototype.hasOwnProperty.call(navOpenMap, k) === true){
+    g.classList.toggle("open", !!navOpenMap[k]);
+  }
+});
 document.querySelectorAll("[data-toggle]").forEach(function(h){
   h.addEventListener("click", function(){
     var g = h.closest(".nav-group");
-    if (g) g.classList.toggle("open");
+    if (!g || h !== g.querySelector(".nav-item")) return;   /* 只认一级菜单名称本身 */
+    g.classList.toggle("open");
+    navWriteOpen(navSnapshot());     /* 记下整栏开合：跳页后逐项保持，点二级菜单不改任何组 */
   });
 });
 
@@ -1592,6 +2039,47 @@ var hamburger = document.getElementById("hamburger");
 var scrim = document.getElementById("scrim");
 hamburger.addEventListener("click", function(){ document.body.classList.toggle("nav-open"); });
 scrim.addEventListener("click", function(){ document.body.classList.remove("nav-open"); });
+
+/* ================= 回填入口守卫（第十八轮 · 四页同源） =================
+   口径：带 ?pdEntry=<目标页>&pdSchemeId=<id> 进来时，只有「目标页」自己认领这次编辑；
+   本页若不是目标页（用户从构造页又点走了），就地作废一次性入口 —— 清掉 sessionStorage
+   的待回填快照与「方案库」里该方案的 pendingEdit 标记，顺带清掉第十二轮遗留的
+   pd_retest_scheme / pd_retest_flag，避免下一次进构造页被再入口捡回旧的编辑态。 */
+(function(){
+  var params = null;
+  try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
+  if (!params) return;
+
+  var entry = params.get("pdEntry") || "";
+  var sid   = params.get("pdSchemeId") || "";
+  if (!entry && !sid) return;
+
+  var here = String(location.pathname || "").split("/").pop();
+  if (entry && here === entry) return;   /* 本页就是目标页：交给本页各自的启动逻辑认领 */
+
+  try{
+    window.sessionStorage.removeItem("pd_edit_snapshot");
+    window.sessionStorage.removeItem("pd_edit_scheme");
+  }catch (e){}
+  if (sid !== ""){
+    try{
+      var arr = JSON.parse(window.localStorage.getItem("pd_prompt_schemes") || "[]");
+      if (arr && typeof arr.length === "number"){
+        var hit = false;
+        for (var i = 0; i < arr.length; i++){
+          if (String(Number(arr[i] && arr[i].id)) === String(Number(sid)) && arr[i] && arr[i].pendingEdit){
+            delete arr[i].pendingEdit; hit = true;
+          }
+        }
+        if (hit) window.localStorage.setItem("pd_prompt_schemes", JSON.stringify(arr));
+      }
+    }catch (e){}
+  }
+  try{
+    window.localStorage.removeItem("pd_retest_scheme");
+    window.localStorage.removeItem("pd_retest_flag");
+  }catch (e){}
+})();
 
 /* ================= 轻提示 ================= */
 function toast(msg, type){

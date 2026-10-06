@@ -1,13 +1,23 @@
-# 运行应用所需（Starlette 版）
-starlette>=0.37
-uvicorn>=0.27
+# 运行应用所需（Django 版）
+django>=5.0
 
-# 可选：仅 verify_ui.py（真实浏览器端到端校验）需要，另需本机装有 Edge
+# 可选：仅 verify_ui.py / verify_ui_tp.py（真实浏览器端到端校验）需要，另需本机装有 Edge
 websocket-client>=1.6
 
 # ---------------------------------------------------------------
 # 说明
 #   app.py / build_components.py / comp/ 是早前「Streamlit + 原型 iframe 内嵌」那一版，
-#   已被 server.py + build_static.py + static/ 取代（见 SKILL：promptdeck-page-builder 第六节）。
-#   若要跑旧版，需要额外安装 streamlit>=1.36。
+#   server.py + build_static.py + static/ 是「Starlette 静态托管原型页」那一版，
+#   当前是 config/ + core/ + manage.py 的 **Django 版**（见 SKILL：promptdeck-page-builder）。
+#
+#   启动：python manage.py runserver 127.0.0.1:8502
+#
+#   数据库：data/prompt_test_DB_twe.db（SQLite）
+#     表结构由 migrate_to_twe.py 一次性建好并搬完旧数据，models 全部 managed=False；
+#     migrate 只落一张 django_migrations 记账表。
+#     旧库 data/prompt_test_DB.db 原样保留，可随时对照（代码里已零引用）。
+#     Starlette 遗留的 db.py（DB_PATH 默认值）与部署包打包脚本 pack_modelscope.py 的
+#     种子源 SEED_SRC_DEFAULT 也已统一到同一个库；promptdeck_modelscope/data/seed.sqlite
+#     就是由它导出的（容器内运行库名仍是 /mnt/workspace/prompt_test_DB.db，属平台持久化路径，未动）。
+#     可用环境变量 PROMPTDECK_DB 覆盖库路径（部署到容器时指到持久化目录）。
 # ---------------------------------------------------------------

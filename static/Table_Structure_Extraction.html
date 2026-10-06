@@ -1,0 +1,2048 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>数据库表结构提取 · PromptDeck</title>
+<style>
+  :root{
+    --cream-1:#F2E8E0;
+    --cream-2:#E7DACE;
+    --ink:#17130F;
+    --text:#241E19;
+    --text-2:#7C7269;
+    --text-3:#A99F95;
+    --purple:#1C1712;
+    --purple-deep:#000000;
+    --purple-soft:#F3EBE1;
+    --mint:#8FB05F;
+    --mint-soft:#E9F2DA;
+    --orange:#D8452C;
+    --orange-soft:#FBEBE5;
+    --gold:#E0A93F;
+    --fill:#F5F0EA;
+    --fill-2:#EDE5DC;
+    --line:#F1EAE2;
+    --line-2:#E4DACF;
+    --r-sm:10px;
+    --r-app:30px;
+    --r-lg:22px;
+    --r-md:14px;
+    --sh-app:0 60px 120px -60px rgba(88,58,42,.42);
+    --sh-card:0 24px 54px -42px rgba(60,40,28,.42);
+    --sh-btn:0 12px 26px -16px rgba(23,19,15,.7);
+    --sans:"Plus Jakarta Sans","Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","SF Mono",Consolas,"Cascadia Mono","Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:14px;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 720px at 8% -12%, #FBF4EE 0%, rgba(251,244,238,0) 62%),
+      radial-gradient(940px 660px at 105% 105%, #E6D8CB 0%, rgba(230,216,203,0) 62%),
+      linear-gradient(150deg,var(--cream-1) 0%,var(--cream-2) 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#E3D9CE;border-radius:99px;}
+  ::-webkit-scrollbar-thumb:hover{background:#D3C7B9;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- 应用外框（浮动白色圆角卡片） ---------- */
+  .app{
+    display:flex;
+    height:calc(100vh - 40px);
+    margin:20px;
+    background:#FBF7F2;
+    border-radius:var(--r-app);
+    box-shadow:var(--sh-app);
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* ---------- 侧边栏 ---------- */
+  .sidebar{
+    width:252px;flex:0 0 252px;
+    background:transparent;
+    display:flex;flex-direction:column;
+    padding:22px 14px 16px;
+    position:relative;z-index:30;
+  }
+  .sidebar::before{display:none;}
+
+  .brand{
+    display:flex;align-items:center;gap:11px;
+    padding:2px 10px 24px;
+    position:relative;z-index:2;
+  }
+  .brand-logo{flex:0 0 auto;display:block;border-radius:11px;}
+  .brand-txt{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .brand-name{
+    font-size:19px;font-weight:800;letter-spacing:-.4px;
+    font-family:var(--sans);
+    color:var(--ink);
+    line-height:1;
+  }
+  .brand-sub{
+    font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:700;
+  }
+
+  .nav{padding:0;overflow-y:auto;flex:1;position:relative;z-index:2;}
+  .nav-label{
+    font-size:10px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+    padding:0 12px 10px;
+  }
+  .nav-group{margin-bottom:2px;}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:11px 12px;border-radius:var(--r-md);
+    color:var(--text-2);cursor:pointer;
+    font-size:14px;font-weight:600;
+    transition:background .18s ease,color .18s ease;
+    user-select:none;
+  }
+  .nav-item:hover{background:var(--fill);color:var(--ink);}
+  .nav-item .ic{
+    flex:0 0 18px;width:18px;height:18px;
+    display:flex;align-items:center;justify-content:center;
+    color:inherit;
+  }
+  .nav-item .caret{
+    margin-left:auto;width:12px;height:12px;color:var(--text-3);
+    transition:transform .22s ease;
+  }
+  .nav-group.open > .nav-item .caret{transform:rotate(90deg);}
+  .nav-item.is-parent{color:var(--ink);font-weight:800;}
+
+  .subnav{
+    list-style:none;margin:2px 0 8px;padding:0 0 0 5px;
+    display:none;
+  }
+  .nav-group.open .subnav{display:block;}
+  .subnav a{
+    display:flex;align-items:center;
+    position:relative;
+    padding:10px 14px;border-radius:var(--r-md);
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .subnav a::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:3px;height:0;border-radius:3px;background:var(--purple);
+    transition:height .2s ease;
+  }
+  .subnav a:hover{background:var(--fill);color:var(--ink);}
+  .subnav a.active{
+    background:var(--purple-soft);color:var(--purple-deep);font-weight:800;
+  }
+  .subnav a.active::before{height:18px;}
+
+  .sidebar-foot{
+    position:relative;z-index:2;
+    margin-top:12px;
+    padding:13px 15px;
+    background:var(--fill);border-radius:var(--r-md);
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;
+    color:var(--text-2);display:flex;align-items:center;gap:8px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    background:var(--mint);box-shadow:0 0 0 3px rgba(79,189,182,.2);
+  }
+
+  /* ---------- 主区 ---------- */
+  .main{
+    flex:1;min-width:0;display:flex;flex-direction:column;
+    overflow-y:auto;
+    border-left:0;
+    padding:0 16px 16px;
+  }
+
+  .topbar{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:14px;
+    padding:20px 0 18px;
+    background:#FBF7F2;
+    border-bottom:0;
+    position:sticky;top:0;z-index:20;
+  }
+  .hamburger{
+    display:none;width:40px;height:40px;border:0;
+    border-radius:var(--r-md);background:var(--fill);cursor:pointer;
+    align-items:center;justify-content:center;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .hamburger:hover{background:var(--fill-2);color:var(--ink);}
+  .crumb{
+    font-size:14px;color:var(--text-3);font-weight:600;
+    display:flex;align-items:center;gap:9px;min-width:0;
+  }
+  .crumb b{color:var(--ink);font-weight:800;font-size:16px;letter-spacing:-.2px;}
+  .crumb .sep{color:#D8CEC2;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .chip{
+    font-size:11px;letter-spacing:.7px;font-weight:700;
+    padding:8px 14px;border-radius:999px;
+    border:1px solid var(--line-2);
+    color:var(--text-2);background:#fff;
+  }
+  .chip.live{
+    color:#5C7F33;background:#E7F1D8;border-color:#D7E6C0;
+    display:flex;align-items:center;gap:7px;
+  }
+
+  .content{
+    flex:1;padding:26px 30px 34px;
+    background:#FFFFFF;
+    border-radius:26px;
+    box-shadow:0 34px 80px -72px rgba(70,45,30,.8);
+  }
+
+  .page-head{margin-bottom:22px;display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+  .page-head-txt{min-width:0;}
+  .page-head .actions{margin-left:auto;align-items:center;}
+  .page-head h1{
+    margin:0 0 8px;font-size:25px;font-weight:800;letter-spacing:-.6px;
+    color:var(--ink);
+    display:flex;align-items:center;gap:10px;
+  }
+  .page-head p{margin:0;color:var(--text-2);font-size:13.5px;font-weight:500;line-height:1.6;}
+  .page-head code{
+    font-family:var(--mono);font-size:12px;background:var(--fill);
+    padding:3px 8px;border-radius:8px;color:#7A6A58;
+  }
+
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    box-shadow:var(--sh-card);
+    overflow:hidden;
+  }
+
+  /* ---------- 搜索 / 操作 ---------- */
+  .panel-top{
+    display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;
+    padding:22px 24px;
+    border-bottom:1px solid var(--line);
+  }
+  .search-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;flex:1 1 100%;}
+  .search-form .field{flex:1 1 240px;}
+  .field{display:flex;flex-direction:column;gap:8px;min-width:190px;}
+  .field label{
+    font-size:10.5px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+  }
+  .field input{
+    height:46px;padding:0 16px;
+    border:1px solid #F1E8DF;border-radius:var(--r-md);
+    background:#F7F2EC;
+    font-size:14px;font-family:var(--sans);font-weight:600;color:var(--ink);
+    outline:none;width:100%;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .field input::placeholder{color:#B3A79A;font-weight:500;}
+  .field input:focus{
+    background:#fff;border-color:#E0D2C2;
+    box-shadow:0 0 0 4px rgba(28,23,18,.07);
+  }
+
+  .btn{
+    height:46px;padding:0 22px;border-radius:999px;
+    border:1px solid transparent;
+    font-size:14px;font-weight:700;font-family:var(--sans);
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;white-space:nowrap;
+    transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease;
+  }
+  .btn svg{flex:0 0 auto;}
+  .btn-primary{
+    background:var(--ink);color:#fff;
+    box-shadow:0 16px 30px -18px rgba(23,19,15,.85);
+  }
+  .btn-primary:hover{background:#000;transform:translateY(-1px);}
+  .btn-ghost{
+    background:#fff;border-color:var(--line-2);color:var(--text-2);
+  }
+  .btn-ghost:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+  .btn-danger{
+    background:#fff;border-color:#F6D8CF;color:var(--orange);
+  }
+  .btn-danger:hover:not(:disabled){background:var(--orange-soft);border-color:#F0B9A4;}
+  .btn:disabled,.btn.is-disabled{
+    background:var(--fill);border-color:transparent;color:#BDB2A6;
+    box-shadow:none;cursor:not-allowed;transform:none;
+  }
+  .btn-add{
+    background:var(--ink);color:#fff;border-color:transparent;
+    box-shadow:var(--sh-btn);
+  }
+  .btn-add:hover{background:#000;transform:translateY(-1px);}
+
+  .actions{display:flex;gap:12px;align-items:flex-end;margin-left:auto;flex-wrap:wrap;}
+
+  .meta-bar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:14px 24px;
+    background:#fff;border-bottom:1px solid var(--line);
+    font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--text-3);
+  }
+  .meta-bar .sel{
+    color:var(--purple-deep);background:var(--purple-soft);
+    padding:5px 12px;border-radius:999px;border:0;
+  }
+  .meta-bar .grow{flex:1;}
+
+  /* ---------- 表格 ---------- */
+  .table-wrap{width:100%;overflow-x:auto;}
+  table{width:100%;min-width:860px;border-collapse:collapse;}
+  thead th{
+    text-align:left;
+    padding:15px 22px;
+    background:#FBF7F2;
+    border-bottom:1px solid var(--line);
+    font-size:10.5px;letter-spacing:1.1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;white-space:nowrap;
+  }
+  tbody td{
+    padding:17px 22px;border-bottom:1px solid var(--line);
+    vertical-align:middle;font-size:14px;font-weight:600;color:var(--ink);
+  }
+  tbody tr{transition:background .18s ease;}
+  tbody tr:hover{background:#FBF7F2;}
+  tbody tr.is-checked{background:var(--purple-soft);}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .col-check{width:54px;}
+  .col-platform{width:23%;}
+  .col-company{width:26%;}
+  .col-api{width:auto;}
+  tbody td.col-check{position:relative;padding-left:22px;}
+  tbody td.col-check::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:4px;height:26px;border-radius:0 4px 4px 0;background:#ECA9B6;
+  }
+  tbody tr:nth-child(4n+1) td.col-check::before{background:#ECA9B6;}
+  tbody tr:nth-child(4n+2) td.col-check::before{background:#EFC05A;}
+  tbody tr:nth-child(4n+3) td.col-check::before{background:#A9CBE8;}
+  tbody tr:nth-child(4n+4) td.col-check::before{background:#2C4A66;}
+
+  /* 方形复选框 */
+  input[type="checkbox"]{
+    appearance:none;-webkit-appearance:none;
+    width:20px;height:20px;border-radius:4px;
+    border:1.8px solid #D9CEC1;background:#fff;
+    cursor:pointer;position:relative;display:block;margin:0;
+    transition:background .16s ease,border-color .16s ease;
+  }
+  input[type="checkbox"]:hover{border-color:var(--purple);}
+  input[type="checkbox"]::after{
+    content:"";position:absolute;left:0;right:0;top:0;bottom:0;margin:auto;
+    width:4px;height:8px;
+    border:2px solid #fff;border-top:0;border-left:0;
+    transform:rotate(42deg);opacity:0;
+    transition:opacity .14s ease;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate{
+    background:var(--purple);border-color:var(--purple);
+  }
+  input[type="checkbox"]:checked::after{opacity:1;}
+  input[type="checkbox"]:indeterminate::after{
+    width:8px;height:2px;border:0;border-radius:2px;
+    background:#fff;transform:none;opacity:1;
+  }
+
+  .link{
+    color:var(--purple);font-weight:700;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:color .16s ease;
+    word-break:break-word;
+  }
+  .link:hover{
+    color:var(--purple-deep);
+    text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px;
+  }
+  .link .ext{opacity:.45;flex:0 0 auto;transition:opacity .16s ease;}
+  .link:hover .ext{opacity:1;}
+  .link-company{color:var(--ink);font-weight:600;}
+  .link-company:hover{color:var(--purple);}
+
+  .api{
+    font-family:var(--mono);font-size:12.5px;font-weight:500;color:#7A6A58;
+    background:#F7F1EA;border:1px solid #EFE5D9;
+    padding:7px 13px;border-radius:999px;display:inline-block;
+    max-width:100%;overflow-wrap:anywhere;
+  }
+
+  .empty-cell{text-align:center;padding:64px 16px;color:var(--text-3);}
+  .empty-cell .big{font-size:15px;color:var(--ink);margin-bottom:8px;font-weight:800;}
+  .empty-cell .small{font-size:12.5px;font-weight:600;color:var(--text-3);}
+
+  .panel-foot{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:16px 24px;border-top:1px solid var(--line);
+    background:#fff;
+    font-size:12.5px;font-weight:700;color:var(--text-3);
+  }
+  .pager{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .pager button{
+    height:34px;padding:0 14px;border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);font-family:var(--sans);font-size:12.5px;font-weight:700;
+    color:var(--text-2);cursor:pointer;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .pager button:hover:not(:disabled){background:var(--fill);color:var(--ink);}
+  .pager button:disabled{color:#C4B9AC;cursor:not-allowed;background:var(--fill);border-color:transparent;}
+  .pager .page-now{
+    height:34px;min-width:34px;padding:0 10px;
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:var(--r-sm);background:var(--ink);color:#fff;
+    font-size:12.5px;font-weight:800;
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .mask{
+    position:fixed;inset:0;z-index:80;
+    background:rgba(50,34,26,.34);
+    backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .mask.show{display:flex;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{
+    width:100%;max-width:440px;background:#fff;border-radius:24px;
+    border:0;
+    box-shadow:0 46px 100px -44px rgba(50,34,26,.62);
+    padding:28px 28px 22px;
+    animation:pop .2s ease;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+  .modal-ic{
+    width:50px;height:50px;border-radius:16px;
+    background:var(--orange-soft);border:0;
+    display:flex;align-items:center;justify-content:center;color:var(--orange);
+    margin-bottom:16px;
+  }
+  .modal h3{margin:0 0 10px;font-size:18.5px;font-weight:800;letter-spacing:-.3px;color:var(--ink);}
+  .modal p{margin:0;color:var(--text-2);font-size:14px;font-weight:500;line-height:1.7;}
+  .modal p b{color:var(--ink);font-weight:800;}
+  .modal .names{
+    margin-top:14px;padding:12px 14px;background:var(--fill);
+    border:0;border-radius:var(--r-md);
+    font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+    line-height:2;max-height:110px;overflow:auto;
+  }
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;}
+  .modal-foot .btn{height:44px;}
+  .btn-danger-solid{
+    background:var(--orange);color:#fff;
+    box-shadow:0 16px 32px -18px rgba(242,99,61,.95);
+  }
+  .btn-danger-solid:hover{background:#BE3A23;transform:translateY(-1px);}
+
+  /* ---------- 轻提示 ---------- */
+  .toast-wrap{position:fixed;right:24px;bottom:24px;z-index:90;display:flex;flex-direction:column;gap:10px;}
+  .toast{
+    background:#fff;border:0;border-radius:var(--r-md);
+    padding:13px 17px;
+    box-shadow:0 26px 56px -26px rgba(50,34,26,.5);
+    font-size:13.5px;font-weight:600;color:var(--text-2);max-width:330px;
+    display:flex;align-items:center;gap:10px;
+    animation:slide .22s ease;
+  }
+  .toast::before{
+    content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;
+    background:var(--purple);
+  }
+  .toast.ok::before{background:var(--mint);}
+  .toast.warn::before{background:var(--gold);}
+  @keyframes slide{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  /* ---------- 响应式 ---------- */
+  /* ---------- 操作列 · 修改弹窗（列表页通用，追加；上方规则一行未动） ---------- */
+  .col-op{width:104px;text-align:right;}
+  .btn-op{
+    height:34px;padding:0 16px;
+    border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);
+    font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text-2);
+    cursor:pointer;white-space:nowrap;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .btn-op:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+
+  /* 修改弹窗：复用 .mask / .modal，只放宽宽度 + 给表单留纵向间距。
+     弹窗里放了下拉框（absolute 定位），所以弹窗体不能裁切；超高时由 #editMask 整体滚动兜底 */
+  #editMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #editMask .modal{max-width:560px;margin:auto 0;}
+  .edit-body{
+    display:flex;flex-direction:column;gap:16px;
+    margin-top:18px;
+  }
+  .edit-body .field{min-width:0;}
+
+  /* ---------- 弹窗内的字段控件：与「新增服务器」页同一套外观（下拉 / 必填星号 / 字段说明） ---------- */
+  .field-hint{font-size:11.5px;font-weight:600;color:var(--text-3);line-height:1.5;}
+  .field label .req{
+    font-style:normal;font-weight:800;font-size:13px;line-height:1;
+    color:var(--orange);margin-left:4px;
+    display:inline-block;vertical-align:top;transform:translateY(-2px);
+  }
+  .combo{position:relative;}
+  .combo input{padding-right:48px;}
+  .combo-btn{
+    position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    width:34px;height:34px;border:0;border-radius:10px;
+    background:transparent;color:var(--text-3);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .16s ease,color .16s ease,transform .22s ease;
+  }
+  .combo-btn:hover{background:var(--fill-2);color:var(--ink);}
+  .combo.open .combo-btn{transform:translateY(-50%) rotate(180deg);color:var(--purple);}
+  .combo-menu{
+    position:absolute;left:0;right:0;top:calc(100% + 8px);z-index:40;
+    background:#fff;border:1px solid var(--line);
+    border-radius:var(--r-md);
+    box-shadow:0 30px 60px -28px rgba(60,40,28,.32);
+    padding:6px;display:none;max-height:240px;overflow:auto;
+  }
+  .combo.open .combo-menu{display:block;animation:pop .16s ease;}
+  .combo-item{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 12px;border-radius:10px;
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    cursor:pointer;transition:background .14s ease,color .14s ease;
+  }
+  .combo-item:hover{background:var(--purple-soft);color:var(--purple-deep);}
+  .combo-item.is-picked{background:var(--fill);color:var(--ink);}
+  .combo-empty{
+    padding:16px 12px;text-align:center;
+    font-size:12.5px;font-weight:600;color:var(--text-3);
+  }
+  .tag-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;display:block;}
+  .d-purple{background:var(--purple);}
+  .d-mint{background:var(--mint);}
+  .d-orange{background:var(--orange);}
+  .d-gold{background:var(--gold);}
+
+  @media (max-width:1100px){
+    .sidebar{width:226px;flex-basis:226px;}
+    .content{padding:24px;}
+    .topbar{padding:18px 0 16px;}
+  }
+  @media (max-width:900px){
+    .app{height:100vh;margin:0;border-radius:0;}
+    .sidebar{
+      position:absolute;left:0;top:0;bottom:0;z-index:40;
+      width:262px;flex-basis:262px;
+      transform:translateX(-100%);
+      transition:transform .24s ease;
+      box-shadow:0 0 70px -20px rgba(50,34,26,.55);
+    }
+    body.nav-open .sidebar{transform:none;}
+    .main{border-left:0;padding:0 12px 12px;}
+    .hamburger{display:inline-flex;}
+    .scrim{position:absolute;inset:0;background:rgba(40,28,22,.32);z-index:35;display:none;}
+    body.nav-open .scrim{display:block;}
+    .content{padding:18px;}
+    .topbar{padding:16px 0 14px;}
+    .page-head h1{font-size:21px;}
+    .search-form{flex-basis:100%;}
+    .field{min-width:0;flex:1 1 160px;}
+    .actions{margin-left:0;width:100%;}
+    .actions .btn{flex:1 1 auto;}
+    .page-head{gap:14px;}
+    .page-head .actions{margin-left:0;width:100%;}
+    .toast-wrap{left:18px;right:18px;bottom:18px;}
+    .toast{max-width:none;}
+  }
+  /* ---------- 数据库表结构提取（页面专有，追加在基座之后；上方规则一行未动） ---------- */
+
+  /* 一级菜单高亮（与 prompt.html / prompt_test.html 同口径） */
+  .nav-item.active{background:var(--purple-soft);color:var(--purple-deep);font-weight:800;}
+
+  /* 数据源工具条：页面左上角的「数据库类型」选择器 */
+  .ts-tool-panel{overflow:visible;}
+  .ts-tool{
+    display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;
+    padding:20px 24px;
+  }
+  .ts-tool .field{flex:0 0 264px;}
+  .ts-tool > .btn{flex:0 0 auto;}
+  .ts-tool-note{
+    margin-left:auto;align-self:center;
+    font-size:12.5px;font-weight:700;color:var(--text-3);
+  }
+  .ts-tool-note b{color:var(--ink);font-weight:800;}
+
+  /* 两列工作区：左 = 数据库与表，右 = 表结构 */
+  .ts-grid{
+    display:grid;gap:22px;align-items:start;
+    grid-template-columns:minmax(320px,1fr) minmax(430px,1.28fr);
+  }
+  .ts-col{display:flex;flex-direction:column;gap:20px;min-width:0;}
+
+  .ts-block-head{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:17px 22px;border-bottom:1px solid var(--line);
+  }
+  .ts-block-t{font-size:14.5px;font-weight:800;letter-spacing:-.2px;color:var(--ink);}
+  .ts-spacer{flex:1 1 auto;}
+  .ts-count{
+    font-size:11.5px;font-weight:700;letter-spacing:.2px;color:var(--text-3);
+    background:var(--fill);border-radius:999px;padding:5px 11px;white-space:nowrap;
+  }
+  .ts-block-body{padding:18px 22px;}
+  /* 第二十五轮：右栏双面板（表结构=表格样式 / 表内容=纯文本） */
+  .ts-tabs{display:flex;gap:6px;margin-bottom:12px;}
+  .ts-tab{
+    height:30px;padding:0 14px;border:1px solid var(--line);border-radius:999px;
+    background:#fff;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--text-3);
+    cursor:pointer;transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .ts-tab:hover{background:var(--fill);color:var(--ink);}
+  .ts-tab.on{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+  .ts-pane[hidden]{display:none;}
+  .sch-db{
+    font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--text-3);
+    margin:2px 0 10px;
+  }
+  .sch-tbl{margin-bottom:18px;}
+  .sch-tbl:last-child{margin-bottom:0;}
+  .sch-tbl-t{
+    font-size:13px;font-weight:800;color:var(--ink);margin-bottom:8px;
+    display:flex;align-items:baseline;gap:8px;
+  }
+  .sch-tbl-desc{font-size:11.5px;font-weight:600;color:var(--text-3);}
+  .sch-table{width:100%;border-collapse:collapse;font-size:12.3px;}
+  .sch-table th,.sch-table td{
+    border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top;
+  }
+  .sch-table th{background:#FBF7F2;font-weight:800;color:var(--text-2);white-space:nowrap;}
+  .sch-table td{color:var(--ink);font-weight:600;}
+  .sch-table .mono{font-family:var(--mono);font-size:12px;white-space:nowrap;}
+  .sch-pk{
+    display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;
+    background:var(--fill);font-size:10.5px;font-weight:800;color:var(--text-2);
+  }
+  /* URL 模式的连接模板：两行展示 */
+  .field-hint.pre{display:block;white-space:pre-line;}
+  /* URL 模式下隐藏 数据库名 / 用户名 / 密码（field 是 flex 布局，hidden 需显式覆盖） */
+  .field[hidden]{display:none;}
+  .ts-block-foot{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:16px 22px;border-top:1px solid var(--line);
+  }
+  .ts-hint{font-size:11.5px;font-weight:600;color:var(--text-3);line-height:1.6;}
+  .ts-hint b{color:var(--ink);font-weight:800;}
+
+  /* 左栏「数据库与表」：内容超出时在**面板右侧**出现滚动条。
+     滚动容器落在 .ts-block-body（宽度 = 面板宽），滚动条即贴面板右缘；
+     若把 max-height 放在 .db-tree 上，滚动条会内缩 22px（正文内边距），不在框选区域的右侧。
+     ⚠️ 408 = 372（树原本的可视高度）+ 18×2（.ts-block-body 上下内边距）。
+        基座 `*{box-sizing:border-box}` ⇒ max-height 含内边距，写 372 会白吃掉 36px 可视高度。 */
+  .ts-grid>.ts-col:first-child .ts-block-body{max-height:408px;overflow-y:auto;}
+  .ts-grid>.ts-col:first-child .db-tree{max-height:none;overflow:visible;}
+
+  /* 数据库 → 表 树 */
+  .db-tree{display:flex;flex-direction:column;gap:12px;}
+  /* flex 子项默认 flex-shrink:1：树一旦被限高，节点会被压扁（.db-node 又是 overflow:hidden，表名被裁掉且不出滚动条）。
+     必须锁死收缩，让内容真实溢出、由外层滚动容器出滚动条。 */
+  .db-node{flex:0 0 auto;border:1px solid var(--line);border-radius:var(--r-md);background:#fff;overflow:hidden;}
+  .db-node-head{
+    display:flex;align-items:center;gap:9px;
+    padding:11px 13px;background:#FBF7F2;
+    border-bottom:1px solid var(--line);cursor:pointer;
+    transition:background .16s ease;
+  }
+  .db-node-head:hover{background:#F7F1EA;}
+  .db-node.is-collapsed .db-node-head{border-bottom:0;}
+  .db-caret{
+    width:15px;height:15px;flex:0 0 auto;color:var(--text-3);
+    transition:transform .18s ease;
+  }
+  .db-node.is-collapsed .db-caret{transform:rotate(-90deg);}
+  .db-name{font-size:13.5px;font-weight:800;letter-spacing:-.1px;color:var(--ink);word-break:break-all;}
+  .db-kind{
+    font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
+    color:var(--text-3);background:#fff;border:1px solid var(--line-2);
+    border-radius:999px;padding:3px 8px;white-space:nowrap;flex:0 0 auto;
+  }
+  .db-count{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--text-3);white-space:nowrap;}
+  .db-del{
+    width:24px;height:24px;flex:0 0 auto;
+    border:0;border-radius:8px;background:transparent;color:var(--text-3);
+    font-family:var(--sans);font-size:15px;line-height:1;cursor:pointer;
+    display:inline-flex;align-items:center;justify-content:center;
+    transition:background .14s ease,color .14s ease;
+  }
+  .db-del:hover{background:var(--orange-soft);color:var(--orange);}
+  .db-node.is-collapsed .tbl-list{display:none;}
+  .tbl-list{list-style:none;margin:0;padding:6px;}
+  .tbl-item{
+    display:flex;align-items:center;gap:11px;
+    padding:9px 11px;border-radius:10px;cursor:pointer;
+    transition:background .14s ease;
+  }
+  .tbl-item:hover{background:var(--purple-soft);}
+  .tbl-item.is-on{background:var(--fill);}
+  .tbl-name{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--ink);word-break:break-all;}
+  .tbl-meta{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--text-3);white-space:nowrap;}
+
+  /* 空状态 */
+  .ts-empty{
+    padding:42px 18px;text-align:center;
+    border:1px dashed var(--line-2);border-radius:var(--r-md);
+    background:#FCFAF8;
+    font-size:12.8px;font-weight:600;color:var(--text-3);line-height:1.75;
+  }
+  .ts-empty b{display:block;color:var(--ink);font-weight:800;font-size:14px;margin-bottom:6px;}
+
+  /* 复制按钮（表结构栏右上角） */
+  .ts-copy{
+    height:34px;padding:0 14px;
+    border:1px solid var(--line-2);background:#fff;border-radius:999px;
+    font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text-2);
+    display:inline-flex;align-items:center;gap:7px;cursor:pointer;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .ts-copy:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+  .ts-copy svg{flex:0 0 auto;}
+
+  /* 表结构卡：字段名 / 字段类型 / 字段描述 */
+  .sch-card{border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden;margin-bottom:14px;}
+  .sch-head{
+    display:flex;align-items:center;gap:9px;
+    padding:11px 14px;background:#FBF7F2;border-bottom:1px solid var(--line);
+  }
+  .sch-tname{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--ink);word-break:break-all;}
+  .sch-own{
+    font-size:10px;font-weight:800;letter-spacing:.5px;
+    color:var(--text-3);background:#fff;border:1px solid var(--line-2);
+    border-radius:999px;padding:3px 8px;white-space:nowrap;max-width:190px;
+    overflow:hidden;text-overflow:ellipsis;
+  }
+  .sch-cols{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--text-3);white-space:nowrap;}
+  .sch-table{width:100%;min-width:0;border-collapse:collapse;}
+  .sch-table th{
+    text-align:left;padding:9px 14px;background:#fff;
+    border-bottom:1px solid var(--line);
+    font-size:10px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;white-space:nowrap;
+  }
+  .sch-table td{
+    padding:10px 14px;border-bottom:1px solid var(--line);
+    font-size:12.8px;font-weight:600;color:var(--ink);vertical-align:top;
+  }
+  .sch-table tr:last-child td{border-bottom:none;}
+  .sch-table .c-name{font-family:var(--mono);font-size:12.3px;font-weight:700;color:var(--ink);word-break:break-all;}
+  .sch-table .c-type{font-family:var(--mono);font-size:12.3px;font-weight:600;color:#7A6A58;word-break:break-all;}
+  .sch-table .c-desc{color:var(--text-2);font-weight:600;}
+  .sch-table .col-f{width:32%;}
+  .sch-table .col-t{width:30%;}
+  .pk{
+    display:inline-block;margin-left:7px;
+    font-family:var(--sans);font-size:9.5px;font-weight:800;letter-spacing:.6px;
+    color:var(--orange);background:var(--orange-soft);
+    border-radius:999px;padding:2px 6px;vertical-align:1px;
+  }
+
+  /* 表间关系 */
+  .rel-block{margin-top:18px;}
+  .rel-t{display:flex;align-items:center;gap:10px;font-size:12.5px;font-weight:800;color:var(--ink);margin-bottom:10px;}
+  .rel-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px;}
+  .rel-item{
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+    padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:#fff;
+  }
+  .rel-item .m{font-family:var(--mono);font-size:12.3px;font-weight:700;color:var(--ink);word-break:break-all;}
+  .rel-arrow{color:var(--text-3);font-weight:800;}
+  .rel-card{
+    font-size:9.5px;font-weight:800;letter-spacing:.5px;
+    color:var(--text-3);background:var(--fill);border-radius:999px;padding:2px 7px;
+    max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .rel-desc{width:100%;font-size:11.5px;font-weight:600;color:var(--text-3);}
+
+  /* 弹窗补充：选文件 / 连接方式切换 */
+  #connMask,#fileMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #connMask .modal,#fileMask .modal{max-width:520px;margin:auto 0;}
+  .pick-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+  .pick-row .btn{height:42px;flex:0 0 auto;}
+  .fname{
+    flex:1 1 180px;min-width:0;
+    font-family:var(--mono);font-size:12.3px;font-weight:500;color:#7A6A58;
+    background:#F7F2EC;border:1px solid #F1E8DF;border-radius:var(--r-sm);
+    padding:11px 13px;word-break:break-all;
+  }
+  .fname.empty{font-family:var(--sans);font-weight:600;color:var(--text-3);}
+  .seg{display:inline-flex;gap:4px;padding:4px;border-radius:999px;background:var(--fill);align-self:flex-start;}
+  .seg button{
+    height:34px;padding:0 18px;border:0;border-radius:999px;background:transparent;
+    font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text-2);
+    cursor:pointer;transition:background .16s ease,color .16s ease;
+  }
+  .seg button:hover{color:var(--ink);}
+  .seg button.on{background:#fff;color:var(--ink);box-shadow:0 8px 18px -10px rgba(60,40,28,.55);}
+  .visually-hidden{
+    position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+
+  @media (max-width:1080px){
+    .ts-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:900px){
+    .ts-tool{padding:18px;gap:14px;}
+    .ts-tool .field{flex:1 1 100%;}
+    .ts-tool > .btn{flex:1 1 auto;}
+    .ts-tool-note{margin-left:0;width:100%;}
+    .ts-block-head{padding:15px 16px;}
+    .ts-block-body{padding:16px;}
+    .ts-block-foot{padding:14px 16px;}
+    .ts-block-foot .btn{flex:1 1 auto;}
+    .db-tree{max-height:none;}
+    /* 移动端不高限左栏：整页本来就纵向滚动，再套一层内滚动会「滚不动 / 双滚动条」 */
+    .ts-grid>.ts-col:first-child .ts-block-body{max-height:none;overflow:visible;}
+  }
+
+  /* ---------- 表结构展示栏：纯文本（09-29 用户点名：方便复制进提示词） ---------- */
+  .sch-text{
+    width:100%;min-width:0;box-sizing:border-box;display:block;
+    min-height:408px;max-height:560px;padding:16px 18px;
+    border:1px solid var(--line);border-radius:var(--r-sm);background:#FDFCFA;
+    font-family:var(--mono);font-size:12.3px;font-weight:500;line-height:1.9;color:var(--ink);
+    resize:vertical;outline:none;white-space:pre;overflow:auto;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .sch-text::placeholder{color:var(--text-3);font-weight:500;}
+  .sch-text:focus{background:#fff;border-color:var(--line-2);box-shadow:0 0 0 4px rgba(28,23,18,.06);}
+
+  /* ---------- 09-29：表名栏全选 + 表结构栏按钮（重新生成 / 清空） ---------- */
+  /* 全选框复用基座方形复选框外观，这里只补 flex 对齐（20px 与表行复选框同尺寸） */
+  .ts-all-check{flex:0 0 auto;}
+  .ts-all-check:disabled{cursor:not-allowed;background:var(--fill);border-color:#E3D9CC;}
+  /* 「复制」按钮同款的次要按钮，补一条禁用态（.ts-copy 不是 .btn，吃不到基座 .btn:disabled） */
+  .ts-copy:disabled,
+  .ts-copy:disabled:hover{
+    background:var(--fill);border-color:transparent;color:#BDB2A6;cursor:not-allowed;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="brand-logo" width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34">
+            <stop stop-color="#2E241B"/>
+            <stop offset=".55" stop-color="#1B1510"/>
+            <stop offset="1" stop-color="#43331F"/>
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="32" height="32" rx="9" fill="url(#lg)"/>
+        <rect x="1" y="1" width="32" height="32" rx="9" stroke="rgba(255,255,255,.35)"/>
+        <path d="M10 11.5 L15.5 17 L10 22.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 23 h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>
+      </svg>
+      <div class="brand-txt">
+        <span class="brand-name">PromptDeck</span>
+        <span class="brand-sub">LLM Workbench</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">工作台</div>
+
+      <!-- 一级：提示词构造 -->
+      <div class="nav-group">
+        <a class="nav-item" href="prompt.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 4.2h11M2.5 8h7.5M2.5 11.8h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>提示词构造</span>
+        </a>
+      </div>
+
+      <!-- 一级：服务器配置 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="1.8" y="2.4" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="1.8" y="9" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="4.6" cy="4.7" r=".95" fill="currentColor"/>
+              <circle cx="4.6" cy="11.3" r=".95" fill="currentColor"/>
+            </svg>
+          </span>
+          <span>服务器配置</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="list_server.html">服务器列表</a></li>
+          <li><a href="new_server.html">新增服务器</a></li>
+        </ul>
+      </div>
+
+      <!-- 一级：模型调试 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.6 1.6M10.9 10.9l1.6 1.6M12.5 3.5l-1.6 1.6M5.1 10.9l-1.6 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>模型调试</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="foundation1_models.html">模型列表</a></li>
+          <li><a href="model_add.html">新增模型</a></li>
+        </ul>
+      </div>
+      <!-- 一级：提示词复核（二级：提示词测试 / 提示词方案 / 测试结果列表） -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M6.4 2.6h3.2M5.6 2.6H4.4a1.2 1.2 0 0 0-1.2 1.2v9a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2v-9a1.2 1.2 0 0 0-1.2-1.2h-1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M5.7 7.7 L7.1 9.1 L10.3 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>提示词复核</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="prompt_test.html">提示词测试</a></li>
+          <li><a href="prompt_scheme.html">提示词方案</a></li>
+          <li><a href="prompt_test_results_list.html">测试结果列表</a></li>
+        </ul>
+      </div>
+      <!-- 一级：数据库表结构提取 -->
+      <div class="nav-group">
+        <div class="nav-item active">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <ellipse cx="8" cy="4.1" rx="5.3" ry="2.1" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M2.7 4.1v7.8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1V4.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M2.7 8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>数据库表结构提取</span>
+        </div>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="dot"></span>
+      <span>v0.9.2 · PROTOTYPE</span>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ========== 主内容 ========== -->
+  <div class="main">
+
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="展开菜单">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="crumb">
+        <b>数据库表结构提取</b>
+        <span class="sep">/</span>
+        <span>表结构提取</span>
+      </div>
+      <div class="topbar-right">
+        <span class="chip">ENV · DEV</span>
+        <span class="chip live"><span class="dot"></span>SERVICE OK</span>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <div class="page-head">
+        <div class="page-head-txt">
+          <h1>数据库表结构提取</h1>
+          <p>选择数据库类型并连接，勾选需要的表，一键提取 <code>字段名 / 字段类型 / 字段描述</code> 与表间关系，复制即可用于建表或文档。</p>
+        </div>
+      </div>
+
+      <!-- ========== 数据源：数据库类型（页面左上角） ========== -->
+      <section class="panel ts-tool-panel">
+        <div class="ts-tool">
+          <div class="field">
+            <label for="inpDbType">数据库类型</label>
+            <div class="combo" id="comboDbType">
+              <input type="text" id="inpDbType" placeholder="请选择数据库类型" readonly aria-haspopup="listbox" />
+              <button type="button" class="combo-btn" data-combo-btn aria-label="展开选项">
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                  <path d="M2.6 4.4 L6 7.8 L9.4 4.4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <div class="combo-menu" data-combo-menu role="listbox" aria-label="数据库类型">
+                <div class="combo-item" data-value="SQLite" role="option"><i class="tag-dot d-purple"></i>SQLite</div>
+                <div class="combo-item" data-value="MySQL" role="option"><i class="tag-dot d-mint"></i>MySQL</div>
+                <div class="combo-item" data-value="Db2 for LUW" role="option"><i class="tag-dot d-orange"></i>Db2 for LUW</div>
+                <div class="combo-item" data-value="PostgreSQL" role="option"><i class="tag-dot d-gold"></i>PostgreSQL</div>
+                <div class="combo-item" data-value="Oracle" role="option"><i class="tag-dot d-purple"></i>Oracle</div>
+                <div class="combo-item" data-value="SQL Server" role="option"><i class="tag-dot d-mint"></i>SQL Server</div>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-primary" id="btnConnect">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M6.2 9.8a3.1 3.1 0 0 0 4.4 0l2.4-2.4a3.1 3.1 0 0 0-4.4-4.4l-.9.9" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M9.8 6.2a3.1 3.1 0 0 0-4.4 0L3 8.6a3.1 3.1 0 0 0 4.4 4.4l.9-.9" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+            </svg>
+            连接数据库
+          </button>
+          <span class="ts-tool-note" id="toolNote">尚未连接数据库</span>
+        </div>
+      </section>
+
+      <div class="ts-grid">
+
+        <!-- 左列：数据库 → 表（表名带复选框，可多选） -->
+        <div class="ts-col">
+          <section class="panel ts-block">
+            <div class="ts-block-head">
+              <input type="checkbox" class="ts-all-check" id="checkAllTables" title="全选 / 取消全选" aria-label="全选所有表" />
+              <span class="ts-block-t">数据库与表</span>
+              <span class="ts-spacer"></span>
+              <span class="ts-count" id="treeCount">0 个数据库</span>
+            </div>
+            <div class="ts-block-body">
+              <div class="db-tree" id="dbTree"></div>
+            </div>
+            <div class="ts-block-foot">
+              <button type="button" class="btn btn-primary" id="btnExtract" disabled>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 2.6v9.2M4.4 8.4 L8 12 L11.6 8.4" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                提取表结构
+              </button>
+              <span class="ts-hint" id="pickNote">勾选需要提取的表</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- 右列：表结构展示栏（右上角复制按钮） -->
+        <div class="ts-col">
+          <section class="panel ts-block">
+            <div class="ts-block-head">
+              <span class="ts-block-t">表结构</span>
+              <span class="ts-spacer"></span>
+              <span class="ts-count" id="schCount">—</span>
+              <button type="button" class="ts-copy" id="btnRegen" disabled>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M13.3 7.3a5.3 5.3 0 1 1-1.6-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M13.5 2v3.4h-3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                重新生成
+              </button>
+              <button type="button" class="ts-copy" id="btnClearSchema" disabled>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <path d="M2.8 4.4h10.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M4.1 4.4l.6 7.6a1.6 1.6 0 0 0 1.6 1.5h3.4a1.6 1.6 0 0 0 1.6-1.5l.6-7.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M6.5 4.4V3.1a.9.9 0 0 1 .9-.9h1.2a.9.9 0 0 1 .9.9v1.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                清空
+              </button>
+              <button type="button" class="ts-copy" id="btnCopy">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <rect x="5.4" y="5.4" width="8.2" height="8.2" rx="1.8" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M10.6 5.4V4.2a1.8 1.8 0 0 0-1.8-1.8H4.2a1.8 1.8 0 0 0-1.8 1.8v4.6a1.8 1.8 0 0 0 1.8 1.8h1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                复制
+              </button>
+            </div>
+            <div class="ts-block-body">
+              <div class="ts-tabs" role="tablist" aria-label="表结构展示切换">
+                <button type="button" class="ts-tab on" id="tabSchema" role="tab" aria-selected="true">表结构</button>
+                <button type="button" class="ts-tab" id="tabContent" role="tab" aria-selected="false">表内容</button>
+              </div>
+              <div class="ts-pane" id="paneSchema"></div>
+              <div class="ts-pane" id="paneContent" hidden></div>
+            </div>
+          </section>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- ========== 选择 SQLite 数据库文件 ========== -->
+<div class="mask" id="fileMask" role="dialog" aria-modal="true" aria-labelledby="fileTitle">
+  <div class="modal">
+    <h3 id="fileTitle">选择 SQLite 数据库文件</h3>
+    <p>从本机选择一个 <b>.db / .sqlite / .sqlite3</b> 文件，连接后将读取其中的表与字段结构。</p>
+    <div class="edit-body">
+      <div class="field">
+        <label for="inpFile">数据库文件</label>
+        <div class="pick-row">
+          <button type="button" class="btn btn-ghost" id="btnPickFile">选择文件</button>
+          <span class="fname empty" id="fileName">尚未选择文件</span>
+        </div>
+        <input type="file" id="fileInput" class="visually-hidden" accept=".db,.sqlite,.sqlite3,.db3" />
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="fileCancel">取消</button>
+      <button type="button" class="btn btn-add" id="fileConfirm">连接数据库</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 连接数据库（主机 / URL） ========== -->
+<div class="mask" id="connMask" role="dialog" aria-modal="true" aria-labelledby="connTitle">
+  <div class="modal">
+    <h3 id="connTitle">连接 <span id="connKind">MySQL</span> 数据库</h3>
+    <p>选择连接方式后填写连接信息。用户名与密码仅用于本次连接，不写入数据库。</p>
+    <div class="edit-body">
+      <div class="field">
+        <label>连接方式</label>
+        <div class="seg" id="segMode" role="group" aria-label="连接方式">
+          <button type="button" class="on" data-mode="host">主机</button>
+          <button type="button" data-mode="url">URL</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="inpAddr">服务器地址</label>
+        <input type="text" id="inpAddr" placeholder="如 127.0.0.1" autocomplete="off" />
+        <span class="field-hint" id="addrHint">填写主机名或 IP；非必填，留空表示本机（localhost）</span>
+      </div>
+      <div class="field" id="fieldPort">
+        <label for="inpPort">端口号 <i class="req">*</i></label>
+        <input type="text" id="inpPort" inputmode="numeric" placeholder="如 3306" autocomplete="off" />
+        <span class="field-hint" id="portHint">必填。已按所选数据库类型带出默认端口，可修改</span>
+      </div>
+      <div class="field" id="fieldUser">
+        <label for="inpUser">用户名</label>
+        <input type="text" id="inpUser" placeholder="如 root" autocomplete="off" />
+      </div>
+      <div class="field" id="fieldPwd">
+        <label for="inpPwd">密码</label>
+        <input type="password" id="inpPwd" placeholder="••••••••" autocomplete="new-password" />
+      </div>
+      <div class="field" id="fieldDbName">
+        <label for="inpDbName">数据库名</label>
+        <input type="text" id="inpDbName" placeholder="如 shop_db" autocomplete="off" />
+        <span class="field-hint">留空则按服务器地址自动命名；可重复连接，添加多个数据库</span>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="connCancel">取消</button>
+      <button type="button" class="btn btn-add" id="connConfirm">连接数据库</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* =======================================================================
+   数据库表结构提取 · 交互层（原型态：内置演示表结构，不连接真实数据库）
+   —— 数据库类型选择 / SQLite 选文件 / 主机·URL 连接 / 多库多表勾选 /
+      提取（字段名 字段类型 字段描述）+ 表间关系 / 一键复制
+   ======================================================================= */
+
+/* ================= 数据库类型 ================= */
+var DB_TYPES = ["SQLite", "MySQL", "Db2 for LUW", "PostgreSQL", "Oracle", "SQL Server"];
+
+/* 逻辑字段类型 → 各数据库方言下的实际字段类型 */
+var TYPE_MAP = {
+  "SQLite":      { pk:"INTEGER",   str:"TEXT",         int:"INTEGER",   money:"REAL",          ts:"DATETIME",  date:"DATE",   bool:"INTEGER",    text:"TEXT" },
+  "MySQL":       { pk:"BIGINT",    str:"VARCHAR(64)",  int:"INT",       money:"DECIMAL(10,2)", ts:"DATETIME",  date:"DATE",   bool:"TINYINT(1)", text:"TEXT" },
+  "Db2 for LUW": { pk:"INTEGER",   str:"VARCHAR(64)",  int:"INTEGER",   money:"DECIMAL(10,2)", ts:"TIMESTAMP", date:"DATE",   bool:"SMALLINT",   text:"CLOB" },
+  "PostgreSQL":  { pk:"BIGSERIAL", str:"VARCHAR(64)",  int:"INTEGER",   money:"NUMERIC(10,2)", ts:"TIMESTAMP", date:"DATE",   bool:"BOOLEAN",    text:"TEXT" },
+  "Oracle":      { pk:"NUMBER",    str:"VARCHAR2(64)", int:"NUMBER(10)",money:"NUMBER(10,2)",  ts:"TIMESTAMP", date:"DATE",   bool:"NUMBER(1)",  text:"CLOB" },
+  "SQL Server":  { pk:"BIGINT",    str:"NVARCHAR(64)", int:"INT",       money:"DECIMAL(10,2)", ts:"DATETIME2", date:"DATE",   bool:"BIT",        text:"NVARCHAR(MAX)" }
+};
+
+/* 二次迭代：原型的演示表结构已下线，改由后端 /api/schema 灌入真实库结构。
+   字段说明分两路（见 core/schema.py）：库里写了注释的直接用，没有的调 DeepSeek 补。 */
+var SCHEMA = [];
+
+/* 表间关系：[从表, 从字段, 主表, 主字段, 关系说明]
+   二次迭代：改由后端提供（取自真实外键），原型演示数据已下线。
+   第二批：外键按「每个已连接的库」分别保存（见 pdFillDb / collectRels），
+   这里的全局 RELATIONS 只作兜底。 */
+var RELATIONS = [];
+
+/* ============ 真实库结构（二次迭代 · 第二批新增的数据层） ============
+   后端返回的统一形状（/api/schema、POST /api/schema、/api/schema/connect 都一样）：
+     { ok, name, kind,
+       tables:    [{ name, rows, desc, descFrom, cols:[[字段名, 类型关键字, 字段说明, 真实类型]] }],
+       relations: [[从表, 从字段, 主表, 主字段, 关系说明]] }
+   · cols[j][1] === "pk" 表示主键 —— 原型据此标「主键」，并用 TYPE_MAP 把它映射成
+     该方言下的真实类型（MySQL→BIGINT / Oracle→NUMBER …）；
+   · 其余列给库里声明的真实类型原文，原型 colType() 查不到就原样返回
+     （所以 VARCHAR(255) / DECIMAL(10,2) 这类会透传，不会被改写）。
+   结构**按库**挂在 db.map / db.rels 上（支持一次连多个库，两个库有同名表也不会串），
+   于是原型的 schemaOf / collectRels / buildSchemaHtml / buildText 照常工作。 */
+function pdFillDb(db, sch){
+  db.schema = sch || { tables: [], relations: [] };
+  db.map = {};
+  db.rels = db.schema.relations || [];
+  var i;
+  for (i = 0; i < (db.schema.tables || []).length; i++){
+    db.map[db.schema.tables[i].name] = db.schema.tables[i];
+  }
+  db.tables = mockTables(db.kind, db.name, db.schema.tables || []);
+}
+
+/* 「提取表结构」前，把本次勾选到的表里「库里没有注释」的部分交给服务端补说明
+   （服务端调 DeepSeek）。哪张表 / 哪个字段进 payload，由 needDesc / need 决定，
+   所以库里本来就有注释的一律不重发、不覆盖。 */
+function pdFetchDesc(sel){
+  var payload = [], names = [], i, j, k;
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, sch = schemaOf(sel[i].t.name, db);
+    var need = [], cols = [], missing = false;
+    for (j = 0; j < sch.cols.length; j++){
+      cols.push([sch.cols[j][0], colType(db.kind, sch.cols[j][1])]);
+      if (!String(sch.cols[j][2] || "").length){ need.push(sch.cols[j][0]); missing = true; }
+    }
+    var noTableDesc = !String(sch.desc || "").length;
+    if (noTableDesc) missing = true;
+    if (missing){
+      payload.push({ name: sch.name, needDesc: noTableDesc, need: need, cols: cols });
+    }
+    for (k = 0; k < names.length; k++){ if (names[k] === db.name) break; }
+    if (k === names.length) names.push(db.name);
+  }
+  if (!payload.length) return Promise.resolve({ ok: true, tables: [], skipped: true });
+  return fetch("/api/schema/desc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ db: names.join(" + "), tables: payload })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok) return null;
+    pdMergeDesc(d.tables || [], sel);
+    return d;
+  }, function(){ return null; });
+}
+
+/* 把服务端生成的说明并回**对应那个库**的结构 —— **只填空的**，库里已有的注释一律不覆盖。 */
+function pdMergeDesc(list, sel){
+  var by = {}, i, j;
+  for (i = 0; i < list.length; i++){ by[list[i].name] = list[i]; }
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, nm = sel[i].t.name;
+    var tgt = (db.map && db.map[nm]) || null, src = by[nm];
+    if (!tgt || !src) continue;
+    if (!String(tgt.desc || "").length && src.desc) tgt.desc = src.desc;
+    var cm = {};
+    for (j = 0; j < (src.cols || []).length; j++){ cm[src.cols[j].name] = src.cols[j].desc; }
+    for (j = 0; j < tgt.cols.length; j++){
+      var one = cm[tgt.cols[j][0]];
+      if (one && !String(tgt.cols[j][2] || "").length) tgt.cols[j][2] = one;
+    }
+  }
+}
+
+/* 真连一个数据库（二次迭代 · 第二批）：把连接弹窗里的信息交给后端，
+   由后端用真实驱动连上去读结构（MySQL / PostgreSQL / SQL Server / Oracle / Db2）。
+   服务端**不做二次校验** —— 连不上就把驱动的真实报错原样提示出来，不伪造表树。 */
+function pdConnectDb(kind, cfg, name){
+  toast("正在连接 " + kind + " 数据库…", "");
+  return fetch("/api/schema/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok){ toast((d && d.error) || ("连接 " + kind + " 失败"), "warn"); return null; }
+    var db = addDb(name, kind, true, d);
+    toast("已连接数据库：" + name + "（" + ((d.tables || []).length) + " 张表）", "ok");
+    return db;
+  }, function(){
+    toast("连接失败，请确认服务已启动", "warn");
+    return null;
+  });
+}
+
+/* ================= 通用小工具 ================= */
+function esc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+/* 等宽文本里的显示宽度：中文/全角按 2 个字符位计 */
+function dw(s){
+  var n = 0;
+  for (var i = 0; i < s.length; i++){
+    var c = s.charCodeAt(i);
+    var wide = (c >= 0x1100 && c <= 0x115F) || (c >= 0x2E80 && c <= 0xA4CF) ||
+               (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0xF900 && c <= 0xFAFF) ||
+               (c >= 0xFE30 && c <= 0xFE6F) || (c >= 0xFF00 && c <= 0xFF60) ||
+               (c >= 0xFFE0 && c <= 0xFFE6);
+    n += wide ? 2 : 1;
+  }
+  return n;
+}
+function padR(s, w){
+  var d = w - dw(s);
+  return d > 0 ? s + new Array(d + 1).join(" ") : s;
+}
+
+/* ================= 元素引用 ================= */
+var $dbTree     = document.getElementById("dbTree");
+var $treeCount  = document.getElementById("treeCount");
+var $pickNote   = document.getElementById("pickNote");
+var $toolNote   = document.getElementById("toolNote");
+var $btnExtract = document.getElementById("btnExtract");
+var $btnRegen   = document.getElementById("btnRegen");
+var $btnClearSc = document.getElementById("btnClearSchema");
+var $btnCopy    = document.getElementById("btnCopy");
+var $allCheck   = document.getElementById("checkAllTables");
+var $btnConnect = document.getElementById("btnConnect");
+var $paneSchema = document.getElementById("paneSchema");
+var $paneContent= document.getElementById("paneContent");
+var $tabSchema  = document.getElementById("tabSchema");
+var $tabContent = document.getElementById("tabContent");
+var $schCount   = document.getElementById("schCount");
+
+var $fileMask   = document.getElementById("fileMask");
+var $fileInput  = document.getElementById("fileInput");
+var $fileName   = document.getElementById("fileName");
+var $btnPickFile= document.getElementById("btnPickFile");
+var $fileCancel = document.getElementById("fileCancel");
+var $fileConfirm= document.getElementById("fileConfirm");
+
+var $connMask   = document.getElementById("connMask");
+var $connKind   = document.getElementById("connKind");
+var $segMode    = document.getElementById("segMode");
+var $inpAddr    = document.getElementById("inpAddr");
+var $addrHint   = document.getElementById("addrHint");
+var $inpPort    = document.getElementById("inpPort");
+var $fieldPort  = document.getElementById("fieldPort");
+var $inpDbName  = document.getElementById("inpDbName");
+var $inpUser    = document.getElementById("inpUser");
+var $inpPwd     = document.getElementById("inpPwd");
+var $fieldUser  = document.getElementById("fieldUser");
+var $fieldPwd   = document.getElementById("fieldPwd");
+var $fieldDbName= document.getElementById("fieldDbName");
+var $connCancel = document.getElementById("connCancel");
+var $connConfirm= document.getElementById("connConfirm");
+
+/* ================= 轻提示 ================= */
+function toast(msg, type){
+  var el = document.createElement("div");
+  el.className = "toast" + (type ? " " + type : "");
+  el.textContent = msg;
+  document.getElementById("toastWrap").appendChild(el);
+  setTimeout(function(){
+    el.style.transition = "opacity .2s ease,transform .2s ease";
+    el.style.opacity = "0";
+    el.style.transform = "translateX(10px)";
+    setTimeout(function(){ el.remove(); }, 220);
+  }, 2200);
+}
+
+/* ================= 复制到剪贴板（带 execCommand 回落，file:// 下 clipboard API 常不可用） ================= */
+function copyText(text, okMsg){
+  if (!text){ toast("没有可复制的内容", "warn"); return; }
+  function done(){ toast(okMsg || "已复制到剪贴板", "ok"); }
+  function fallback(){
+    try{
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, ta.value.length);
+      var ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      ok ? done() : toast("复制失败，请手动选择文本", "warn");
+    } catch (e){
+      toast("复制失败，请手动选择文本", "warn");
+    }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done, fallback);
+  } else {
+    fallback();
+  }
+}
+
+/* ================= 下拉（只读单选，选项写在 HTML 里） ================= */
+function initCombo(rootId, onPick){
+  var root = document.getElementById(rootId);
+  if (!root) return null;
+  var input = root.querySelector("input");
+  var btn   = root.querySelector("[data-combo-btn]");
+  var menu  = root.querySelector("[data-combo-menu]");
+  if (!input || !btn || !menu) return null;
+
+  function close(){ root.classList.remove("open"); }
+  function open(){ root.classList.add("open"); }
+  function pick(it){
+    input.value = it.getAttribute("data-value") || "";
+    var all = menu.querySelectorAll(".combo-item");
+    for (var i = 0; i < all.length; i++){ all[i].classList.remove("is-picked"); }
+    it.classList.add("is-picked");
+    close();
+    if (onPick) onPick(input.value, it);
+  }
+
+  btn.addEventListener("click", function(e){
+    e.stopPropagation();
+    root.classList.contains("open") ? close() : open();
+  });
+  menu.addEventListener("mousedown", function(e){
+    var it = e.target.closest ? e.target.closest(".combo-item") : null;
+    if (!it) return;
+    e.preventDefault();
+    pick(it);
+  });
+  document.addEventListener("click", function(e){ if (!root.contains(e.target)) close(); });
+  document.addEventListener("keydown", function(e){ if (e.key === "Escape") close(); });
+
+  return { root: root, input: input, menu: menu, close: close, open: open };
+}
+
+/* ================= 状态 ================= */
+var dbs = [];              /* [{id, name, kind, collapsed, tables:[{name, rows, checked}]}] */
+var nextDbId = 1;
+var currentType = "";
+var connKind = "";
+var connMode = "host";
+var pickedFile = "";
+var lastSig = "";
+var extracted = false;
+
+/* ================= 演示数据 ================= */
+/* 二次迭代（第二批）：结构按库取（db.map）—— 一次连多个库时，同名表不会串；
+   没给 db（或该库里没有这张表）时回落到全局 SCHEMA。 */
+function schemaOf(name, db){
+  if (db && db.map && db.map[name]) return db.map[name];
+  for (var i = 0; i < SCHEMA.length; i++){ if (SCHEMA[i].name === name) return SCHEMA[i]; }
+  return { name:name, desc:"", cols:[] };
+}
+function colType(kind, logic){
+  var m = TYPE_MAP[kind] || TYPE_MAP["SQLite"];
+  return m[logic] || logic;
+}
+/* 二次迭代（第二批）：表清单来自后端灌进来的「本库结构」，行数用库里真实行数 */
+function mockTables(kind, name, sch){
+  var out = [], i;
+  for (i = 0; i < (sch || []).length; i++){
+    out.push({ name: sch[i].name, rows: sch[i].rows || 0, checked: false });
+  }
+  return out;
+}
+function findDb(id){
+  for (var i = 0; i < dbs.length; i++){ if (dbs[i].id === id) return dbs[i]; }
+  return null;
+}
+function findTable(db, name){
+  if (!db) return null;
+  for (var i = 0; i < db.tables.length; i++){ if (db.tables[i].name === name) return db.tables[i]; }
+  return null;
+}
+/* 二次迭代（第二批）：按库保存结构（db.map / db.rels）——
+   支持一次连多个库；两个库有同名表也不会互相串数据。 */
+function addDb(name, kind, silent, sch){
+  var db = { id: nextDbId++, name: name, kind: kind, collapsed: false,
+             tables: [], map: {}, rels: [] };
+  dbs.push(db);
+  pdFillDb(db, sch);
+  renderTree();
+  if (!silent) toast("已连接数据库：" + name, "ok");
+  return db;
+}
+function removeDb(id){
+  for (var i = 0; i < dbs.length; i++){
+    if (dbs[i].id === id){ dbs.splice(i, 1); break; }
+  }
+  renderTree();
+  toast("已移除该数据库", "ok");
+}
+
+/* ================= 渲染：数据库与表 ================= */
+function selection(){
+  var out = [];
+  for (var i = 0; i < dbs.length; i++){
+    for (var j = 0; j < dbs[i].tables.length; j++){
+      if (dbs[i].tables[j].checked) out.push({ db: dbs[i], t: dbs[i].tables[j] });
+    }
+  }
+  return out;
+}
+
+function renderTree(){
+  if (!dbs.length){
+    $dbTree.innerHTML = '<div class="ts-empty"><b>还没有连接数据库</b>先在上方选择「数据库类型」，'
+      + 'SQLite 从本机选文件，其余类型填写主机 / URL、用户名与密码后连接。</div>';
+    syncPick();
+    return;
+  }
+  var h = "", i, j;
+  for (i = 0; i < dbs.length; i++){
+    var db = dbs[i];
+    h += '<div class="db-node' + (db.collapsed ? ' is-collapsed' : '') + '" data-db="' + db.id + '">';
+    h +=   '<div class="db-node-head">'
+        +     '<svg class="db-caret" viewBox="0 0 12 12" fill="none"><path d="M3 4.6 L6 7.8 L9 4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        +     '<span class="db-name">' + esc(db.name) + '</span>'
+        +     '<span class="db-kind">' + esc(db.kind) + '</span>'
+        +     '<span class="db-count">' + db.tables.length + ' 张表</span>'
+        +     '<button type="button" class="db-del" data-db-del="' + db.id + '" title="移除该数据库" aria-label="移除该数据库">×</button>'
+        +   '</div>'
+        +   '<ul class="tbl-list">';
+    for (j = 0; j < db.tables.length; j++){
+      var t = db.tables[j];
+      h += '<li class="tbl-item' + (t.checked ? ' is-on' : '') + '" data-db="' + db.id + '" data-table="' + esc(t.name) + '">'
+        +    '<input type="checkbox" class="tbl-check"' + (t.checked ? ' checked' : '') + ' aria-label="选择表 ' + esc(t.name) + '" />'
+        +    '<span class="tbl-name">' + esc(t.name) + '</span>'
+        +    '<span class="tbl-meta">' + t.rows.toLocaleString("en-US") + ' 行</span>'
+        +  '</li>';
+    }
+    h += '</ul></div>';
+  }
+  $dbTree.innerHTML = h;
+  syncPick();
+}
+
+function syncPick(){
+  var sel = selection();
+  var keys = [], i;
+  for (i = 0; i < sel.length; i++){ keys.push(sel[i].db.id + ":" + sel[i].t.name); }
+  keys.sort();
+  var sig = keys.join("|");
+
+  $treeCount.textContent = dbs.length + " 个数据库";
+  $toolNote.innerHTML = dbs.length
+    ? '已连接 <b>' + dbs.length + '</b> 个数据库'
+    : '尚未连接数据库';
+  $pickNote.innerHTML = sel.length
+    ? '已选 <b>' + sel.length + '</b> 张表'
+    : '勾选需要提取的表';
+  $btnExtract.disabled = sel.length === 0;
+  syncAllCheck();
+
+  /* 勾选内容变了 → 之前生成的表结构已过期，重置展示栏 */
+  if (sig !== lastSig){
+    lastSig = sig;
+    extracted = false;
+    resetSchema();
+  }
+  syncSchBtns();
+}
+
+/* 表名栏的全选框：全部选中 → 勾上；选中一部分 → 半选；一个都没选 → 不勾 */
+function syncAllCheck(){
+  var total = 0, on = 0, i, j;
+  for (i = 0; i < dbs.length; i++){
+    for (j = 0; j < dbs[i].tables.length; j++){
+      total++;
+      if (dbs[i].tables[j].checked) on++;
+    }
+  }
+  $allCheck.checked       = total > 0 && on === total;
+  $allCheck.indeterminate = on > 0 && on < total;
+  $allCheck.disabled      = total === 0;
+}
+
+/* 表结构栏的「重新生成 / 清空」：没勾选表就不能重新生成；没生成过就没得清空 */
+function syncSchBtns(){
+  $btnRegen.disabled   = selection().length === 0;
+  $btnClearSc.disabled = !extracted;
+}
+
+/* ================= 渲染：表结构展示栏 ================= */
+var SCH_EMPTY = '<div class="ts-empty"><b>表结构展示栏</b>'
+  + '勾选左侧的表并点击「提取表结构」，「表结构」面板生成表格样式的字段清单，「表内容」面板生成可直接复制进提示词的纯文本（含表间关系）。</div>';
+
+function resetSchema(){
+  $paneSchema.innerHTML = SCH_EMPTY;
+  $paneContent.innerHTML = SCH_EMPTY;
+  $schCount.textContent = "—";
+  extracted = false;
+  setSchTab("schema");
+  syncSchBtns();
+}
+
+/* ================= 面板切换：表结构（表格样式）/ 表内容（纯文本） ================= */
+var schTab = "schema";
+function setSchTab(t){
+  schTab = t;
+  $tabSchema.classList.toggle("on", t === "schema");
+  $tabContent.classList.toggle("on", t !== "schema");
+  $tabSchema.setAttribute("aria-selected", t === "schema" ? "true" : "false");
+  $tabContent.setAttribute("aria-selected", t !== "schema" ? "true" : "false");
+  $paneSchema.hidden = (t !== "schema");
+  $paneContent.hidden = (t === "schema");
+}
+$tabSchema.addEventListener("click", function(){ setSchTab("schema"); });
+$tabContent.addEventListener("click", function(){ setSchTab("content"); });
+
+/* 表间关系只保留「两端都在本次勾选内」的，并按数据库分组 */
+function collectRels(sel){
+  var group = {}, order = [], i, k;
+  for (i = 0; i < sel.length; i++){
+    var id = sel[i].db.id;
+    if (!group[id]){ group[id] = { db: sel[i].db, names: {} }; order.push(id); }
+    group[id].names[sel[i].t.name] = 1;
+  }
+  var out = [];
+  for (i = 0; i < order.length; i++){
+    var g = group[order[i]];
+    var rels = (g.db && g.db.rels) || RELATIONS;   /* 二次迭代（第二批）：外键按库取 */
+    for (k = 0; k < rels.length; k++){
+      var r = rels[k];
+      if (g.names[r[0]] && g.names[r[2]]) out.push({ db: g.db, r: r });
+    }
+  }
+  return out;
+}
+
+function relBlockHtml(rels){
+  var h = '<div class="rel-block"><div class="rel-t">表间关系'
+        + '<span class="ts-count">' + rels.length + ' 条</span></div>';
+  if (!rels.length){
+    return h + '<div class="ts-hint">所选表之间没有外键关联。</div></div>';
+  }
+  h += '<ul class="rel-list">';
+  for (var i = 0; i < rels.length; i++){
+    var r = rels[i].r;
+    h += '<li class="rel-item">'
+      +    '<span class="m">' + esc(r[0]) + '.' + esc(r[1]) + '</span>'
+      +    '<span class="rel-arrow">→</span>'
+      +    '<span class="m">' + esc(r[2]) + '.' + esc(r[3]) + '</span>'
+      +    '<span class="rel-card" title="' + esc(rels[i].db.name) + '">' + esc(rels[i].db.name) + '</span>'
+      +    '<span class="rel-desc">' + esc(r[4]) + '</span>'
+      +  '</li>';
+  }
+  h += '</ul></div>';
+  return h;
+}
+
+/* 表结构展示栏：直接渲染成「可复制的纯文本」（表 / 注释 / 字段 三段式，字段名与类型分列对齐）
+   09-29 第一次：展示文本内容，方便复制后放进提示词里使用。
+   09-29 第二次：改成「表 xxx / 注释: xxx / 字段:」+「  - 字段名  (类型) [主键] 说明」的格式。 */
+function renderSchema(){
+  var sel = selection();
+  if (!sel.length){ resetSchema(); return; }
+  var rels = collectRels(sel);
+  /* 「表内容」面板：可复制的纯文本（与复制按钮同源） */
+  $paneContent.innerHTML = '<textarea class="sch-text" id="schText" readonly wrap="off" spellcheck="false"'
+    + ' aria-label="表内容文本">' + esc(buildText(sel, rels)) + '</textarea>';
+  /* 「表结构」面板：表格样式（字段名 / 类型 / 说明，主键加标记） */
+  $paneSchema.innerHTML = buildSchemaHtml(sel);
+  $schCount.textContent = sel.length + " 张表 · " + rels.length + " 条关系";
+  extracted = true;
+  syncSchBtns();
+}
+
+/* 表结构面板的表格渲染：每库一组、每表一块（表名 + 注释 + 三列表格）。
+   表间关系不进本面板（留在「表内容」文本里），避免同一信息两处维护。 */
+function buildSchemaHtml(sel){
+  var h = "", curDbId = null, i, j;
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, tbl = sel[i].t, sch = schemaOf(tbl.name, db);
+    if (db.id !== curDbId){
+      curDbId = db.id;
+      h += '<div class="sch-db">' + esc(db.name) + '（' + esc(db.kind) + '）</div>';
+    }
+    h += '<div class="sch-tbl">'
+      +    '<div class="sch-tbl-t">表 ' + esc(tbl.name)
+      +      '<span class="sch-tbl-desc">' + esc(sch.desc || "") + '</span></div>'
+      +    '<table class="sch-table">'
+      +      '<thead><tr><th style="width:26%">字段名</th><th style="width:30%">类型</th><th>说明</th></tr></thead>'
+      +      '<tbody>';
+    if (!sch.cols.length){
+      h += '<tr><td colspan="3">（无字段）</td></tr>';
+    }
+    for (j = 0; j < sch.cols.length; j++){
+      var c = sch.cols[j];
+      h += '<tr>'
+        +    '<td class="mono">' + esc(c[0]) + '</td>'
+        +    '<td class="mono">' + esc(colType(db.kind, c[1]))
+        +      (c[1] === "pk" ? '<span class="sch-pk">主键</span>' : '') + '</td>'
+        +    '<td>' + esc(c[2] || "") + '</td>'
+        +  '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  return h;
+}
+
+/* 表结构文本的列宽：字段名列 18 起（超出按实际最宽值 +2），类型列 8 起 */
+var NAME_W = 18;
+var TYPE_W = 8;
+
+/* 复制 / 展示共用的纯文本，每张表一段：
+     表 member_level
+     注释: 会员等级字典表（新客/活跃/忠实/核心）
+     字段:
+       - level_code        (INTEGER ) [主键] 等级编码，0=新客会员、1=活跃会员、2=忠实会员、3=核心会员
+       - level_name        (TEXT    ) 等级名称
+   多库时，在同一数据库的第一张表之前加一行「数据库 名称（类型）」，避免重名表分不清来源。 */
+function buildText(sel, rels){
+  var parts = [], i, j, r, curDbId = null;
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, tbl = sel[i].t, sch = schemaOf(tbl.name, db);
+
+    if (db.id !== curDbId){
+      curDbId = db.id;
+      parts.push("数据库 " + db.name + "（" + db.kind + "）");
+    }
+
+    /* 本表两列的实际列宽：字段名 18 起、类型 8 起，取本表内最宽值 */
+    var wName = NAME_W, wType = TYPE_W;
+    for (j = 0; j < sch.cols.length; j++){
+      wName = Math.max(wName, dw(sch.cols[j][0]) + 2);
+      wType = Math.max(wType, colType(db.kind, sch.cols[j][1]).length);
+    }
+
+    var lines = ["表 " + tbl.name, "注释: " + (sch.desc || ""), "字段:"];
+    if (!sch.cols.length){ lines.push("  （无字段）"); }
+    for (j = 0; j < sch.cols.length; j++){
+      var c = sch.cols[j];
+      lines.push("  - " + padR(c[0], wName)
+               + "(" + padR(colType(db.kind, c[1]), wType) + ")"
+               + (c[1] === "pk" ? " [主键]" : "")
+               + " " + (c[2] || ""));
+    }
+    parts.push(lines.join("\n"));
+  }
+  if (rels.length){
+    var rl = ["表间关系："];
+    for (i = 0; i < rels.length; i++){
+      r = rels[i].r;
+      rl.push("  " + r[0] + "." + r[1] + " → " + r[2] + "." + r[3] + "　" + r[4]
+            + "　（" + rels[i].db.name + "）");
+    }
+    parts.push(rl.join("\n"));
+  }
+  return parts.join("\n\n");
+}
+
+/* ================= 弹窗开关 ================= */
+function showMask(m){ m.classList.add("show"); }
+function hideMask(m){ m.classList.remove("show"); }
+
+/* ================= 流程：选择数据库类型 → 弹窗 ================= */
+function openConnectFlow(type){
+  if (!type){ toast("请先选择数据库类型", "warn"); return; }
+  if (type === "SQLite"){ openFileModal(); } else { openConnModal(type); }
+}
+
+/* ================= 弹窗：SQLite 文件 ================= */
+function openFileModal(){
+  pickedFile = "";
+  $fileInput.value = "";
+  $fileName.textContent = "尚未选择文件";
+  $fileName.classList.add("empty");
+  showMask($fileMask);
+}
+$btnPickFile.addEventListener("click", function(){ $fileInput.click(); });
+$fileInput.addEventListener("change", function(){
+  var f = this.files && this.files[0];
+  if (!f) return;
+  pickedFile = f.name;
+  $fileName.textContent = f.name;
+  $fileName.classList.remove("empty");
+});
+$fileCancel.addEventListener("click", function(){ hideMask($fileMask); });
+$fileConfirm.addEventListener("click", function(){
+  if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
+  var f = $fileInput.files && $fileInput.files[0];
+  if (!f){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
+  /* 二次迭代：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端临时打开、
+     读出真实表结构（含外键）后回传；说明仍在「提取表结构」时由 DeepSeek 补。 */
+  var fd = new FormData();
+  fd.append("file", f);
+  hideMask($fileMask);
+  toast("正在读取数据库结构…", "");
+  fetch("/api/schema", { method: "POST", body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){ toast((d && d.error) || "读取数据库结构失败", "warn"); return; }
+      addDb(d.name || f.name, d.kind || "SQLite", false, d);
+    }, function(){ toast("读取数据库结构失败，请确认服务已启动", "warn"); });
+});
+$fileMask.addEventListener("click", function(e){ if (e.target === $fileMask) hideMask($fileMask); });
+
+/* ================= 弹窗：连接数据库（主机 / URL） ================= */
+/* 各数据库类型的默认端口（只用于弹窗里预填，可自由改） */
+var DEF_PORT = {
+  "MySQL": "3306",
+  "Db2 for LUW": "50000",
+  "PostgreSQL": "5432",
+  "Oracle": "1521",
+  "SQL Server": "1433"
+};
+
+function setConnMode(m){
+  connMode = m;
+  var btns = $segMode.querySelectorAll("button");
+  for (var i = 0; i < btns.length; i++){
+    btns[i].classList.toggle("on", btns[i].getAttribute("data-mode") === m);
+  }
+  /* 第二十三轮：URL 模式下 数据库名 / 用户名 / 密码 三个字段整体隐藏（连接 URL 里已包含） */
+  $fieldDbName.style.display = (m === "url") ? "none" : "";
+  $fieldUser.style.display   = (m === "url") ? "none" : "";
+  $fieldPwd.style.display    = (m === "url") ? "none" : "";
+  if (m === "host"){
+    $inpAddr.placeholder = "如 127.0.0.1";
+    $addrHint.textContent = "填写主机名或 IP；非必填，留空表示本机（localhost）";
+    $addrHint.classList.remove("pre");
+  } else {
+    $inpAddr.placeholder = "如 jdbc:mysql://127.0.0.1:3306/shop_db";
+    /* URL 模式：服务器地址必填，下方展示填写模板与示例 */
+    $addrHint.textContent = "填写模板：mysql://用户名:密码@主机:端口/数据库名\n例如：mysql://root:123456@localhost:3306/tes";
+    $addrHint.classList.add("pre");
+  }
+  /* URL 模式下端口已写在连接 URL 里，端口框整体隐藏（该模式下也不参与必填校验） */
+  $fieldPort.style.display = (m === "url") ? "none" : "";
+}
+function openConnModal(kind){
+  connKind = kind;
+  $connKind.textContent = kind;
+  setConnMode("host");
+  $inpAddr.value = "";
+  $inpPort.value = DEF_PORT[kind] || "";
+  $inpDbName.value = "";
+  $inpUser.value = "";
+  $inpPwd.value = "";
+  showMask($connMask);
+}
+function deriveName(kind, addr, dbName){
+  var n = String(dbName || "").trim();
+  if (n) return n;
+  var a = String(addr || "").trim().replace(/[/?#]+$/, "");
+  if (a){
+    var seg = a.split("/");
+    var last = seg[seg.length - 1] || "";
+    if (last && last.indexOf(":") < 0) return last;
+    var head = a.split(":")[0];
+    if (head) return head;
+  }
+  return kind + " 数据库";
+}
+$segMode.addEventListener("click", function(e){
+  var b = e.target.closest ? e.target.closest("button") : null;
+  if (!b) return;
+  setConnMode(b.getAttribute("data-mode"));
+});
+$connCancel.addEventListener("click", function(){ hideMask($connMask); });
+$connConfirm.addEventListener("click", function(){
+  var kind = connKind || "MySQL";
+  /* 服务器地址：URL 模式下必填（第二十五轮）；主机模式非必填（留空表示本机）。
+     端口号仅在「主机」模式显示并必填（须为 1–65535 的数字），
+     URL 模式端口已包含在连接 URL 中，不做端口校验 */
+  if (connMode === "url"){
+    var u = String($inpAddr.value || "").trim();
+    if (!u){ toast("服务器地址 为必填项", "warn"); $inpAddr.focus(); return; }
+  }
+  if (connMode === "host"){
+    var port = String($inpPort.value || "").trim();
+    if (!port){ toast("端口号 为必填项", "warn"); $inpPort.focus(); return; }
+    if (!/^\d+$/.test(port) || Number(port) < 1 || Number(port) > 65535){
+      toast("端口号需为 1–65535 之间的数字", "warn"); $inpPort.focus(); return;
+    }
+  }
+  var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
+  hideMask($connMask);
+  /* 二次迭代（第二批）：**真接驱动** —— 把弹窗里的连接信息交给后端，由后端用真实驱动
+     （MySQL = pymysql / PostgreSQL = psycopg2 / SQL Server = pymssql /
+       Oracle = oracledb / Db2 for LUW = ibm_db）连上去读真实表结构。
+     服务端**不做二次校验**：不查必填、不查端口格式，连不上就把驱动的真实报错原样提示。
+     URL 模式下端口 / 用户名 / 密码 / 库名都在连接串里，所以把 url 一起送过去。 */
+  pdConnectDb(kind, {
+    kind: kind, mode: connMode,
+    host: $inpAddr.value, port: $inpPort.value,
+    user: $inpUser.value, pwd: $inpPwd.value, dbname: $inpDbName.value,
+    url: $inpAddr.value
+  }, name);
+});
+$connMask.addEventListener("click", function(e){ if (e.target === $connMask) hideMask($connMask); });
+
+/* ================= 交互：数据库树 ================= */
+$dbTree.addEventListener("click", function(e){
+  var t = e.target;
+
+  var del = t.closest ? t.closest("[data-db-del]") : null;
+  if (del){ e.stopPropagation(); removeDb(Number(del.getAttribute("data-db-del"))); return; }
+
+  var head = t.closest ? t.closest(".db-node-head") : null;
+  if (head){
+    var node = head.closest(".db-node");
+    var db = findDb(Number(node.getAttribute("data-db")));
+    if (db){
+      db.collapsed = !db.collapsed;
+      node.classList.toggle("is-collapsed", db.collapsed);
+    }
+    return;
+  }
+
+  var li = t.closest ? t.closest(".tbl-item") : null;
+  if (!li) return;
+  var cb = li.querySelector(".tbl-check");
+  if (!cb) return;
+  /* 点复选框本身 → 让原生先切换；点行内其它位置 → 手动切换 */
+  if (t !== cb) cb.checked = !cb.checked;
+
+  var db2 = findDb(Number(li.getAttribute("data-db")));
+  var tab = findTable(db2, li.getAttribute("data-table"));
+  if (tab) tab.checked = cb.checked;
+  li.classList.toggle("is-on", cb.checked);
+  syncPick();
+});
+
+/* ================= 交互：提取 / 复制 ================= */
+$btnConnect.addEventListener("click", function(){ openConnectFlow(currentType); });
+
+/* 表名栏全选：勾上 = 所有数据库下的表全部选上（含折叠起来的），取消 = 全部清空 */
+$allCheck.addEventListener("change", function(){
+  var on = this.checked, i, j;
+  for (i = 0; i < dbs.length; i++){
+    for (j = 0; j < dbs[i].tables.length; j++){ dbs[i].tables[j].checked = on; }
+  }
+  renderTree();
+  toast(on ? "已全选所有表" : "已取消全选", on ? "ok" : "");
+});
+
+/* 二次迭代：提取前先让服务端把「库里没有注释」的表 / 字段说明补上（调 DeepSeek），
+   补完再按原型原有口径渲染 —— 字段 / 排版 / CSS 一字未动。
+   模型不可用时只是说明为空，提取本身照常出结果。 */
+function pdRunExtract(word){
+  var sel = selection();
+  if (!sel.length){ toast("请先勾选要提取的表", "warn"); return; }
+  $btnExtract.disabled = true;
+  $btnRegen.disabled   = true;
+  toast("正在生成表结构说明…", "");
+  pdFetchDesc(sel).then(function(d){
+    renderSchema();
+    syncSchBtns();
+    toast(d ? (word + " " + sel.length + " 张表的表结构")
+            : (word + " " + sel.length + " 张表（说明未生成，模型不可用）"),
+          d ? "ok" : "warn");
+  });
+}
+
+$btnExtract.addEventListener("click", function(){ pdRunExtract("已提取"); });
+
+/* 重新生成：按当前勾选重跑一次（勾选没变时「提取表结构」按钮是灰的，这里可以强制重出） */
+$btnRegen.addEventListener("click", function(){ pdRunExtract("已重新生成"); });
+
+/* 清空：只清表结构展示栏，左侧「数据库与表」的勾选保留 */
+$btnClearSc.addEventListener("click", function(){
+  resetSchema();
+  toast("已清空表结构展示栏（左侧勾选保留）", "ok");
+});
+
+$btnCopy.addEventListener("click", function(){
+  if (!extracted){
+    toast("请先点「提取表结构」生成表结构", "warn");
+    return;
+  }
+  var sel = selection();
+  copyText(buildText(sel, collectRels(sel)), "表内容已复制到剪贴板");
+});
+
+/* ================= 侧边栏 / 移动端 =================
+   口径：一级菜单的展开 / 关闭只由「点击一级菜单名称」触发；点击二级菜单只做跳页与高亮，
+   不改任何一级菜单的开合状态。一级菜单一旦被点，就把**整栏**的开合快照存进 localStorage，
+   跳页时逐项还原 —— 所以换页面时侧栏不动，也不会被新页面的默认值改掉。 */
+var NAV_OPEN_KEY = "pd_nav_open";
+function navGroupName(g){
+  var el = g.querySelector(".nav-item > span:not(.ic)");
+  return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+}
+function navReadOpen(){
+  try { return JSON.parse(localStorage.getItem(NAV_OPEN_KEY)) || {}; } catch(e){ return {}; }
+}
+function navWriteOpen(map){
+  try { localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(map)); } catch(e){}
+}
+/* 整栏开合快照：一级菜单被点后记下全部组的开合，跳页时逐项还原 */
+function navSnapshot(){
+  var map = {}, gs = document.querySelectorAll(".nav-group");
+  for (var i = 0; i < gs.length; i++){
+    var k = navGroupName(gs[i]);
+    if (k) map[k] = gs[i].classList.contains("open");
+  }
+  return map;
+}
+/* 载入：库里有记录的组按记录还原；没记录过的组保留本页默认（当前页所在组默认展开） */
+var navOpenMap = navReadOpen();
+document.querySelectorAll(".nav-group").forEach(function(g){
+  var k = navGroupName(g);
+  if (k && Object.prototype.hasOwnProperty.call(navOpenMap, k) === true){
+    g.classList.toggle("open", !!navOpenMap[k]);
+  }
+});
+document.querySelectorAll("[data-toggle]").forEach(function(h){
+  h.addEventListener("click", function(){
+    var g = h.closest(".nav-group");
+    if (!g || h !== g.querySelector(".nav-item")) return;   /* 只认一级菜单名称本身 */
+    g.classList.toggle("open");
+    navWriteOpen(navSnapshot());     /* 记下整栏开合：跳页后逐项保持，点二级菜单不改任何组 */
+  });
+});
+
+document.querySelectorAll("[data-nav]").forEach(function(el){
+  el.addEventListener("click", function(e){
+    if (el.classList.contains("active")) return;
+    e.preventDefault();
+    toast("原型演示：跳转至「" + el.getAttribute("data-nav") + "」页");
+  });
+});
+
+var hamburger = document.getElementById("hamburger");
+var scrim = document.getElementById("scrim");
+hamburger.addEventListener("click", function(){ document.body.classList.toggle("nav-open"); });
+scrim.addEventListener("click", function(){ document.body.classList.remove("nav-open"); });
+
+/* ================= 启动 ================= */
+initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
+
+/* 二次迭代（第二批）：打开页面先连上后端自己的应用库（SQLite，真实结构），
+   其余 5 种类型由用户从「连接数据库」弹窗**真连**（见 pdConnectDb）。
+   「演示种子」换成「真实结构」，字段 / 排版 / CSS 一字未动。
+   说明文字不在这一步生成 —— 点「提取表结构」时才调 DeepSeek 补，且只补勾选到的表。 */
+function pdBoot(){
+  fetch("/api/schema").then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok){ toast((d && d.error) || "读取库结构失败", "warn"); resetSchema(); return; }
+    addDb(d.name, d.kind, true, d);
+    resetSchema();
+  }, function(){
+    toast("读取库结构失败，请确认服务已启动", "warn");
+    resetSchema();
+  });
+}
+pdBoot();
+</script>
+</body>
+</html>

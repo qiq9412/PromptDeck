@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>测试结果列表 · PromptDeck</title>
+<style>
+  :root{
+    --cream-1:#F2E8E0;
+    --cream-2:#E7DACE;
+    --ink:#17130F;
+    --text:#241E19;
+    --text-2:#7C7269;
+    --text-3:#A99F95;
+    --purple:#1C1712;
+    --purple-deep:#000000;
+    --purple-soft:#F3EBE1;
+    --mint:#8FB05F;
+    --mint-soft:#E9F2DA;
+    --orange:#D8452C;
+    --orange-soft:#FBEBE5;
+    --gold:#E0A93F;
+    --fill:#F5F0EA;
+    --fill-2:#EDE5DC;
+    --line:#F1EAE2;
+    --line-2:#E4DACF;
+    --r-sm:10px;
+    --r-app:30px;
+    --r-lg:22px;
+    --r-md:14px;
+    --sh-app:0 60px 120px -60px rgba(88,58,42,.42);
+    --sh-card:0 24px 54px -42px rgba(60,40,28,.42);
+    --sh-btn:0 12px 26px -16px rgba(23,19,15,.7);
+    --sans:"Plus Jakarta Sans","Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","SF Mono",Consolas,"Cascadia Mono","Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:14px;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 720px at 8% -12%, #FBF4EE 0%, rgba(251,244,238,0) 62%),
+      radial-gradient(940px 660px at 105% 105%, #E6D8CB 0%, rgba(230,216,203,0) 62%),
+      linear-gradient(150deg,var(--cream-1) 0%,var(--cream-2) 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#E3D9CE;border-radius:99px;}
+  ::-webkit-scrollbar-thumb:hover{background:#D3C7B9;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- 应用外框（浮动白色圆角卡片） ---------- */
+  .app{
+    display:flex;
+    height:calc(100vh - 40px);
+    margin:20px;
+    background:#FBF7F2;
+    border-radius:var(--r-app);
+    box-shadow:var(--sh-app);
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* ---------- 侧边栏 ---------- */
+  .sidebar{
+    width:252px;flex:0 0 252px;
+    background:transparent;
+    display:flex;flex-direction:column;
+    padding:22px 14px 16px;
+    position:relative;z-index:30;
+  }
+  .sidebar::before{display:none;}
+
+  .brand{
+    display:flex;align-items:center;gap:11px;
+    padding:2px 10px 24px;
+    position:relative;z-index:2;
+  }
+  .brand-logo{flex:0 0 auto;display:block;border-radius:11px;}
+  .brand-txt{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .brand-name{
+    font-size:19px;font-weight:800;letter-spacing:-.4px;
+    font-family:var(--sans);
+    color:var(--ink);
+    line-height:1;
+  }
+  .brand-sub{
+    font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:700;
+  }
+
+  .nav{padding:0;overflow-y:auto;flex:1;position:relative;z-index:2;}
+  .nav-label{
+    font-size:10px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+    padding:0 12px 10px;
+  }
+  .nav-group{margin-bottom:2px;}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:11px 12px;border-radius:var(--r-md);
+    color:var(--text-2);cursor:pointer;
+    font-size:14px;font-weight:600;
+    transition:background .18s ease,color .18s ease;
+    user-select:none;
+  }
+  .nav-item:hover{background:var(--fill);color:var(--ink);}
+  .nav-item .ic{
+    flex:0 0 18px;width:18px;height:18px;
+    display:flex;align-items:center;justify-content:center;
+    color:inherit;
+  }
+  .nav-item .caret{
+    margin-left:auto;width:12px;height:12px;color:var(--text-3);
+    transition:transform .22s ease;
+  }
+  .nav-group.open > .nav-item .caret{transform:rotate(90deg);}
+  .nav-item.is-parent{color:var(--ink);font-weight:800;}
+
+  .subnav{
+    list-style:none;margin:2px 0 8px;padding:0 0 0 5px;
+    display:none;
+  }
+  .nav-group.open .subnav{display:block;}
+  .subnav a{
+    display:flex;align-items:center;
+    position:relative;
+    padding:10px 14px;border-radius:var(--r-md);
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .subnav a::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:3px;height:0;border-radius:3px;background:var(--purple);
+    transition:height .2s ease;
+  }
+  .subnav a:hover{background:var(--fill);color:var(--ink);}
+  .subnav a.active{
+    background:var(--purple-soft);color:var(--purple-deep);font-weight:800;
+  }
+  .subnav a.active::before{height:18px;}
+
+  .sidebar-foot{
+    position:relative;z-index:2;
+    margin-top:12px;
+    padding:13px 15px;
+    background:var(--fill);border-radius:var(--r-md);
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;
+    color:var(--text-2);display:flex;align-items:center;gap:8px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    background:var(--mint);box-shadow:0 0 0 3px rgba(79,189,182,.2);
+  }
+
+  /* ---------- 主区 ---------- */
+  .main{
+    flex:1;min-width:0;display:flex;flex-direction:column;
+    overflow-y:auto;
+    border-left:0;
+    padding:0 16px 16px;
+  }
+
+  .topbar{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:14px;
+    padding:20px 0 18px;
+    background:#FBF7F2;
+    border-bottom:0;
+    position:sticky;top:0;z-index:20;
+  }
+  .hamburger{
+    display:none;width:40px;height:40px;border:0;
+    border-radius:var(--r-md);background:var(--fill);cursor:pointer;
+    align-items:center;justify-content:center;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .hamburger:hover{background:var(--fill-2);color:var(--ink);}
+  .crumb{
+    font-size:14px;color:var(--text-3);font-weight:600;
+    display:flex;align-items:center;gap:9px;min-width:0;
+  }
+  .crumb b{color:var(--ink);font-weight:800;font-size:16px;letter-spacing:-.2px;}
+  .crumb .sep{color:#D8CEC2;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .chip{
+    font-size:11px;letter-spacing:.7px;font-weight:700;
+    padding:8px 14px;border-radius:999px;
+    border:1px solid var(--line-2);
+    color:var(--text-2);background:#fff;
+  }
+  .chip.live{
+    color:#5C7F33;background:#E7F1D8;border-color:#D7E6C0;
+    display:flex;align-items:center;gap:7px;
+  }
+
+  .content{
+    flex:1;padding:26px 30px 34px;
+    background:#FFFFFF;
+    border-radius:26px;
+    box-shadow:0 34px 80px -72px rgba(70,45,30,.8);
+  }
+
+  .page-head{margin-bottom:22px;display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+  .page-head-txt{min-width:0;}
+  .page-head .actions{margin-left:auto;align-items:center;}
+  .page-head h1{
+    margin:0 0 8px;font-size:25px;font-weight:800;letter-spacing:-.6px;
+    color:var(--ink);
+    display:flex;align-items:center;gap:10px;
+  }
+  .page-head p{margin:0;color:var(--text-2);font-size:13.5px;font-weight:500;line-height:1.6;}
+  .page-head code{
+    font-family:var(--mono);font-size:12px;background:var(--fill);
+    padding:3px 8px;border-radius:8px;color:#7A6A58;
+  }
+
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    box-shadow:var(--sh-card);
+    overflow:hidden;
+  }
+
+  /* ---------- 搜索 / 操作 ---------- */
+  .panel-top{
+    display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;
+    padding:22px 24px;
+    border-bottom:1px solid var(--line);
+  }
+  .search-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;flex:1 1 100%;}
+  .search-form .field{flex:1 1 240px;}
+  .field{display:flex;flex-direction:column;gap:8px;min-width:190px;}
+  .field label{
+    font-size:10.5px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+  }
+  .field input{
+    height:46px;padding:0 16px;
+    border:1px solid #F1E8DF;border-radius:var(--r-md);
+    background:#F7F2EC;
+    font-size:14px;font-family:var(--sans);font-weight:600;color:var(--ink);
+    outline:none;width:100%;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .field input::placeholder{color:#B3A79A;font-weight:500;}
+  .field input:focus{
+    background:#fff;border-color:#E0D2C2;
+    box-shadow:0 0 0 4px rgba(28,23,18,.07);
+  }
+
+  .btn{
+    height:46px;padding:0 22px;border-radius:999px;
+    border:1px solid transparent;
+    font-size:14px;font-weight:700;font-family:var(--sans);
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;white-space:nowrap;
+    transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease;
+  }
+  .btn svg{flex:0 0 auto;}
+  .btn-primary{
+    background:var(--ink);color:#fff;
+    box-shadow:0 16px 30px -18px rgba(23,19,15,.85);
+  }
+  .btn-primary:hover{background:#000;transform:translateY(-1px);}
+  .btn-ghost{
+    background:#fff;border-color:var(--line-2);color:var(--text-2);
+  }
+  .btn-ghost:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+  .btn-danger{
+    background:#fff;border-color:#F6D8CF;color:var(--orange);
+  }
+  .btn-danger:hover:not(:disabled){background:var(--orange-soft);border-color:#F0B9A4;}
+  .btn:disabled,.btn.is-disabled{
+    background:var(--fill);border-color:transparent;color:#BDB2A6;
+    box-shadow:none;cursor:not-allowed;transform:none;
+  }
+  .btn-add{
+    background:var(--ink);color:#fff;border-color:transparent;
+    box-shadow:var(--sh-btn);
+  }
+  .btn-add:hover{background:#000;transform:translateY(-1px);}
+
+  .actions{display:flex;gap:12px;align-items:flex-end;margin-left:auto;flex-wrap:wrap;}
+
+  .meta-bar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:14px 24px;
+    background:#fff;border-bottom:1px solid var(--line);
+    font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--text-3);
+  }
+  .meta-bar .sel{
+    color:var(--purple-deep);background:var(--purple-soft);
+    padding:5px 12px;border-radius:999px;border:0;
+  }
+  .meta-bar .grow{flex:1;}
+
+  /* ---------- 表格 ---------- */
+  .table-wrap{width:100%;overflow-x:auto;}
+  table{width:100%;min-width:860px;border-collapse:collapse;}
+  thead th{
+    text-align:left;
+    padding:15px 22px;
+    background:#FBF7F2;
+    border-bottom:1px solid var(--line);
+    font-size:10.5px;letter-spacing:1.1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;white-space:nowrap;
+  }
+  tbody td{
+    padding:17px 22px;border-bottom:1px solid var(--line);
+    vertical-align:middle;font-size:14px;font-weight:600;color:var(--ink);
+  }
+  tbody tr{transition:background .18s ease;}
+  tbody tr:hover{background:#FBF7F2;}
+  tbody tr.is-checked{background:var(--purple-soft);}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .col-check{width:54px;}
+  .col-platform{width:23%;}
+  .col-company{width:26%;}
+  .col-api{width:auto;}
+  tbody td.col-check{position:relative;padding-left:22px;}
+  tbody td.col-check::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:4px;height:26px;border-radius:0 4px 4px 0;background:#ECA9B6;
+  }
+  tbody tr:nth-child(4n+1) td.col-check::before{background:#ECA9B6;}
+  tbody tr:nth-child(4n+2) td.col-check::before{background:#EFC05A;}
+  tbody tr:nth-child(4n+3) td.col-check::before{background:#A9CBE8;}
+  tbody tr:nth-child(4n+4) td.col-check::before{background:#2C4A66;}
+
+  /* 方形复选框 */
+  input[type="checkbox"]{
+    appearance:none;-webkit-appearance:none;
+    width:20px;height:20px;border-radius:4px;
+    border:1.8px solid #D9CEC1;background:#fff;
+    cursor:pointer;position:relative;display:block;margin:0;
+    transition:background .16s ease,border-color .16s ease;
+  }
+  input[type="checkbox"]:hover{border-color:var(--purple);}
+  input[type="checkbox"]::after{
+    content:"";position:absolute;left:0;right:0;top:0;bottom:0;margin:auto;
+    width:4px;height:8px;
+    border:2px solid #fff;border-top:0;border-left:0;
+    transform:rotate(42deg);opacity:0;
+    transition:opacity .14s ease;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate{
+    background:var(--purple);border-color:var(--purple);
+  }
+  input[type="checkbox"]:checked::after{opacity:1;}
+  input[type="checkbox"]:indeterminate::after{
+    width:8px;height:2px;border:0;border-radius:2px;
+    background:#fff;transform:none;opacity:1;
+  }
+
+  .link{
+    color:var(--purple);font-weight:700;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:color .16s ease;
+    word-break:break-word;
+  }
+  .link:hover{
+    color:var(--purple-deep);
+    text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px;
+  }
+  .link .ext{opacity:.45;flex:0 0 auto;transition:opacity .16s ease;}
+  .link:hover .ext{opacity:1;}
+  .link-company{color:var(--ink);font-weight:600;}
+  .link-company:hover{color:var(--purple);}
+
+  .api{
+    font-family:var(--mono);font-size:12.5px;font-weight:500;color:#7A6A58;
+    background:#F7F1EA;border:1px solid #EFE5D9;
+    padding:7px 13px;border-radius:999px;display:inline-block;
+    max-width:100%;overflow-wrap:anywhere;
+  }
+
+  .empty-cell{text-align:center;padding:64px 16px;color:var(--text-3);}
+  .empty-cell .big{font-size:15px;color:var(--ink);margin-bottom:8px;font-weight:800;}
+  .empty-cell .small{font-size:12.5px;font-weight:600;color:var(--text-3);}
+
+  .panel-foot{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:16px 24px;border-top:1px solid var(--line);
+    background:#fff;
+    font-size:12.5px;font-weight:700;color:var(--text-3);
+  }
+  .pager{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .pager button{
+    height:34px;padding:0 14px;border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);font-family:var(--sans);font-size:12.5px;font-weight:700;
+    color:var(--text-2);cursor:pointer;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .pager button:hover:not(:disabled){background:var(--fill);color:var(--ink);}
+  .pager button:disabled{color:#C4B9AC;cursor:not-allowed;background:var(--fill);border-color:transparent;}
+  .pager .page-now{
+    height:34px;min-width:34px;padding:0 10px;
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:var(--r-sm);background:var(--ink);color:#fff;
+    font-size:12.5px;font-weight:800;
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .mask{
+    position:fixed;inset:0;z-index:80;
+    background:rgba(50,34,26,.34);
+    backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .mask.show{display:flex;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{
+    width:100%;max-width:440px;background:#fff;border-radius:24px;
+    border:0;
+    box-shadow:0 46px 100px -44px rgba(50,34,26,.62);
+    padding:28px 28px 22px;
+    animation:pop .2s ease;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+  .modal-ic{
+    width:50px;height:50px;border-radius:16px;
+    background:var(--orange-soft);border:0;
+    display:flex;align-items:center;justify-content:center;color:var(--orange);
+    margin-bottom:16px;
+  }
+  .modal h3{margin:0 0 10px;font-size:18.5px;font-weight:800;letter-spacing:-.3px;color:var(--ink);}
+  .modal p{margin:0;color:var(--text-2);font-size:14px;font-weight:500;line-height:1.7;}
+  .modal p b{color:var(--ink);font-weight:800;}
+  .modal .names{
+    margin-top:14px;padding:12px 14px;background:var(--fill);
+    border:0;border-radius:var(--r-md);
+    font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+    line-height:2;max-height:110px;overflow:auto;
+  }
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;}
+  .modal-foot .btn{height:44px;}
+  .btn-danger-solid{
+    background:var(--orange);color:#fff;
+    box-shadow:0 16px 32px -18px rgba(242,99,61,.95);
+  }
+  .btn-danger-solid:hover{background:#BE3A23;transform:translateY(-1px);}
+
+  /* ---------- 轻提示 ---------- */
+  .toast-wrap{position:fixed;right:24px;bottom:24px;z-index:90;display:flex;flex-direction:column;gap:10px;}
+  .toast{
+    background:#fff;border:0;border-radius:var(--r-md);
+    padding:13px 17px;
+    box-shadow:0 26px 56px -26px rgba(50,34,26,.5);
+    font-size:13.5px;font-weight:600;color:var(--text-2);max-width:330px;
+    display:flex;align-items:center;gap:10px;
+    animation:slide .22s ease;
+  }
+  .toast::before{
+    content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;
+    background:var(--purple);
+  }
+  .toast.ok::before{background:var(--mint);}
+  .toast.warn::before{background:var(--gold);}
+  @keyframes slide{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  /* ---------- 响应式 ---------- */
+  /* ---------- 操作列 · 修改弹窗（列表页通用，追加；上方规则一行未动） ---------- */
+  .col-op{width:104px;text-align:right;}
+  .btn-op{
+    height:34px;padding:0 16px;
+    border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);
+    font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text-2);
+    cursor:pointer;white-space:nowrap;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .btn-op:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+
+  /* 修改弹窗：复用 .mask / .modal，只放宽宽度 + 给表单留纵向间距。
+     弹窗里放了下拉框（absolute 定位），所以弹窗体不能裁切；超高时由 #editMask 整体滚动兜底 */
+  #editMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #editMask .modal{max-width:560px;margin:auto 0;}
+  .edit-body{
+    display:flex;flex-direction:column;gap:16px;
+    margin-top:18px;
+  }
+  .edit-body .field{min-width:0;}
+
+  /* ---------- 弹窗内的字段控件：与「新增服务器」页同一套外观（下拉 / 必填星号 / 字段说明） ---------- */
+  .field-hint{font-size:11.5px;font-weight:600;color:var(--text-3);line-height:1.5;}
+  .field label .req{
+    font-style:normal;font-weight:800;font-size:13px;line-height:1;
+    color:var(--orange);margin-left:4px;
+    display:inline-block;vertical-align:top;transform:translateY(-2px);
+  }
+  .combo{position:relative;}
+  .combo input{padding-right:48px;}
+  .combo-btn{
+    position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    width:34px;height:34px;border:0;border-radius:10px;
+    background:transparent;color:var(--text-3);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .16s ease,color .16s ease,transform .22s ease;
+  }
+  .combo-btn:hover{background:var(--fill-2);color:var(--ink);}
+  .combo.open .combo-btn{transform:translateY(-50%) rotate(180deg);color:var(--purple);}
+  .combo-menu{
+    position:absolute;left:0;right:0;top:calc(100% + 8px);z-index:40;
+    background:#fff;border:1px solid var(--line);
+    border-radius:var(--r-md);
+    box-shadow:0 30px 60px -28px rgba(60,40,28,.32);
+    padding:6px;display:none;max-height:240px;overflow:auto;
+  }
+  .combo.open .combo-menu{display:block;animation:pop .16s ease;}
+  .combo-item{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 12px;border-radius:10px;
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    cursor:pointer;transition:background .14s ease,color .14s ease;
+  }
+  .combo-item:hover{background:var(--purple-soft);color:var(--purple-deep);}
+  .combo-item.is-picked{background:var(--fill);color:var(--ink);}
+  .combo-empty{
+    padding:16px 12px;text-align:center;
+    font-size:12.5px;font-weight:600;color:var(--text-3);
+  }
+  .tag-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;display:block;}
+  .d-purple{background:var(--purple);}
+  .d-mint{background:var(--mint);}
+  .d-orange{background:var(--orange);}
+  .d-gold{background:var(--gold);}
+
+  @media (max-width:1100px){
+    .sidebar{width:226px;flex-basis:226px;}
+    .content{padding:24px;}
+    .topbar{padding:18px 0 16px;}
+  }
+  @media (max-width:900px){
+    .app{height:100vh;margin:0;border-radius:0;}
+    .sidebar{
+      position:absolute;left:0;top:0;bottom:0;z-index:40;
+      width:262px;flex-basis:262px;
+      transform:translateX(-100%);
+      transition:transform .24s ease;
+      box-shadow:0 0 70px -20px rgba(50,34,26,.55);
+    }
+    body.nav-open .sidebar{transform:none;}
+    .main{border-left:0;padding:0 12px 12px;}
+    .hamburger{display:inline-flex;}
+    .scrim{position:absolute;inset:0;background:rgba(40,28,22,.32);z-index:35;display:none;}
+    body.nav-open .scrim{display:block;}
+    .content{padding:18px;}
+    .topbar{padding:16px 0 14px;}
+    .page-head h1{font-size:21px;}
+    .search-form{flex-basis:100%;}
+    .field{min-width:0;flex:1 1 160px;}
+    .actions{margin-left:0;width:100%;}
+    .actions .btn{flex:1 1 auto;}
+    .page-head{gap:14px;}
+    .page-head .actions{margin-left:0;width:100%;}
+    .toast-wrap{left:18px;right:18px;bottom:18px;}
+    .toast{max-width:none;}
+  }
+
+  /* ---------- 测试结果列表页专有（09-29 新增；上方基座规则一行未动） ---------- */
+
+  /* 搜索栏「准确率区间」：两个数字框 + 中间连接符 */
+  .field-range{flex:1 1 320px;}
+  .range-box{display:flex;align-items:center;gap:10px;}
+  .range-box input{flex:1 1 0;min-width:0;}
+  .range-sep{flex:0 0 auto;color:#C9BDB0;font-weight:800;font-size:13px;line-height:1;}
+
+  /* 操作列：查看 / 重新测试 两个按钮 */
+  .col-op{width:208px;text-align:right;}
+  .op-btns{display:inline-flex;gap:8px;justify-content:flex-end;}
+  .btn-op.is-primary{color:var(--purple-deep);border-color:#E3D3F1;}
+  .btn-op.is-primary:hover{background:var(--purple-soft);color:var(--purple-deep);border-color:#D6BEEE;}
+
+  /* 列宽：数据列一律给百分比，避免最后一列把余量吞掉导致错位 */
+  .col-name{width:20%;}
+  .col-platform{width:14%;}
+  .col-modelname{width:15%;}
+  .col-total{width:11%;}
+  .col-acc{width:12%;}
+  .col-wrong{width:10%;}
+  .col-fix{width:14%;}
+
+  /* 准确率：数字 + 细进度条（<80% 转金，<60% 转朱红） */
+  .acc{display:flex;align-items:center;gap:10px;}
+  .acc b{font-size:14.5px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .acc-bar{flex:0 0 64px;height:6px;border-radius:999px;background:var(--fill);overflow:hidden;}
+  .acc-bar i{display:block;height:100%;border-radius:999px;background:var(--mint);}
+  .acc.is-mid b{color:#9A7B12;}
+  .acc.is-mid .acc-bar i{background:var(--gold);}
+  .acc.is-low b{color:var(--orange);}
+  .acc.is-low .acc-bar i{background:var(--orange);}
+
+  /* 数量列 */
+  .cnt{font-size:14.5px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink);}
+  .cnt.is-zero{color:var(--text-3);font-weight:700;}
+  .cnt.is-wrong{color:var(--orange);}
+  .cnt-fix{
+    display:inline-flex;align-items:center;justify-content:center;
+    min-width:38px;padding:4px 11px;border-radius:999px;
+    background:var(--purple-soft);color:var(--purple-deep);
+    font-size:12.5px;font-weight:800;font-variant-numeric:tabular-nums;
+  }
+  .cnt-fix.is-zero{background:var(--fill);color:var(--text-3);}
+
+  /* 查看弹窗：只读键值网格 + 逐题明细 */
+  #viewMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #viewMask .modal{max-width:720px;margin:auto 0;}
+  .read-grid{
+    display:grid;grid-template-columns:1fr 1fr;gap:16px;
+    margin-top:18px;
+  }
+  .read-item{display:flex;flex-direction:column;gap:6px;min-width:0;}
+  .read-item .k,
+  .read-block .k{
+    font-size:10.5px;letter-spacing:1.1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+  }
+  .read-item .v{font-size:13.5px;font-weight:700;color:var(--ink);word-break:break-word;}
+  .read-block{display:flex;flex-direction:column;gap:9px;margin-top:18px;}
+
+  .q-list{
+    display:flex;flex-direction:column;gap:10px;
+    max-height:330px;overflow:auto;padding-right:2px;
+  }
+  .q-item{
+    background:#FBF7F2;border:1px solid var(--line);border-radius:var(--r-md);
+    padding:13px 15px;display:flex;flex-direction:column;gap:9px;
+  }
+  .q-top{display:flex;align-items:flex-start;gap:10px;}
+  .q-no{
+    flex:0 0 auto;min-width:22px;height:22px;padding:0 6px;
+    border-radius:7px;background:#fff;border:1px solid var(--line);
+    display:inline-flex;align-items:center;justify-content:center;
+    font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text-2);
+  }
+  .q-text{
+    flex:1 1 auto;min-width:0;
+    font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.6;
+    word-break:break-word;
+  }
+  .q-tag{
+    flex:0 0 auto;padding:4px 10px;border-radius:999px;
+    font-size:11px;font-weight:800;letter-spacing:.3px;white-space:nowrap;
+  }
+  .q-tag.is-right{background:#E7F1D8;color:#5C7F33;}
+  .q-tag.is-wrong{background:var(--orange-soft);color:var(--orange);}
+  .q-tag.is-fix{background:var(--purple-soft);color:var(--purple-deep);}
+  .q-tag.is-none{background:var(--fill);color:var(--text-3);}
+  /* 第十九轮：明细默认只到标签，答案 / 输出折叠进 .q-more，点「展开」再看 */
+  .q-toggle{
+    flex:0 0 auto;height:24px;padding:0 10px;border:1px solid var(--line);border-radius:999px;
+    background:#fff;font-family:var(--sans);font-size:11px;font-weight:700;color:var(--text-3);
+    cursor:pointer;transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .q-toggle:hover{background:var(--fill-2);color:var(--ink);border-color:#D9CBBB;}
+  .q-more{display:flex;flex-direction:column;gap:9px;}
+  .q-more[hidden]{display:none;}
+  /* 第二十一轮：问题详情整体折叠，默认只露统计标签（正确 / 错误 / 总数量 / 准确率） */
+  .q-sum-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .q-sum-tags{display:inline-flex;gap:6px;flex-wrap:wrap;flex:1 1 auto;min-width:0;}
+  .q-list[hidden]{display:none;}
+  #vwQToggle{margin-left:auto;}
+  .q-line{display:flex;gap:9px;font-size:12.5px;line-height:1.75;}
+  .q-line .k2{flex:0 0 auto;color:var(--text-3);font-weight:800;}
+  .q-line .v2{
+    flex:1 1 auto;min-width:0;color:var(--text-2);font-weight:600;
+    white-space:pre-wrap;word-break:break-word;
+  }
+
+  /* ---------- 多轮用户提示词：逐轮一个文本框 ---------- */
+  .dt-rounds{display:flex;flex-direction:column;gap:10px;margin-top:2px;}
+  .dt-rounds[hidden]{display:none;}
+  .dt-round{display:flex;flex-direction:column;gap:7px;}
+  .dt-round-k{font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--text-3);}
+  .dt-round-v{
+    padding:11px 13px;border:1px solid var(--line);border-radius:var(--r-sm);
+    background:#FDFCFA;font-size:12.5px;font-weight:600;line-height:1.75;color:var(--ink);
+    white-space:pre-wrap;word-break:break-word;max-height:150px;overflow:auto;
+  }
+
+  @media (max-width:900px){
+    .read-grid{grid-template-columns:1fr;}
+    .col-op{width:auto;}
+    .field-range{flex-basis:100%;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="brand-logo" width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34">
+            <stop stop-color="#2E241B"/>
+            <stop offset=".55" stop-color="#1B1510"/>
+            <stop offset="1" stop-color="#43331F"/>
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="32" height="32" rx="9" fill="url(#lg)"/>
+        <rect x="1" y="1" width="32" height="32" rx="9" stroke="rgba(255,255,255,.35)"/>
+        <path d="M10 11.5 L15.5 17 L10 22.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 23 h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>
+      </svg>
+      <div class="brand-txt">
+        <span class="brand-name">PromptDeck</span>
+        <span class="brand-sub">LLM Workbench</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">工作台</div>
+
+      <!-- 一级：提示词构造 -->
+      <div class="nav-group">
+        <a class="nav-item" href="prompt.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 4.2h11M2.5 8h7.5M2.5 11.8h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>提示词构造</span>
+        </a>
+      </div>
+
+      <!-- 一级：服务器配置 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="1.8" y="2.4" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="1.8" y="9" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="4.6" cy="4.7" r=".95" fill="currentColor"/>
+              <circle cx="4.6" cy="11.3" r=".95" fill="currentColor"/>
+            </svg>
+          </span>
+          <span>服务器配置</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="list_server.html">服务器列表</a></li>
+          <li><a href="new_server.html">新增服务器</a></li>
+        </ul>
+      </div>
+
+      <!-- 一级：模型调试 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.6 1.6M10.9 10.9l1.6 1.6M12.5 3.5l-1.6 1.6M5.1 10.9l-1.6 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>模型调试</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="foundation1_models.html">模型列表</a></li>
+          <li><a href="model_add.html">新增模型</a></li>
+        </ul>
+      </div>
+      <!-- 一级：提示词复核（二级：提示词测试 / 提示词方案 / 测试结果列表） -->
+      <div class="nav-group open">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M6.4 2.6h3.2M5.6 2.6H4.4a1.2 1.2 0 0 0-1.2 1.2v9a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2v-9a1.2 1.2 0 0 0-1.2-1.2h-1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M5.7 7.7 L7.1 9.1 L10.3 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>提示词复核</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="prompt_test.html">提示词测试</a></li>
+          <li><a href="prompt_scheme.html">提示词方案</a></li>
+          <li><a href="prompt_test_results_list.html" class="active">测试结果列表</a></li>
+        </ul>
+      </div>
+      <!-- 一级：数据库表结构提取 -->
+      <div class="nav-group">
+        <a class="nav-item" href="Table_Structure_Extraction.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <ellipse cx="8" cy="4.1" rx="5.3" ry="2.1" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M2.7 4.1v7.8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1V4.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M2.7 8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>数据库表结构提取</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="dot"></span>
+      <span>v0.9.2 · PROTOTYPE</span>
+    </div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ========== 主内容 ========== -->
+  <div class="main">
+
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="展开菜单">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="crumb">
+        <b>提示词复核</b>
+        <span class="sep">/</span>
+        <span>测试结果列表</span>
+      </div>
+      <div class="topbar-right">
+        <span class="chip">ENV · DEV</span>
+        <span class="chip live"><span class="dot"></span>SERVICE OK</span>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <div class="page-head">
+        <div class="page-head-txt">
+          <h1>测试结果列表</h1>
+          <p>汇总每一次提示词测试的结果：查看准确率与逐题判定，或把该方案的问题<b>重新打包</b>回 <code>提示词测试</code> 页再跑一轮。</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-danger" id="btnBatchDelete" disabled>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2.8 4.1h10.4M6.4 4.1V2.9h3.2v1.2M4.2 4.1l.7 9h6.2l.7-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            批量删除
+          </button>
+          <a class="btn btn-add" href="prompt_test.html" id="btnAddTest">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            添加提示词测试
+          </a>
+        </div>
+      </div>
+
+      <section class="panel">
+
+        <!-- 搜索 + 操作 -->
+        <div class="panel-top">
+          <form class="search-form" id="searchForm" autocomplete="off">
+            <div class="field">
+              <label for="qName">提示词方案名称</label>
+              <input type="text" id="qName" placeholder="如 电商客服回复方案" />
+            </div>
+            <div class="field field-range">
+              <label for="qAccMin">准确率区间（%）</label>
+              <div class="range-box">
+                <input type="number" id="qAccMin" min="0" max="100" inputmode="numeric" placeholder="最低准确率" />
+                <span class="range-sep">—</span>
+                <input type="number" id="qAccMax" min="0" max="100" inputmode="numeric" placeholder="最高准确率" />
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <circle cx="7" cy="7" r="4.6" stroke="#fff" stroke-width="1.7"/>
+                <path d="M10.6 10.6 L14 14" stroke="#fff" stroke-width="1.7" stroke-linecap="round"/>
+              </svg>
+              搜索
+            </button>
+            <button type="button" class="btn btn-ghost" id="btnReset">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M13.2 7.2a5.3 5.3 0 1 1-1.6-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                <path d="M13.4 1.9v3.3h-3.3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              重置
+            </button>
+          </form>
+        </div>
+
+        <!-- 状态条 -->
+        <div class="meta-bar">
+          <span id="metaTotal">共 0 条记录</span>
+          <span class="grow"></span>
+          <span class="sel" id="metaSelected" style="display:none;">已选 0 项</span>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-check">
+                  <input type="checkbox" id="checkAll" title="全选 / 取消全选" />
+                </th>
+                <th class="col-name">提示词方案名称</th>
+                <th class="col-platform">平台 / 官方名</th>
+                <th class="col-modelname">model 名称</th>
+                <th class="col-total">测试问题数量</th>
+                <th class="col-acc">准确率</th>
+                <th class="col-wrong">错误数量</th>
+                <th class="col-fix">人工矫正问题数量</th>
+                <th class="col-op">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="panel-foot">
+          <span id="footCount">共 0 条记录</span>
+          <div class="pager">
+            <button type="button" disabled>上一页</button>
+            <span class="page-now">1</span>
+            <button type="button" disabled>下一页</button>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- ========== 删除确认弹窗 ========== -->
+<div class="mask" id="delMask" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+  <div class="modal">
+    <div class="modal-ic">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+        <path d="M2.8 4.1h10.4M6.4 4.1V2.9h3.2v1.2M4.2 4.1l.7 9h6.2l.7-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h3 id="delTitle">确认删除</h3>
+    <p>确定要删除以下 <b id="delCount">0</b> 条测试结果吗？删除后该记录将从列表中移除，此操作不可撤销。</p>
+    <div class="names" id="delNames"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="delCancel">取消</button>
+      <button type="button" class="btn btn-danger-solid" id="delConfirm">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- ========== 查看测试结果详情弹窗（只读） ========== -->
+<div class="mask" id="viewMask" role="dialog" aria-modal="true" aria-labelledby="viewTitle">
+  <div class="modal">
+    <h3 id="viewTitle">测试结果详情</h3>
+    <p>该次测试的准确率与逐题判定（只读）。标为「<b>人工矫正</b>」的题目是 AI 判定被人工改判过的。</p>
+    <div class="read-grid">
+      <div class="read-item"><span class="k">提示词方案名称</span><span class="v" id="vwName"></span></div>
+      <div class="read-item"><span class="k">平台 / 官方名</span><span class="v" id="vwPlatform"></span></div>
+      <div class="read-item"><span class="k">model 名称</span><span class="v" id="vwModelName"></span></div>
+      <div class="read-item"><span class="k">测试问题数量</span><span class="v" id="vwTotal"></span></div>
+      <div class="read-item"><span class="k">准确率</span><span class="v" id="vwAcc"></span></div>
+      <div class="read-item"><span class="k">人工矫正问题数量</span><span class="v" id="vwFix"></span></div>
+    </div>
+    <div class="read-block" id="vwSchemeBlock" hidden>
+      <span class="k">提示词方案内容</span>
+      <div class="read-grid">
+        <div class="read-item"><span class="k">服务器</span><span class="v" id="vwScServer">—</span></div>
+        <div class="read-item"><span class="k">模型</span><span class="v" id="vwScModel">—</span></div>
+        <div class="read-item"><span class="k">API_key</span><span class="v" id="vwScApiKey">—</span></div>
+      </div>
+      <div class="read-item"><span class="k">请求地址</span><span class="v" id="vwScBase">—</span></div>
+      <div class="read-item"><span class="k">系统提示词</span><span class="v" id="vwScSys">—</span></div>
+      <div class="read-item"><span class="k">用户提示词</span><span class="v" id="vwScUser">—</span></div>
+      <div class="dt-rounds" id="vwScRounds" hidden></div>
+    </div>
+    <div class="read-block">
+      <div class="q-sum-head">
+        <span class="k">本次测试的问题详情</span>
+        <span class="q-sum-tags" id="vwQSummary"></span>
+        <button type="button" class="q-toggle" id="vwQToggle">展开明细</button>
+      </div>
+      <div class="q-list" id="vwList" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="viewClose">关闭</button>
+      <button type="button" class="btn btn-add" id="viewRetest">重新测试</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =======================================================================
+   测试结果列表 · 数据层（原型态用 localStorage）
+   存储键 1  PD_RESULT_KEY = "pd_test_results"：数组，每项
+     { id, name, problems:[ { q, ans, out, ai, judge } ] }
+       q     测试问题
+       ans   标准答案
+       out   模型输出（本次测试跑出来的模型回答）
+       ai    AI 自动判定  "right" | "wrong" | ""
+       judge 人工判定     "right" | "wrong" | ""
+   ★ 四个指标不单独存：测试问题数量 / 准确率 / 错误数量 / 人工矫正问题数量
+     全部由 problems 实时算出，保证表里的数字与弹窗明细永远对得上。
+     口径：准确率 = 人工判定为「对」的题数 ÷ 总题数；错误数量 = 人工判定为「错」的题数；
+           人工矫正问题数量 = AI 判定与人工判定不一致（被改判）的题数。
+   ★ 「重新测试」：把该条的 problems 转成「提示词测试」页的问题列表格式写进
+     PD_TEST_KEY = "pd_prompt_tests"（{id,q,ans,fb,ai,judge}），再跳到 prompt_test.html，
+     该页左栏列表即展示这批问题。
+   ★ 同时把「要选中的提示词方案名」写进 PD_RETEST_SCHEME_KEY，测试页打开后据此
+     自动在左栏选中对应方案（方案内容随之补齐），并跳过按方案生成问题的默认行为，
+     保证跳过去看到的就是本条结果对应的方案 + 那批问题。
+   ======================================================================= */
+var PD_RESULT_KEY = "pd_test_results";
+var PD_TEST_KEY   = "pd_prompt_tests";
+var PD_RETEST_SCHEME_KEY = "pd_retest_scheme";   /* 跳转时带上要选中的方案名 */
+var PD_RETEST_FLAG       = "pd_retest_flag";     /* 告诉测试页「别覆盖这批问题」 */
+
+/* 首次打开（存储里还没有 PD_RESULT_KEY）时把这批示例一次性落库；
+   已有数据（哪怕是空数组 []）一律以存储为准，不再回填。 */
+var SEED_RESULTS = [
+  { id:1, name:"电商客服回复方案", problems:[
+    { q:"客户问：我买的口红收到了，但颜色和图片不一样，能换吗？",
+      ans:"先致歉并安抚情绪，说明色差可能来自屏幕显示，告知 7 天无理由换货流程，并请客户提供订单号与实物照片。",
+      out:"非常抱歉给您带来困扰～ 屏幕显示与实物可能存在轻微色差。您可以在 7 天内无理由换货，麻烦把订单号和实物照片发我，我马上为您安排。",
+      ai:"right", judge:"right" },
+    { q:"客户问：下单三天了还没发货，是不是忘了？",
+      ans:"致歉 + 说明当前发货时效，查询订单状态并告知预计发货时间；已超时则给出补偿方案。",
+      out:"不好意思让您久等了，我帮您查一下订单状态。正常情况下 48 小时内发出，如果超时会为您申请相应补偿。",
+      ai:"right", judge:"right" },
+    { q:"客户问：这个面膜孕妇能用吗？",
+      ans:"不做绝对化的功效承诺，说明成分表并建议咨询医生后使用。",
+      out:"可以放心使用，孕妇和敏感肌都能用，绝对不会过敏。",
+      ai:"wrong", judge:"wrong" },
+    { q:"客户问：能开专用发票吗？税率多少？",
+      ans:"说明可开票类型，税率以实际开票为准，引导客户提供开票信息。",
+      out:"可以的，我们支持开增值税专用发票。您提供公司名称、税号、地址电话和开户行信息即可，税率以实际开票为准。",
+      ai:"right", judge:"right" },
+    { q:"客户问：满 199 减 50 的券能和会员折扣一起用吗？",
+      ans:"说明优惠叠加规则；不可叠加时主动给出更划算的方案。",
+      out:"这两项优惠不能叠加使用，建议您优先用满 199 减 50 的券，折算下来更划算。",
+      ai:"wrong", judge:"right" },
+    { q:"客户问：收货地址填错了怎么办？",
+      ans:"未发货可协助修改；已发货则引导联系快递改派或拒收重发。",
+      out:"如果还没发货我帮您改；已经发出的可以联系快递改派，或者拒收后我们再重新寄出。",
+      ai:"right", judge:"right" }
+  ]},
+  { id:2, name:"商品标题生成方案", problems:[
+    { q:"请为「纯棉宽松短袖T恤 男女同款」写一条促销标题",
+      ans:"不超过 20 字，只输出一句话标题，含核心卖点与促销信息，不做解释。",
+      out:"纯棉宽松短袖T恤 男女同款 限时直降",
+      ai:"right", judge:"right" },
+    { q:"请为「陶瓷不粘炒锅 32cm」写一条促销标题",
+      ans:"不超过 20 字，只输出一句话标题。",
+      out:"32cm 陶瓷不粘炒锅，少油不糊底，今天下单立减 30 元，还送木铲，库存不多手慢无！",
+      ai:"wrong", judge:"wrong" },
+    { q:"请为「降噪蓝牙耳机 长续航」写一条促销标题",
+      ans:"不超过 20 字，只输出一句话标题。",
+      out:"降噪蓝牙耳机 长续航 通勤必备",
+      ai:"right", judge:"right" },
+    { q:"请为「婴幼儿有机米粉 6个月+」写一条促销标题",
+      ans:"不超过 20 字，只输出一句话标题。",
+      out:"婴幼儿有机米粉 6个月+ 无添加蔗糖",
+      ai:"right", judge:"right" },
+    { q:"请为「北欧风实木餐桌 1.4m」写一条促销标题",
+      ans:"不超过 20 字，只输出一句话标题。",
+      out:"北欧实木餐桌 1.4m 小户型也够用",
+      ai:"right", judge:"right" }
+  ]},
+  { id:3, name:"发票信息抽取方案", problems:[
+    { q:"（图片）帮我从这张增值税发票里抽取关键信息",
+      ans:"输出 JSON，含发票号、金额、开票日期三个字段。",
+      out:"{\"发票号\":\"04327115\",\"金额\":\"1280.00\",\"开票日期\":\"2026-08-14\"}",
+      ai:"right", judge:"right" },
+    { q:"只保留「金额」和「开票日期」两个字段",
+      ans:"输出 JSON，只含金额与开票日期。",
+      out:"{\"金额\":\"1280.00\",\"开票日期\":\"2026-08-14\"}",
+      ai:"right", judge:"right" },
+    { q:"（图片）这张发票的销方税号是多少？",
+      ans:"输出 JSON，含销方税号。",
+      out:"{\"销方税号\":\"91330100MA2XXXXX7K\"}",
+      ai:"right", judge:"wrong" },
+    { q:"把金额改成不含税金额",
+      ans:"输出 JSON，金额为不含税金额。",
+      out:"发票上未单独列示不含税金额，无法给出。",
+      ai:"wrong", judge:"wrong" }
+  ]},
+  { id:4, name:"合同风险审阅方案", problems:[
+    { q:"（附件）审阅这份 12 页的服务采购合同",
+      ans:"逐条指出对甲方不利的条款，并给出修改建议与风险等级。",
+      out:"发现 5 处风险点：付款节点前置、违约金不对等、验收标准模糊、单方终止权缺失、知识产权归属不清。",
+      ai:"right", judge:"right" },
+    { q:"重点看付款条款",
+      ans:"指出付款条款的风险点并给出修改建议。",
+      out:"第 4.2 条约定合同签订后 5 日内支付 60%，早于服务交付节点，对甲方现金流不利，建议改为按里程碑分期支付。",
+      ai:"right", judge:"right" },
+    { q:"违约责任这条风险大吗？",
+      ans:"给出风险等级并说明判断依据。",
+      out:"风险非常高，建议立刻起诉对方。",
+      ai:"wrong", judge:"wrong" },
+    { q:"知识产权归属怎么写更安全？",
+      ans:"明确交付成果归属甲方，乙方仅保留署名权。",
+      out:"建议约定：本项目全部交付成果的知识产权归甲方所有，乙方不得将成果用于其他项目。",
+      ai:"right", judge:"right" },
+    { q:"验收标准有漏洞吗？",
+      ans:"指出验收标准模糊的具体条款并给出可量化写法。",
+      out:"第 6.1 条仅约定「甲方满意后验收」，标准过于主观；建议改为可量化的验收清单与验收时限。",
+      ai:"right", judge:"right" }
+  ]},
+  { id:5, name:"会议纪要整理方案", problems:[
+    { q:"把这段会议记录整理成纪要",
+      ans:"按「议题 / 结论 / 待办（负责人 + 截止时间）」三段输出。",
+      out:"议题：Q4 上新节奏\n结论：10/15 前完成选品\n待办：张三 10/08 前出选品清单",
+      ai:"right", judge:"right" },
+    { q:"待办事项要带上负责人和截止时间",
+      ans:"每条待办都含负责人与截止时间。",
+      out:"待办：\n1. 出选品清单 —— 张三 —— 10/08\n2. 撰写详情页文案 —— 李四 —— 10/10",
+      ai:"right", judge:"right" },
+    { q:"这段录音里有三处结论，都整理出来",
+      ans:"把三处结论全部列出。",
+      out:"结论只有一条：10/15 前完成选品。",
+      ai:"wrong", judge:"right" },
+    { q:"给每条待办标上优先级",
+      ans:"待办条目中含优先级字段。",
+      out:"待办：\n1. 出选品清单（高）—— 张三 —— 10/08\n2. 撰写详情页文案（中）—— 李四 —— 10/10",
+      ai:"right", judge:"right" }
+  ]}
+];
+
+/* localStorage 在 file:// 或隐私模式下可能不可用，用一次探测决定是否提示 */
+var pdStoreOK = (function(){
+  try{
+    window.localStorage.setItem("__pd_probe__", "1");
+    window.localStorage.removeItem("__pd_probe__");
+    return true;
+  } catch (e){ return false; }
+})();
+
+function pdNormProb(p){
+  p = p || {};
+  return {
+    q:     (p.q   === undefined || p.q   === null) ? "" : String(p.q),
+    ans:   (p.ans === undefined || p.ans === null) ? "" : String(p.ans),
+    out:   (p.out === undefined || p.out === null) ? "" : String(p.out),
+    ai:    (p.ai === "right" || p.ai === "wrong") ? p.ai : "",
+    judge: (p.judge === "right" || p.judge === "wrong") ? p.judge : ""
+  };
+}
+
+function pdNormResult(r){
+  r = r || {};
+  var ps = (r.problems && typeof r.problems.length === "number") ? r.problems : [];
+  var out = [];
+  for (var i = 0; i < ps.length; i++) out.push(pdNormProb(ps[i]));
+  return {
+    id:   (r.id === undefined || r.id === null) ? 0 : r.id,
+    name: (r.name === undefined || r.name === null) ? "" : String(r.name),
+    problems: out
+  };
+}
+
+function pdReadResults(){
+  try{
+    var raw = window.localStorage.getItem(PD_RESULT_KEY);
+    if (raw === null || raw === "") return null;
+    var arr = JSON.parse(raw);
+    if (!arr || typeof arr.length !== "number") return null;
+    var out = [];
+    for (var i = 0; i < arr.length; i++) out.push(pdNormResult(arr[i]));
+    return out;
+  } catch (e){ return null; }
+}
+
+function pdWriteResults(list){
+  try{ window.localStorage.setItem(PD_RESULT_KEY, JSON.stringify(list)); return true; }
+  catch (e){ return false; }
+}
+
+/* id 兜底：缺失 / 重复一律重排，避免同一行被两处引用 */
+function pdEnsureIds(list){
+  var seen = {}, next = 1;
+  for (var i = 0; i < list.length; i++){
+    var n = Number(list[i].id);
+    if (!n || !isFinite(n) || seen[n]){
+      while (seen[next]) next++;
+      n = next;
+    }
+    seen[n] = 1;
+    list[i].id = n;
+    if (n >= next) next = n + 1;
+  }
+  return list;
+}
+
+var results = (function(){
+  var raw = null;
+  try{ raw = window.localStorage.getItem(PD_RESULT_KEY); }catch (e){ raw = null; }
+  if (raw === null){
+    try{ window.localStorage.setItem(PD_RESULT_KEY, JSON.stringify(SEED_RESULTS)); }catch (e){}
+  }
+  var stored = pdReadResults();
+  var src = (stored !== null) ? stored : SEED_RESULTS;
+  var out = [];
+  for (var i = 0; i < src.length; i++){
+    var r = pdNormResult(src[i]);
+    if (!r.id) r.id = i + 1;
+    out.push(r);
+  }
+  return pdEnsureIds(out);
+})();
+
+/* 一旦在本页做过修改（删除），就把整份列表写回存储 */
+function pdPersist(){
+  if (!pdWriteResults(results)){
+    toast("保存失败：当前环境无法写入本地存储", "warn");
+    return false;
+  }
+  return true;
+}
+
+/* ================= 指标（全部由 problems 实时算出） ================= */
+function metrics(r){
+  var ps = r.problems || [], total = ps.length, right = 0, wrong = 0, fix = 0;
+  for (var i = 0; i < ps.length; i++){
+    var p = ps[i];
+    if (p.judge === "right")      right++;
+    else if (p.judge === "wrong") wrong++;
+    if (p.ai && p.judge && p.ai !== p.judge) fix++;
+  }
+  return { total: total, right: right, wrong: wrong, fix: fix,
+           acc: total ? Math.round(right / total * 100) : 0 };
+}
+
+/* 逐题标签：AI 与人工判定不一致 → 人工矫正 */
+function tagOf(p){
+  if (p.ai && p.judge && p.ai !== p.judge) return { cls:"is-fix",   txt:"人工矫正" };
+  if (p.judge === "right")                 return { cls:"is-right", txt:"正确" };
+  if (p.judge === "wrong")                 return { cls:"is-wrong", txt:"错误" };
+  return { cls:"is-none", txt:"未判定" };
+}
+
+/* ================= 状态 ================= */
+var selected = {};   // id -> true
+var view = results.slice();
+
+/* ================= DOM ================= */
+var $tbody      = document.getElementById("tbody");
+var $checkAll   = document.getElementById("checkAll");
+var $btnDel     = document.getElementById("btnBatchDelete");
+var $metaTotal  = document.getElementById("metaTotal");
+var $metaSel    = document.getElementById("metaSelected");
+var $footCount  = document.getElementById("footCount");
+var $qName      = document.getElementById("qName");
+var $qAccMin    = document.getElementById("qAccMin");
+var $qAccMax    = document.getElementById("qAccMax");
+
+/* ================= 渲染 ================= */
+function esc(s){
+  return String(s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function accCell(acc){
+  var cls = (acc < 60) ? " is-low" : (acc < 80 ? " is-mid" : "");
+  return '<div class="acc' + cls + '"><b>' + acc + '%</b>'
+       + '<span class="acc-bar"><i style="width:' + acc + '%"></i></span></div>';
+}
+
+function rowHtml(r){
+  var m       = metrics(r);
+  var checked = selected[r.id] ? " checked" : "";
+  var rowCls  = selected[r.id] ? ' class="is-checked"' : "";
+  var wrongCls = m.wrong ? " is-wrong" : " is-zero";
+  var fixCls   = m.fix   ? "" : " is-zero";
+  return ''
+    + '<tr data-id="' + r.id + '"' + rowCls + '>'
+    +   '<td class="col-check"><input type="checkbox" class="row-check"' + checked + ' data-id="' + r.id + '" /></td>'
+    +   '<td class="col-name">' + (r.name ? esc(r.name) : '<span class="cnt is-zero">未命名方案</span>') + '</td>'
+    +   '<td class="col-platform">' + cellOrDash(schemeFieldFor(r.name, "server")) + '</td>'
+    +   '<td class="col-modelname">' + cellOrDash(schemeFieldFor(r.name, "model")) + '</td>'
+    +   '<td class="col-total"><span class="cnt' + (m.total ? '' : ' is-zero') + '">' + m.total + '</span></td>'
+    +   '<td class="col-acc">' + accCell(m.acc) + '</td>'
+    +   '<td class="col-wrong"><span class="cnt' + wrongCls + '">' + m.wrong + '</span></td>'
+    +   '<td class="col-fix"><span class="cnt-fix' + fixCls + '">' + m.fix + '</span></td>'
+    +   '<td class="col-op">'
+    +     '<div class="op-btns">'
+    +       '<button type="button" class="btn-op" data-view="' + r.id + '">查看</button>'
+    +       '<button type="button" class="btn-op" data-edit="' + r.id + '">修改</button>'
+    +       '<button type="button" class="btn-op is-primary" data-retest="' + r.id + '">重新测试</button>'
+    +     '</div>'
+    +   '</td>'
+    + '</tr>';
+}
+
+function render(){
+  if (!view.length){
+    $tbody.innerHTML = '<tr><td colspan="9" class="empty-cell">'
+      + '<div class="big">没有找到匹配的测试结果</div>'
+      + '<div class="small">调整「提示词方案名称」或「准确率区间」后重新搜索，或点击重置</div>'
+      + '</td></tr>';
+  } else {
+    var html = "";
+    for (var i = 0; i < view.length; i++){ html += rowHtml(view[i]); }
+    $tbody.innerHTML = html;
+  }
+  syncHeader();
+  updateMeta();
+}
+
+/* 全选框状态（含半选） */
+function syncHeader(){
+  if (!view.length){
+    $checkAll.checked = false;
+    $checkAll.indeterminate = false;
+    return;
+  }
+  var hit = 0;
+  for (var i = 0; i < view.length; i++){ if (selected[view[i].id]) hit++; }
+  $checkAll.checked = hit === view.length;
+  $checkAll.indeterminate = hit > 0 && hit < view.length;
+}
+
+function selectedIds(){
+  var out = [];
+  for (var k in selected){ if (selected[k]) out.push(Number(k)); }
+  return out;
+}
+
+function updateMeta(){
+  var n = selectedIds().length;
+  $metaTotal.textContent = "共 " + view.length + " 条记录";
+  $footCount.textContent = "共 " + view.length + " 条记录";
+  $metaSel.style.display = n ? "inline-block" : "none";
+  $metaSel.textContent = "已选 " + n + " 项";
+  $btnDel.disabled = n === 0;
+}
+
+/* ================= 搜索 / 重置 ================= */
+/* 空 → null（该端不参与过滤）；非法值 → null；越界钳到 0..100 */
+function parseAcc(v){
+  var t = String(v === null || v === undefined ? "" : v).trim();
+  if (!t) return null;
+  var n = Number(t);
+  if (!isFinite(n)) return null;
+  if (n < 0)   n = 0;
+  if (n > 100) n = 100;
+  return n;
+}
+
+function applyFilter(){
+  var kw = $qName.value.trim().toLowerCase();
+  var lo = parseAcc($qAccMin.value);
+  var hi = parseAcc($qAccMax.value);
+  /* 起止填反了就自动对调，避免出现「填了区间却搜不到任何东西」 */
+  if (lo !== null && hi !== null && lo > hi){ var t = lo; lo = hi; hi = t; }
+  view = results.filter(function(r){
+    var m   = metrics(r);
+    var okN = !kw || String(r.name || "").toLowerCase().indexOf(kw) > -1;
+    var okL = (lo === null) || m.acc >= lo;
+    var okH = (hi === null) || m.acc <= hi;
+    return okN && okL && okH;
+  });
+  render();
+}
+
+document.getElementById("searchForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  applyFilter();
+  if (!view.length) toast("未匹配到测试结果，可调整条件或重置", "warn");
+});
+
+document.getElementById("btnReset").addEventListener("click", function(){
+  $qName.value   = "";
+  $qAccMin.value = "";
+  $qAccMax.value = "";
+  view = results.slice();
+  render();
+  toast("已重置搜索条件，共 " + view.length + " 条记录");
+});
+
+/* ================= 勾选 ================= */
+$checkAll.addEventListener("change", function(){
+  var on = $checkAll.checked;
+  for (var i = 0; i < view.length; i++){
+    if (on) selected[view[i].id] = true;
+    else delete selected[view[i].id];
+  }
+  render();
+});
+
+$tbody.addEventListener("change", function(e){
+  var cb = e.target;
+  if (!cb.classList || !cb.classList.contains("row-check")) return;
+  var id = Number(cb.getAttribute("data-id"));
+  if (cb.checked) selected[id] = true; else delete selected[id];
+  var tr = cb.closest("tr");
+  if (tr) tr.classList.toggle("is-checked", cb.checked);
+  syncHeader();
+  updateMeta();
+});
+
+$tbody.addEventListener("click", function(e){
+  if (e.target.tagName === "A") return;
+  /* 点「查看 / 重新测试」时交给各自流程处理，不要顺手勾选这一行 */
+  if (e.target.closest && (e.target.closest("[data-view]") || e.target.closest("[data-retest]"))) return;
+  /* 直接点在复选框上时交给原生 toggle，避免二次反转导致无法取消 */
+  if (e.target.closest && e.target.closest(".row-check")) return;
+  var tr = e.target.closest ? e.target.closest("tr") : null;
+  if (!tr) return;
+  var cb = tr.querySelector(".row-check");
+  if (cb){ cb.checked = !cb.checked; cb.dispatchEvent(new Event("change", { bubbles:true })); }
+});
+
+/* ================= 批量删除（二次确认） ================= */
+var $delMask  = document.getElementById("delMask");
+var $delCount = document.getElementById("delCount");
+var $delNames = document.getElementById("delNames");
+
+function findResult(id){
+  for (var i = 0; i < results.length; i++){
+    if (results[i].id === id) return results[i];
+  }
+  return null;
+}
+
+/* 本次待删集合：由勾选集合驱动 */
+var pendingDel = [];
+
+function openModal(ids){
+  ids = ids || [];
+  if (!ids.length) return;                       /* 没勾选时按钮本身就是灰的，这里再兜一层 */
+  pendingDel = ids.slice();
+  $delCount.textContent = ids.length;
+  var names = [];
+  for (var i = 0; i < ids.length; i++){
+    var r = findResult(ids[i]);
+    if (r) names.push("· " + (r.name || "未命名方案") + "（" + metrics(r).total + " 题）");
+  }
+  $delNames.innerHTML = names.join("<br/>");
+  $delNames.style.display = "block";
+  $delMask.classList.add("show");
+}
+function closeModal(){ $delMask.classList.remove("show"); pendingDel = []; }
+
+$btnDel.addEventListener("click", function(){ openModal(selectedIds()); });
+document.getElementById("delCancel").addEventListener("click", closeModal);
+$delMask.addEventListener("click", function(e){ if (e.target === $delMask) closeModal(); });
+
+document.getElementById("delConfirm").addEventListener("click", function(){
+  var ids = pendingDel.slice();
+  if (!ids.length){ closeModal(); return; }
+  var kill = {};
+  for (var i = 0; i < ids.length; i++) kill[ids[i]] = 1;
+  var keep = [];
+  for (var j = 0; j < results.length; j++){
+    if (!kill[results[j].id]) keep.push(results[j]);
+  }
+  results = keep;
+  for (var k in selected){ if (kill[k]) delete selected[k]; }
+  closeModal();
+  pdPersist();
+  applyFilter();
+  toast("已删除 " + ids.length + " 条测试结果", "ok");
+});
+
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape"){ closeModal(); closeView(); }
+});
+
+/* ================= 查看（操作列 · 只读详情） ================= */
+var $viewMask = document.getElementById("viewMask");
+var viewingId = null;
+
+function setRead(el, text){
+  var t = (text === null || text === undefined) ? "" : String(text);
+  el.textContent = t;
+}
+
+/* 二次迭代口径（09-30 第五轮建立 / 第六轮定终态 · 用户拍板「只在折叠态截断、展开后给全文」）：
+   查看弹窗的正文**只截折叠态**——逐题默认只露「问题」，此时问题取前 30 字
+   （超出补「…」，恰好 30 字不加省略号）；点「展开」后问题换回全文。
+   标准答案 / 模型输出本身只存在于展开区（.q-more），按「展开后给全文」一律给全文。
+   **所有题一律截**：没有展开入口的题（标准答案与模型输出都为空 ⇒ 第十九轮口径不给按钮）
+   同样截 30 字，只是它无处可展。
+   只改渲染出来的文本，字段 / 排版 / CSS 一律不动。 */
+var PROB_THUMB_MAX = 30;
+function thumbText(t, max){
+  var s = (t === null || t === undefined) ? "" : String(t);
+  max = (typeof max === "number") ? max : PROB_THUMB_MAX;
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+/* 第十九轮口径：明细默认只展示「问题 + 判定标签」，标准答案 / 模型输出折叠进
+   .q-more，点「展开」再看全文；答案与输出都为空的题不显示展开按钮。
+   二次迭代：问题的全文存进 .q-text 的 data-full（折叠态渲染截断版），
+   点「展开」时由展开事件换回全文；没有展开入口的题同样截，只是无处可展。 */
+function probHtml(p, i){
+  var t = tagOf(p);
+  var more = ''
+    + (p.ans ? '<div class="q-line"><span class="k2">标准答案</span><span class="v2">' + esc(p.ans) + '</span></div>' : '')
+    + (p.out ? '<div class="q-line"><span class="k2">模型输出</span><span class="v2">' + esc(p.out) + '</span></div>' : '');
+  var qFull = p.q || "（空问题）";
+  var qFold = thumbText(qFull);
+  return ''
+    + '<div class="q-item">'
+    +   '<div class="q-top">'
+    +     '<span class="q-no">' + (i + 1) + '</span>'
+    +     '<span class="q-text" data-full="' + esc(qFull) + '">' + esc(qFold) + '</span>'
+    +     '<span class="q-tag ' + t.cls + '">' + t.txt + '</span>'
+    +     (more ? '<button type="button" class="q-toggle" data-qtoggle>展开</button>' : '')
+    +   '</div>'
+    +   (more ? '<div class="q-more" hidden>' + more + '</div>' : '')
+    + '</div>';
+}
+
+/* 单元格：有值给原文（转义后），无值给「—」（与列表的空值口径一致） */
+function cellOrDash(v){
+  var t = String(v == null ? "" : v).trim();
+  return t ? esc(t) : '<span class="cnt is-zero">—</span>';
+}
+
+/* 按方案名取方案库里的某个字段（平台 / 模型）；方案被删或改名 ⇒ ""（显示「—」）
+   口径与第十二轮的 findSchemeByName 一致：结果记录只存方案名，内容一律实时回查方案库，
+   所以「提示词方案」页覆盖保存后，本页这两列立即跟着变。 */
+function schemeFieldFor(name, field){
+  var s = findSchemeByName(name);
+  return s ? String(s[field] || "") : "";
+}
+
+/* API_key 遮掩（与「提示词方案」页同一口径）：只给遮挡形态，不给查看入口 */
+function apiKeyMasked(s){
+  var k = String((s && s.apiKey) || "").trim();
+  if (!k) return "";
+  if (k.length <= 8) return "sk-" + new Array(Math.max(k.length, 4) + 1).join("•");
+  return k.slice(0, 3) + "-" + new Array(9).join("•") + k.slice(-4);
+}
+
+/* 按方案名去「提示词方案」库（pd_prompt_schemes）里查回该方案的完整内容；
+   查不到（方案被删或改名）返回 null，此时方案块整块隐藏。 */
+var PD_SCHEME_KEY = "pd_prompt_schemes";
+function findSchemeByName(name){
+  var arr = null;
+  try{
+    var raw = window.localStorage.getItem(PD_SCHEME_KEY);
+    if (raw === null || raw === "") return null;
+    arr = JSON.parse(raw);
+  } catch (e){ return null; }
+  if (!arr || typeof arr.length !== "number") return null;
+  for (var i = 0; i < arr.length; i++){
+    if (String(arr[i] && arr[i].name) === String(name)) return arr[i];
+  }
+  return null;
+}
+
+/* 把方案的提示词内容填进查看弹窗：单轮用一格纯文本，多轮拆成 N 个文本框逐轮标注 */
+function fillViewScheme(name){
+  var block = document.getElementById("vwSchemeBlock");
+  var rounds = document.getElementById("vwScRounds");
+  var single = document.getElementById("vwScUser");
+  var s = findSchemeByName(name);
+  if (!s){
+    block.hidden = true;
+    rounds.hidden = true;
+    rounds.innerHTML = "";
+    return;
+  }
+  block.hidden = false;
+  setRead(document.getElementById("vwScServer"), s.server || "—");
+  setRead(document.getElementById("vwScModel"),  (s.model || "—") + (s.modelType ? "（" + s.modelType + "）" : ""));
+  setRead(document.getElementById("vwScBase"),   s.base || "—");
+  setRead(document.getElementById("vwScApiKey"), apiKeyMasked(s) || "未保存");
+  setRead(document.getElementById("vwScSys"),    s.sys || "—");
+  var us = [];
+  var arr = (s.user && typeof s.user.length === "number") ? s.user : [];
+  for (var i = 0; i < arr.length; i++){ if (String(arr[i] || "").trim()) us.push(String(arr[i])); }
+  if (us.length > 1){
+    var rh = "";
+    for (var k = 0; k < us.length; k++){
+      rh += '<div class="dt-round">'
+          +   '<span class="dt-round-k">第 ' + (k + 1) + ' 轮对话内容</span>'
+          +   '<div class="dt-round-v">' + esc(us[k]) + '</div>'
+          + '</div>';
+    }
+    rounds.innerHTML = rh;
+    rounds.hidden = false;
+    single.hidden = true;
+  } else {
+    rounds.hidden = true;
+    rounds.innerHTML = "";
+    single.hidden = false;
+    setRead(single, us.length ? us[0] : "—");
+  }
+}
+
+function openView(id){
+  var r = findResult(id);
+  if (!r) return;
+  viewingId = id;
+  var m = metrics(r);
+  document.getElementById("viewTitle").textContent = "测试结果详情 · " + (r.name || "未命名方案");
+  setRead(document.getElementById("vwName"),  r.name || "未命名方案");
+  setRead(document.getElementById("vwPlatform"),  schemeFieldFor(r.name, "server") || "—");
+  setRead(document.getElementById("vwModelName"), schemeFieldFor(r.name, "model")  || "—");
+  setRead(document.getElementById("vwTotal"), m.total + " 题");
+  setRead(document.getElementById("vwAcc"),   m.acc + "%（" + m.right + " / " + m.total + "）");
+  setRead(document.getElementById("vwFix"),   m.fix + " 题");
+  fillViewScheme(r.name);
+  /* 第二十一轮：详情默认折叠，只露统计标签（正确 / 错误 / 总数量 / 准确率） */
+  document.getElementById("vwQSummary").innerHTML = ''
+    + '<span class="q-tag is-right">正确数量 ' + m.right + '</span>'
+    + '<span class="q-tag is-wrong">错误数量 ' + m.wrong + '</span>'
+    + '<span class="q-tag is-none">总数量 ' + m.total + '</span>'
+    + '<span class="q-tag is-fix">准确率 ' + m.acc + '%</span>';
+  $vwQList.hidden = true;
+  $vwQToggle.textContent = "展开明细";
+  var html = "";
+  for (var i = 0; i < r.problems.length; i++){ html += probHtml(r.problems[i], i); }
+  document.getElementById("vwList").innerHTML = html || '<div class="q-item"><div class="q-text">该次测试没有问题记录</div></div>';
+  $viewMask.classList.add("show");
+}
+function closeView(){ $viewMask.classList.remove("show"); viewingId = null; }
+
+document.getElementById("viewClose").addEventListener("click", closeView);
+$viewMask.addEventListener("click", function(e){ if (e.target === $viewMask) closeView(); });
+
+/* ================= 问题详情折叠（第二十一轮） =================
+   默认只露统计标签；点「展开明细」看逐题列表（逐题内部的展开/收起不变）。 */
+var $vwQList   = document.getElementById("vwList");
+var $vwQToggle = document.getElementById("vwQToggle");
+$vwQToggle.addEventListener("click", function(){
+  var open = !$vwQList.hidden;
+  $vwQList.hidden = open;
+  $vwQToggle.textContent = open ? "展开明细" : "收起明细";
+});
+document.getElementById("viewRetest").addEventListener("click", function(){
+  var id = viewingId;
+  closeView();
+  if (id) doRetest(id);
+});
+
+/* ================= 修改（第十九轮）：跳「提示词构造」页，覆盖口径与方案页一致 =================
+   按本行方案名去方案库查回方案 → 写 pd_edit_snapshot + pendingEdit →
+   跳 prompt.html?pdSchemeId=<id>&pdEntry=prompt.html；构造页回填后保存即按 id 覆盖，
+   本页所有展示（平台 / 模型 / 方案内容块）靠 findSchemeByName 现查，自动跟着变。 */
+function doEdit(id){
+  var r = findResult(id);
+  if (!r) return;
+  var s = findSchemeByName(r.name);
+  if (!s){
+    toast("提示词方案库里找不到「" + (r.name || "未命名方案") + "」，无法修改", "warn");
+    return;
+  }
+  try{
+    window.sessionStorage.setItem("pd_edit_snapshot", JSON.stringify({
+      id: s.id, name: s.name,
+      server: s.server || "", base: s.base || "",
+      model: s.model || "", modelType: s.modelType || "",
+      sys: s.sys || "",
+      user: (s.user && typeof s.user.length === "number") ? s.user : [],
+      multi: !!s.multi, apiKey: s.apiKey || ""
+    }));
+  } catch (e){
+    toast("无法写入本地存储，无法跳转修改", "warn");
+    return;
+  }
+  /* 在方案库记录上打 pendingEdit 标记（与「提示词方案」页 pdGotoEdit 同一口径） */
+  try{
+    var arr = JSON.parse(window.localStorage.getItem("pd_prompt_schemes") || "null");
+    if (arr && typeof arr.length === "number"){
+      for (var i = 0; i < arr.length; i++){
+        if (Number(arr[i] && arr[i].id) === Number(s.id)){ arr[i].pendingEdit = true; break; }
+      }
+      window.localStorage.setItem("pd_prompt_schemes", JSON.stringify(arr));
+    }
+  } catch (e){}
+  toast("已带上方案内容，正在跳转「提示词构造」…", "ok");
+  setTimeout(function(){
+    location.href = "prompt.html?pdSchemeId=" + encodeURIComponent(s.id) + "&pdEntry=prompt.html";
+  }, 420);
+}
+
+/* 明细「展开 / 收起」：委托在 #vwList 上（明细每次整体重绘）
+   二次迭代：问题正文跟着换 —— 折叠态是 30 字截断版，展开后换回 data-full 里的全文。
+   ⚠️ 原型里的 open 是「点击**前**的状态」（open 为真 = 这次是来收起的），
+   所以判断换哪一版必须看**点击后**的 more.hidden，不能复用 open。 */
+document.getElementById("vwList").addEventListener("click", function(e){
+  var b = e.target.closest ? e.target.closest("[data-qtoggle]") : null;
+  if (!b) return;
+  var item = b.closest(".q-item");
+  var more = item ? item.querySelector(".q-more") : null;
+  if (!more) return;
+  var open = !more.hidden;
+  more.hidden = open;
+  b.textContent = open ? "展开" : "收起";
+  var qt = item.querySelector(".q-text");
+  if (qt && qt.hasAttribute("data-full")){
+    var full = qt.getAttribute("data-full");
+    qt.textContent = more.hidden ? thumbText(full) : full;
+  }
+});
+
+/* ================= 重新测试：问题打包 → 跳转「提示词测试」页 =================
+   写进 PD_TEST_KEY（测试页的问题列表存储键），该页打开即渲染这批问题。 */
+function doRetest(id){
+  var r = findResult(id);
+  if (!r) return;
+  if (!r.problems.length){
+    toast("该条测试结果没有问题记录，无法重新测试", "warn");
+    return;
+  }
+  /* ① 本条已测问题 → 测试问题列表（测试页左栏那份存储） */
+  var list = [];
+  for (var i = 0; i < r.problems.length; i++){
+    var p = r.problems[i];
+    list.push({ id: i + 1, q: p.q, ans: p.ans, fb: "", ai: "", judge: "" });
+  }
+  try{
+    window.localStorage.setItem(PD_TEST_KEY, JSON.stringify(list));
+    /* ② 对应的提示词方案名 → 测试页据此自动选中并补齐方案内容 */
+    window.localStorage.setItem(PD_RETEST_SCHEME_KEY, String(r.name || ""));
+    /* ③ 标记：测试页不要再按方案覆盖这批问题 */
+    window.localStorage.setItem(PD_RETEST_FLAG, "1");
+  } catch (e){
+    toast("无法写入本地存储，已在当前页展示问题", "warn");
+    return;
+  }
+  toast("已带上方案与 " + list.length + " 个问题，正在跳转「提示词测试」…", "ok");
+  setTimeout(function(){ location.href = "prompt_test.html"; }, 420);
+}
+
+$tbody.addEventListener("click", function(e){
+  var v = e.target.closest ? e.target.closest("[data-view]") : null;
+  if (v){ openView(Number(v.getAttribute("data-view"))); return; }
+  var d = e.target.closest ? e.target.closest("[data-edit]") : null;
+  if (d){ doEdit(Number(d.getAttribute("data-edit"))); return; }
+  var t = e.target.closest ? e.target.closest("[data-retest]") : null;
+  if (t){ doRetest(Number(t.getAttribute("data-retest"))); return; }
+});
+
+/* ================= 侧边栏 =================
+   口径：一级菜单的展开 / 关闭只由「点击一级菜单名称」触发；点击二级菜单只做跳页与高亮，
+   不改任何一级菜单的开合状态。一级菜单一旦被点，就把**整栏**的开合快照存进 localStorage，
+   跳页时逐项还原 —— 所以换页面时侧栏不动，也不会被新页面的默认值改掉。 */
+var NAV_OPEN_KEY = "pd_nav_open";
+function navGroupName(g){
+  var el = g.querySelector(".nav-item > span:not(.ic)");
+  return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+}
+function navReadOpen(){
+  try { return JSON.parse(localStorage.getItem(NAV_OPEN_KEY)) || {}; } catch(e){ return {}; }
+}
+function navWriteOpen(map){
+  try { localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(map)); } catch(e){}
+}
+/* 整栏开合快照：一级菜单被点后记下全部组的开合，跳页时逐项还原 */
+function navSnapshot(){
+  var map = {}, gs = document.querySelectorAll(".nav-group");
+  for (var i = 0; i < gs.length; i++){
+    var k = navGroupName(gs[i]);
+    if (k) map[k] = gs[i].classList.contains("open");
+  }
+  return map;
+}
+/* 载入：库里有记录的组按记录还原；没记录过的组保留本页默认（当前页所在组默认展开） */
+var navOpenMap = navReadOpen();
+document.querySelectorAll(".nav-group").forEach(function(g){
+  var k = navGroupName(g);
+  if (k && Object.prototype.hasOwnProperty.call(navOpenMap, k) === true){
+    g.classList.toggle("open", !!navOpenMap[k]);
+  }
+});
+document.querySelectorAll("[data-toggle]").forEach(function(h){
+  h.addEventListener("click", function(){
+    var g = h.closest(".nav-group");
+    if (!g || h !== g.querySelector(".nav-item")) return;   /* 只认一级菜单名称本身 */
+    g.classList.toggle("open");
+    navWriteOpen(navSnapshot());     /* 记下整栏开合：跳页后逐项保持，点二级菜单不改任何组 */
+  });
+});
+
+/* 移动端菜单 */
+var hamburger = document.getElementById("hamburger");
+var scrim = document.getElementById("scrim");
+hamburger.addEventListener("click", function(){ document.body.classList.toggle("nav-open"); });
+scrim.addEventListener("click", function(){ document.body.classList.remove("nav-open"); });
+
+/* ================= 轻提示 ================= */
+function toast(msg, type){
+  var el = document.createElement("div");
+  el.className = "toast" + (type ? " " + type : "");
+  el.textContent = msg;
+  document.getElementById("toastWrap").appendChild(el);
+  setTimeout(function(){
+    el.style.transition = "opacity .2s ease,transform .2s ease";
+    el.style.opacity = "0";
+    el.style.transform = "translateX(10px)";
+    setTimeout(function(){ el.remove(); }, 220);
+  }, 2200);
+}
+
+/* ================= 回填入口守卫（第十八轮 · 四页同源） =================
+   口径：带 ?pdEntry=<目标页>&pdSchemeId=<id> 进来时，只有「目标页」自己认领这次编辑；
+   本页若不是目标页（用户从构造页又点走了），就地作废一次性入口 —— 清掉 sessionStorage
+   的待回填快照与「方案库」里该方案的 pendingEdit 标记，顺带清掉第十二轮遗留的
+   pd_retest_scheme / pd_retest_flag，避免下一次进构造页被再入口捡回旧的编辑态。 */
+(function(){
+  var params = null;
+  try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
+  if (!params) return;
+
+  var entry = params.get("pdEntry") || "";
+  var sid   = params.get("pdSchemeId") || "";
+  if (!entry && !sid) return;
+
+  var here = String(location.pathname || "").split("/").pop();
+  if (entry && here === entry) return;   /* 本页就是目标页：交给本页各自的启动逻辑认领 */
+
+  try{
+    window.sessionStorage.removeItem("pd_edit_snapshot");
+    window.sessionStorage.removeItem("pd_edit_scheme");
+  }catch (e){}
+  if (sid !== ""){
+    try{
+      var arr = JSON.parse(window.localStorage.getItem("pd_prompt_schemes") || "[]");
+      if (arr && typeof arr.length === "number"){
+        var hit = false;
+        for (var i = 0; i < arr.length; i++){
+          if (String(Number(arr[i] && arr[i].id)) === String(Number(sid)) && arr[i] && arr[i].pendingEdit){
+            delete arr[i].pendingEdit; hit = true;
+          }
+        }
+        if (hit) window.localStorage.setItem("pd_prompt_schemes", JSON.stringify(arr));
+      }
+    }catch (e){}
+  }
+  try{
+    window.localStorage.removeItem("pd_retest_scheme");
+    window.localStorage.removeItem("pd_retest_flag");
+  }catch (e){}
+})();
+
+/* ================= 启动 ================= */
+render();
+</script>
+</body>
+</html>

@@ -164,7 +164,72 @@ def fmt_price(v):
 
 
 sys.path.insert(0, HERE)
-import db as appdb  # noqa: E402
+
+# ---------------------------------------------------------------- 核对用的数据层
+# 第三次迭代换了库：应用读写的是 promptdeck/data/prompt_test_DB_twe.db 的
+# srv / mdl / tst_plan / tst_plan_prompt / tst_api_key 表。
+# 上一版这里写的是 `import db as appdb` —— 导的是 Starlette 版遗留的 db.py，
+# 它连的是**旧库**、查的是已废弃的 tp 表。换库后不改这里，
+# 「页面写的库」和「脚本核对的库」就不是同一个，断言会整片假失败。
+# 所以改成走 Django 侧同一套数据层 core.store，下面再包一层适配。
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django  # noqa: E402
+
+django.setup()
+
+from core import store as _store  # noqa: E402
+
+
+class _DbBridge(object):
+    """把 core.store 的输出适配成 verify_ui.py 一直用的那套接口形态。
+
+    差异只有一处：store.list_srv 返回的是 ORM 对象，而脚本按下标取字段
+    （r["plat_name"] / r["id"]），所以这里转成 dict。
+    store.list_mdl 本来就返回 dict 列表，原样透传。
+    """
+
+    @staticmethod
+    def list_srv(platform="", company=""):
+        return [{"id": s.id,
+                 "plat_name": s.plat_name or "",
+                 "base_url": s.base_url,
+                 "comp_name": s.comp_name,
+                 "home_url": s.home_url}
+                for s in _store.list_srv(platform, company)]
+
+    def count_srv(self):
+        return len(self.list_srv())
+
+    @staticmethod
+    def list_mdl():
+        return _store.list_mdl()
+
+    @staticmethod
+    def count_mdl():
+        return len(_store.list_mdl())
+
+    @staticmethod
+    def price_text(v):
+        return _store.price_text(v)
+
+    @staticmethod
+    def create_srv(*a, **kw):
+        return _store.create_srv(*a, **kw)
+
+    @staticmethod
+    def create_mdl(*a, **kw):
+        return _store.create_mdl(*a, **kw)
+
+    @staticmethod
+    def delete_srv(ids):
+        return _store.delete_srv(ids)
+
+    @staticmethod
+    def delete_mdl(ids):
+        return _store.delete_mdl(ids)
+
+
+appdb = _DbBridge()
 
 buf = io.StringIO()
 events = []
@@ -387,7 +452,7 @@ JS_PB_RUN_REAL = (
     "    var t0 = Date.now();\n"
     "    (function poll(){\n"
     "      var s = snap();\n"
-    "      var settled = s.uTotal !== '0 tokens' || s.out.indexOf('（调用失败）') === 0;\n"
+    "      var settled = s.uTotal !== '0 tokens' || s.out.indexOf('链接模型失败') === 0 || s.out.indexOf('（调用失败）') === 0;\n"
     "      if (settled || Date.now() - t0 > 25000) resolve(JSON.stringify({loadingNow: loadingNow, final: s}));\n"
     "      else setTimeout(poll, 150);\n"
     "    })();\n"
@@ -425,7 +490,7 @@ JS_PB_RUN_MULTI = (
     "    var t0 = Date.now();\n"
     "    (function poll(){\n"
     "      var s = snap();\n"
-    "      var settled = s.uTotal !== '0 tokens' || s.out.indexOf('（调用失败）') === 0;\n"
+    "      var settled = s.uTotal !== '0 tokens' || s.out.indexOf('链接模型失败') === 0 || s.out.indexOf('（调用失败）') === 0;\n"
     "      if (settled || Date.now() - t0 > 25000) resolve(JSON.stringify(s));\n"
     "      else setTimeout(poll, 150);\n"
     "    })();\n"
@@ -571,6 +636,27 @@ JS_EDIT_PLATFORM_COMBO = """(function(){
   return JSON.stringify({readonly: input.hasAttribute('readonly'), before:before,
                          opened:opened, items:items.length, first:first,
                          after:input.value, closed: !root.classList.contains('open')});
+})()"""
+
+# 新增模型页 · 「平台 / 官方名」下拉：选项应来自服务器列表（无写死的假平台）
+JS_ADD_PLATFORM_MENU = """(function(){
+  var root  = document.getElementById('comboPlatform');
+  var input = document.getElementById('platform');
+  if (!root || !input) return JSON.stringify({err:'__NOCOMBO__'});
+  root.querySelector('[data-combo-btn]').click();
+  var opened = root.classList.contains('open');
+  var nodes  = root.querySelectorAll('.combo-item');
+  var vals = [], dots = 0;
+  for (var i = 0; i < nodes.length; i++){
+    vals.push(nodes[i].getAttribute('data-value'));
+    if (nodes[i].querySelector('.tag-dot')) dots++;
+  }
+  var first = nodes.length ? nodes[0].getAttribute('data-value') : '';
+  if (nodes.length) nodes[0].dispatchEvent(new MouseEvent('mousedown', {bubbles:true}));
+  return JSON.stringify({opened:opened, items:nodes.length, vals:vals, dots:dots,
+                         first:first, after:input.value,
+                         readonly: input.hasAttribute('readonly'),
+                         closed: !root.classList.contains('open')});
 })()"""
 
 # 列表页快照：操作列结构 + 命中行的关键单元格（模板块用 NAME 占位，交由 .replace 注入）
@@ -855,40 +941,52 @@ def main():
                              "o": appdb.price_text(m0["out_price"]) or "",
                              "u": m0["unit"] or ""}, snap["mdl0"])
 
-        plat = srvs[0]["plat_name"]
-        w("")
-        w("[9] 选服务器「%s」-> Base_url 自动填充 + 模型/类型下拉收窄" % plat)
-        base = c.ev(JS_PB_PICK_SERVER % json.dumps(plat))
-        chk("Base_url 自动填成该服务器的 base_url", base == (srvs[0]["base_url"] or ""), base)
-        vis_m = ev_json(c, JS_PB_VISIBLE + "('menuModel')", "[9] 模型下拉")
-        exp_m = [r["mdl_name"] for r in mdls if r["plat_name"] == plat]
-        chk("模型下拉只剩该服务器下的模型", vis_m == exp_m, "%s vs %s" % (vis_m, exp_m))
-        vis_t = ev_json(c, JS_PB_VISIBLE + "('menuModelType')", "[9] 类型下拉")
-        exp_t = [t for t in exp_types
-                 if any(r["mdl_type"] == t and r["plat_name"] == plat for r in mdls)]
-        chk("类型下拉只剩该服务器下存在的类型", vis_t == exp_t, "%s vs %s" % (vis_t, exp_t))
+        # ⚠️ 不许硬编码平台名（原先写死 srvs[0] / OpenAI）：现场挑一台「库里确实挂着模型」
+        #    的服务器来测联动。某台服务器在库里一个模型都没配是完全合法的状态
+        #    （例如 OpenAI 可以只登记了平台、模型另配），写死就会让 exp_t 变成空列表，
+        #    紧接着 exp_t[0] 直接 IndexError —— 校验脚本当场崩，而不是如实报结论。
+        plat_row = next((r for r in srvs
+                         if any(m["plat_name"] == r["plat_name"] for m in mdls)), None)
+        if plat_row is None:
+            w("")
+            w("[9]-[11] 跳过：库里没有任何「挂着模型的服务器」，联动用例失去前提")
+            chk("库里至少有一台挂着模型的服务器", False,
+                "srv=%d mdl=%d" % (len(srvs), len(mdls)))
+        else:
+            plat = plat_row["plat_name"]
+            w("")
+            w("[9] 选服务器「%s」-> Base_url 自动填充 + 模型/类型下拉收窄" % plat)
+            base = c.ev(JS_PB_PICK_SERVER % json.dumps(plat))
+            chk("Base_url 自动填成该服务器的 base_url", base == (plat_row["base_url"] or ""), base)
+            vis_m = ev_json(c, JS_PB_VISIBLE + "('menuModel')", "[9] 模型下拉")
+            exp_m = [r["mdl_name"] for r in mdls if r["plat_name"] == plat]
+            chk("模型下拉只剩该服务器下的模型", vis_m == exp_m, "%s vs %s" % (vis_m, exp_m))
+            vis_t = ev_json(c, JS_PB_VISIBLE + "('menuModelType')", "[9] 类型下拉")
+            exp_t = [t for t in exp_types
+                     if any(r["mdl_type"] == t and r["plat_name"] == plat for r in mdls)]
+            chk("类型下拉只剩该服务器下存在的类型", vis_t == exp_t, "%s vs %s" % (vis_t, exp_t))
 
-        ttype = exp_t[0]
-        w("")
-        w("[10] 选模型类型「%s」-> 模型下拉再按类型收窄" % ttype)
-        vis_m2 = ev_json(c, JS_PB_PICK_TYPE % json.dumps(ttype), "[10] 类型联动")
-        exp_m2 = [r["mdl_name"] for r in mdls
-                  if r["plat_name"] == plat and r["mdl_type"] == ttype]
-        chk("模型下拉只剩该类型", vis_m2 == exp_m2, "%s vs %s" % (vis_m2, exp_m2))
+            ttype = exp_t[0]
+            w("")
+            w("[10] 选模型类型「%s」-> 模型下拉再按类型收窄" % ttype)
+            vis_m2 = ev_json(c, JS_PB_PICK_TYPE % json.dumps(ttype), "[10] 类型联动")
+            exp_m2 = [r["mdl_name"] for r in mdls
+                      if r["plat_name"] == plat and r["mdl_type"] == ttype]
+            chk("模型下拉只剩该类型", vis_m2 == exp_m2, "%s vs %s" % (vis_m2, exp_m2))
 
-        tgt = [r for r in mdls if r["plat_name"] == plat and r["mdl_type"] == ttype][0]
-        w("")
-        w("[11] 选模型「%s」-> 费用标签取库内计费" % tgt["mdl_name"])
-        tags = ev_json(c, JS_PB_PICK_MODEL % json.dumps(tgt["mdl_name"]), "[11] 选模型")
-        w("    %s" % json.dumps(tags, ensure_ascii=False))
-        chk("费用标签已显示", tags.get("hidden") is False, tags)
-        chk("输入计费标签 == in_price 原文（不四舍五入）",
-            tags.get("inTag") == "¥" + fmt_price(appdb.price_text(tgt["in_price"])),
-            tags.get("inTag"))
-        chk("输出计费标签 == out_price 原文（不四舍五入）",
-            tags.get("outTag") == "¥" + fmt_price(appdb.price_text(tgt["out_price"])),
-            tags.get("outTag"))
-        chk("单位标签 == unit", tags.get("unitIn") == "/ " + (tgt["unit"] or ""), tags.get("unitIn"))
+            tgt = [r for r in mdls if r["plat_name"] == plat and r["mdl_type"] == ttype][0]
+            w("")
+            w("[11] 选模型「%s」-> 费用标签取库内计费" % tgt["mdl_name"])
+            tags = ev_json(c, JS_PB_PICK_MODEL % json.dumps(tgt["mdl_name"]), "[11] 选模型")
+            w("    %s" % json.dumps(tags, ensure_ascii=False))
+            chk("费用标签已显示", tags.get("hidden") is False, tags)
+            chk("输入计费标签 == in_price 原文（不四舍五入）",
+                tags.get("inTag") == "¥" + fmt_price(appdb.price_text(tgt["in_price"])),
+                tags.get("inTag"))
+            chk("输出计费标签 == out_price 原文（不四舍五入）",
+                tags.get("outTag") == "¥" + fmt_price(appdb.price_text(tgt["out_price"])),
+                tags.get("outTag"))
+            chk("单位标签 == unit", tags.get("unitIn") == "/ " + (tgt["unit"] or ""), tags.get("unitIn"))
 
         w("")
         w("[12] 必填校验原样（未填系统提示词 / API_key 时应被拦下）")
@@ -1307,6 +1405,41 @@ def main():
             spf.get("opened") is True and spf.get("items", 0) > 0, spf)
         chk("服务器平台选中即回填并收起面板",
             spf.get("after") == spf.get("first") and spf.get("closed") is True, spf)
+
+        w("")
+        w("[24] 新增模型 · 「平台 / 官方名」下拉 = 服务器列表（动态同步，无写死的假平台）")
+        # 先真实新增一台服务器，再打开页面 —— 用来证明下拉取的是「当前」服务器列表，而不是快照
+        sync_plat = "UI复现平台同步-" + stamp
+        appdb.create_srv(sync_plat, "https://api.example.com/v1", "UI复现同步公司", "https://www.example.com")
+        c.go(APP + "model_add.html", wait=4)
+
+        exp_plats, _seen = [], set()
+        for r in appdb.list_srv():
+            n = r["plat_name"]
+            if n and n not in _seen:
+                _seen.add(n)
+                exp_plats.append(n)
+
+        pm = ev_json(c, JS_ADD_PLATFORM_MENU, "[24] 新增模型页 · 平台下拉")
+        w("    库内服务器（去重）：%s" % json.dumps(exp_plats, ensure_ascii=False))
+        w("    下拉实际选项：%s" % json.dumps(pm.get("vals"), ensure_ascii=False))
+        chk("下拉可展开", pm.get("opened") is True, pm)
+        chk("选项与「服务器列表」逐项同值同序", pm.get("vals") == exp_plats,
+            "%s vs %s" % (pm.get("vals"), exp_plats))
+        chk("刚新增的服务器已同步进下拉", sync_plat in (pm.get("vals") or []), sync_plat)
+        chk("每个选项都带彩色标记点 .tag-dot（沿用原型视觉）",
+            pm.get("items") and pm.get("dots") == pm.get("items"),
+            "%s/%s" % (pm.get("dots"), pm.get("items")))
+        chk("框仍可编辑（支持手输自定义平台名）", pm.get("readonly") is False, pm.get("readonly"))
+        chk("选中即回填对应平台名并收起面板",
+            pm.get("after") == pm.get("first") and pm.get("closed") is True, pm)
+
+        # 页面源码层面：写死的假平台必须一个都不剩
+        with urllib.request.urlopen(APP + "model_add.html", timeout=20) as resp:
+            add_src = resp.read().decode("utf-8", "replace")
+        for ghost in ("魔搭社区", "OpenAI", "硅基流动", "OpenRouter"):
+            chk("页面源码已无写死的平台项「%s」" % ghost,
+                ('data-value="%s"' % ghost) not in add_src)
 
         w("")
         w("[22] 控制台异常")

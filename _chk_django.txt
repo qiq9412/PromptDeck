@@ -1,0 +1,187 @@
+==========================================================================
+PromptDeck（Django 版）· 接口端到端校验  base=http://127.0.0.1:8502
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+==========================================================================
+
+■ 0. 本次换库的 4 条拍板口径（直接查库结构）
+  [PASS] 库文件已指向 prompt_test_DB_twe.db  D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+  [PASS] 旧 tp 表在新库已不存在
+  [PASS] tst_plan 已加 plan_name / base_url 两列  现有列 ['id', 'plan_name', 'base_url', 'srv_id', 'mdl_id']
+  [PASS] mdl.srv_id 外键已改成 ON DELETE CASCADE  on_delete=CASCADE
+  [PASS] mdl 计费单价按 TEXT 存（原文保留）  typeof=text
+  [PASS] 单价小数位未被规范化（18.00 不会变 18）  样例=4.00
+
+■ 1. 原型页托管
+  [PASS] GET /prompt.html -> 200 且有内容  HTTP 200 / 86869 bytes
+  [PASS] GET /prompt_scheme.html -> 200 且有内容  HTTP 200 / 57114 bytes
+  [PASS] GET /list_server.html -> 200 且有内容  HTTP 200 / 50341 bytes
+  [PASS] GET /foundation1_models.html -> 200 且有内容  HTTP 200 / 66655 bytes
+  [PASS] GET /prompt_test.html -> 200 且有内容  HTTP 200 / 136768 bytes
+  [PASS] prompt_scheme.html 已接后端（含 /api/tp 拉取）
+  [PASS] prompt.html 保存已接后端（含 POST /api/tp）
+  [PASS] prompt.html 保存后跳提示词方案列表页
+  [PASS] 未在白名单里的页面 -> 404  HTTP 404
+  [PASS] 根路径可达（跳 prompt.html）  HTTP 200
+
+■ 2. 上一版接口换库后仍可用
+  [PASS] GET /api/srv 返回列表  17 条
+  [PASS] GET /api/mdl 返回列表  16 条
+  [PASS] mdl 行含联表字段 platform / cUrl
+  [PASS] 单价经接口出来仍是原文字符串  样例 [('claude-3-5-sonnet', '21.60'), ('deepseek-reasoner', '4.00')]
+
+■ 3. /api/tp（提示词方案 · 落 tst_plan 三张表）
+  [PASS] GET /api/tp 返回列表  0 条
+  [PASS] 接口条数与库内 tst_plan 行数一致  接口 0 / 库 0
+  [PASS] POST 新增 -> ok/created  HTTP 201 / {'ok': True, 'id': 76, 'result': 'created'}
+  [PASS] 接口条数 +1
+  [PASS] 库内 tst_plan 行数 +1  库 1
+  [PASS] 首行落 tst_plan：方案名 / 请求地址 / 外键齐全  库内：{'plan_name': 'E2E 自动化校验方案', 'base_url': 'https://e2e.example.com/v1', 'srv_id': 87, 'mdl_id': 95}
+  [PASS] 供应商 / 模型按名字换成了外键并查得回名字  E2E 供应商 / e2e-model
+  [PASS] 系统提示词落 tst_plan_prompt（seq_no=0, role=system）
+  [PASS] 用户提示词逐轮落 tst_plan_prompt（seq_no=1..N, role=user）  ['第一轮问题', '第二轮追问']
+  [PASS] 提示词明细行数 = 1 条系统 + 2 条用户  实际 3 行
+  [PASS] API_key 落 tst_api_key（一把「默认」）
+  [PASS] 多轮由 user 条数还原（multi_turn 不单独落库）
+  [PASS] POST 同名 -> overwritten 且沿用原 id  {'ok': True, 'id': 76, 'result': 'overwritten'}
+  [PASS] 同名覆盖后条数不变
+  [PASS] 同名覆盖后库内已更新
+  [PASS] 覆盖时提示词明细被重写、没有堆积（仍是 3 行）  实际 3 行
+  [PASS] POST 带 id -> updated（改名也按 id 覆盖）  {'ok': True, 'id': 76, 'result': 'updated'}
+  [PASS] 改名生效且条数不变
+  [PASS] 方案名为空 -> 400（不落库）  HTTP 400 / {'ok': False, 'error': '缺少方案命名'}
+
+■ 3.5 测试记录（/api/rec 落 tst_rec / tst_rec_dtl）
+  [PASS] POST /api/rec -> 201 且返回 id / summary  HTTP 201 / {'ok': True, 'id': 17, 'summary': {'planId': 76, 'qCnt': 3, 'accRate': 66.67, 'errCnt': 1, 'fixCnt': 1}}
+  [PASS] 汇总四数由明细现算：题数 3 / 错题 1 / 矫正 1 / 准确率 66.67  {'planId': 76, 'qCnt': 3, 'accRate': 66.67, 'errCnt': 1, 'fixCnt': 1}
+  [PASS] 库内 tst_rec +1、tst_rec_dtl +3  rec 0->1 dtl 0->3
+  [PASS] 汇总行挂在被调试的方案上，并指向该方案自己的密钥  plan_id=76 api_key_id=54
+  [PASS] 汇总行四个数字与明细同源（q_cnt/err_cnt/fix_cnt/acc_rate）  {'q_cnt': 3, 'err_cnt': 1, 'fix_cnt': 1, 'acc_rate': 66.67}
+  [PASS] 逐题明细 3 行，问题 / 标准答案 / 模型答案原样落库  3 行
+  [PASS] AI 判定归一落库（right / wrong / 未判定 -> NULL）  ['right', 'wrong', None]
+  [PASS] 人工改判只在「AI 结论与人工结论不一致」那题置 1  [0, 1, 0]
+  [PASS] GET /api/rec 能读回该记录（带方案名与逐题明细）  planName=E2E 自动化校验方案（改名） / 3 条明细
+  [PASS] 缺 planId -> 400（不落库）  HTTP 400
+  [PASS] planId 非数字 -> 400  HTTP 400
+  [PASS] DELETE /api/rec 删除 -> ok / 1  {'ok': True, 'deleted': 1}
+  [PASS] 删除后 tst_rec / tst_rec_dtl 双双回到基线（明细无残留）  rec 0 dtl 0
+  [PASS] 不支持的方法 -> 405  HTTP 405
+  [PASS] 删除前该方案在两张子表里都有行  prompt=3 key=1
+  [PASS] DELETE 删除 -> ok  {'ok': True, 'deleted': 1}
+  [PASS] 删除后主表回到基线
+  [PASS] 删除后提示词 / 密钥两张子表无残留（级联生效）  prompt=0 key=0
+  [PASS] 不支持的方法 -> 405  HTTP 405
+
+■ 4. AI 判定（/api/judge · 固定走 DeepSeek，密钥取自 tst_api_key）
+  [PASS] GET /api/judge -> 405  HTTP 405
+  [PASS] tst_api_key 存在全局判定密钥（plan_id 为 NULL）  长度 35
+  [PASS] 判定密钥除 settings.py（用户指定的配置点）外没有写死在任何 .py / .html 里  命中 []
+  [PASS] 模型答案为空 -> 未判定（ai 为空、ok 为真）  {'ok': True, 'ai': '', 'reason': '', 'model': 'deepseek-v4-pro'}
+  [PASS] 标准答案为空 -> 未判定  {'ok': True, 'ai': '', 'reason': '', 'model': 'deepseek-v4-pro'}
+  [PASS] 语义一致 -> right  ai=right
+  [PASS] 判定模型为 deepseek-v4-pro（需求指定）  deepseek-v4-pro
+  [PASS] 语义不一致 -> wrong  ai=wrong
+
+■ 5. 数据库表结构（/api/schema · /api/schema/desc）
+  [PASS] GET /api/schema -> 200 且 ok  HTTP 200
+  [PASS] 表清单 = 库内真实表（8 张，sqlite 内部表除外）  接口=['django_migrations', 'mdl', 'srv', 'tst_api_key'] 库内=['django_migrations', 'mdl', 'srv', 'tst_api_key']
+  [PASS] kind 标为 SQLite、name 是库文件名  prompt_test_DB_twe.db / SQLite
+  [PASS] 每张表的字段清单 / 类型与 PRAGMA table_info 一致  异常表 []
+  [PASS] 主键列的关键字统一为 pk（原型靠它标「主键」+ 映射 INTEGER）
+  [PASS] 行数 = 库里真实行数  异常表 []
+  [PASS] 表间关系条数 = PRAGMA foreign_key_list（共 8 条）  []
+  [PASS] 关系文案固定为「外键关联」
+  [PASS] 库里本来没注释：表说明一律为空  非空表 []
+  [PASS] 库里本来没注释：字段说明一律为空
+  [PASS] 注释解析：表注释 = 「提示词调试表」  '提示词调试表'
+  [PASS] 注释解析：字段注释逐列对上（id / prompt_name）  {'id': '主键ID', 'prompt_name': '提示词名称'}
+  [PASS] 注释解析：没有注释的库返回空（不臆造）  '' {}
+  [PASS] 带注释的库：表说明从注释里读出来（descFrom=db）  提示词调试表
+  [PASS] 带注释的库：缺注释的只剩 raw_txt 一个字段（已有注释的字段不重发）  ['raw_txt']
+  [PASS] 带注释的库：表说明已有 ⇒ needDesc 为假  False
+  [PASS] POST /api/schema 上传 .sqlite -> 200 且读回注释  HTTP 200
+  [PASS] 上传库的字段注释也读回来了
+  [PASS] GET /api/schema/desc -> 405  HTTP 405
+  [PASS] POST /api/schema/desc 空清单 -> 400  HTTP 400
+  [PASS] PUT /api/schema -> 405  HTTP 405
+  [PASS] 说明模型为 deepseek-v4-pro（需求指定）  deepseek-v4-pro
+  [PASS] 只回送去的 2 张表  ['srv', 'tst_plan']
+  [PASS] 每个送去的字段都拿到了说明  缺 []
+  [PASS] 每张表都拿到了表说明  缺 []
+     示例：srv - 服务信息表 / id -> 服务主键ID
+  [PASS] settings.py 里配了 DeepSeek 三项（表结构说明用）
+  [PASS] judge_api 仍从 tst_api_key 现读判定密钥（没用 settings 里的常量兜底）
+
+■ 5.8 真接驱动（core/dbx.py：驱动可用性 + 连接信息解析）
+  [PASS] MySQL 驱动已安装（pymysql）  2.2.8
+  [PASS] PostgreSQL 驱动已安装（psycopg2）  2.9.13 (dt dec pq3 ext lo64)
+  [PASS] SQL Server 驱动已安装（pymssql）  2.4.2
+  [PASS] Oracle 驱动已安装（oracledb）  26.0.1
+  [PASS] Db2 for LUW 驱动已安装（ibm_db_dbi）  3.3.0
+  [PASS] URL 解析：完整 mysql 连接串  {'host': 'localhost', 'port': 3306, 'user': 'root', 'pwd': '123456', 'dbname': 'tes'}
+  [PASS] URL 解析：吃掉 jdbc: 前缀  {'host': '127.0.0.1', 'port': 3306, 'dbname': 'shop_db'}
+  [PASS] URL 解析：没写 scheme 也能解 + 密码百分号反转义  {'host': 'host', 'port': 1433, 'user': 'sa', 'pwd': 'P@ss', 'dbname': 'master'}
+  [PASS] URL 解析：省略端口时不臆造（留给默认端口兜底）  {'host': 'h', 'user': 'u', 'dbname': 'kb'}
+  [PASS] host 模式：主机留空 -> localhost（原型口径：留空表示本机）  {'mode': 'host', 'host': 'localhost', 'port': 3306, 'user': '', 'pwd': '', 'dbname': ''}
+  [PASS] host 模式：端口留空 -> 该类型默认端口 1521  {'mode': 'host', 'host': 'db', 'port': 1521, 'user': '', 'pwd': '', 'dbname': ''}
+  [PASS] url 模式：只认 URL 里的信息（URL 下隐藏的五个框不参与）  {'mode': 'url', 'host': 'h', 'port': 3307, 'user': 'a', 'pwd': 'b', 'dbname': 'k'}
+
+■ 5.9 各类型结构读取（桩驱动：验真方言反射 SQL 与形状转换）
+  [PASS] MySQL：真的调了驱动 connect()  kwargs=['charset', 'connect_timeout', 'database', 'host', 'password', 'port', 'read_timeout', 'user', 'write_timeout'] args=()
+  [PASS] MySQL：ok=True 且 kind 正确
+  [PASS] MySQL：读到 2 张真实表  ['orders', 'users']
+  [PASS] MySQL：主键列关键字统一为 pk（原型靠它标「主键」）  ['id']
+  [PASS] MySQL：字段说明从目录表注释读出来  [('id', '主键'), ('user_id', '下单用户')]
+  [PASS] MySQL：非主键列保留库里的真实声明类型  ['int']
+  [PASS] MySQL：行数 = COUNT(*) 的真实返回值  7
+  [PASS] MySQL：外键 = 从表.字段 -> 主表.字段  [['orders', 'user_id', 'users', 'id', '外键关联']]
+  [PASS] PostgreSQL：真的调了驱动 connect()  kwargs=['connect_timeout', 'dbname', 'host', 'password', 'port', 'user'] args=()
+  [PASS] PostgreSQL：ok=True 且 kind 正确
+  [PASS] PostgreSQL：读到 2 张真实表  ['orders', 'users']
+  [PASS] PostgreSQL：主键列关键字统一为 pk（原型靠它标「主键」）  ['id']
+  [PASS] PostgreSQL：字段说明从目录表注释读出来  [('id', '主键'), ('user_id', '下单用户')]
+  [PASS] PostgreSQL：非主键列保留库里的真实声明类型  ['integer']
+  [PASS] PostgreSQL：行数 = COUNT(*) 的真实返回值  7
+  [PASS] PostgreSQL：外键 = 从表.字段 -> 主表.字段  [['orders', 'user_id', 'users', 'id', '外键关联']]
+  [PASS] SQL Server：真的调了驱动 connect()  kwargs=['charset', 'database', 'login_timeout', 'password', 'port', 'server', 'timeout', 'user'] args=()
+  [PASS] SQL Server：ok=True 且 kind 正确
+  [PASS] SQL Server：读到 2 张真实表  ['orders', 'users']
+  [PASS] SQL Server：主键列关键字统一为 pk（原型靠它标「主键」）  ['id']
+  [PASS] SQL Server：字段说明从目录表注释读出来  [('id', '主键'), ('user_id', '下单用户')]
+  [PASS] SQL Server：非主键列保留库里的真实声明类型  ['int']
+  [PASS] SQL Server：行数 = COUNT(*) 的真实返回值  7
+  [PASS] SQL Server：外键 = 从表.字段 -> 主表.字段  [['orders', 'user_id', 'users', 'id', '外键关联']]
+  [PASS] Oracle：真的调了驱动 connect()  kwargs=['host', 'password', 'port', 'service_name', 'user'] args=()
+  [PASS] Oracle：ok=True 且 kind 正确
+  [PASS] Oracle：读到 2 张真实表  ['ORDERS', 'USERS']
+  [PASS] Oracle：主键列关键字统一为 pk（原型靠它标「主键」）  ['ID']
+  [PASS] Oracle：字段说明从目录表注释读出来  [('ID', '主键'), ('USER_ID', '下单用户')]
+  [PASS] Oracle：非主键列保留库里的真实声明类型  ['NUMBER(10)']
+  [PASS] Oracle：行数 = COUNT(*) 的真实返回值  7
+  [PASS] Oracle：外键 = 从表.字段 -> 主表.字段  [['ORDERS', 'USER_ID', 'USERS', 'ID', '外键关联']]
+  [PASS] Db2 for LUW：真的调了驱动 connect()  kwargs=[] args=('DATABASE=shop;HOSTNAME=db.example.com;PORT=50000;PROTOCOL=TCPIP;CONNECTTIMEOUT=10;', 'u', 'p')
+  [PASS] Db2 for LUW：ok=True 且 kind 正确
+  [PASS] Db2 for LUW：读到 2 张真实表  ['ORDERS', 'USERS']
+  [PASS] Db2 for LUW：主键列关键字统一为 pk（原型靠它标「主键」）  ['ID']
+  [PASS] Db2 for LUW：字段说明从目录表注释读出来  [('ID', '主键'), ('USER_ID', '下单用户')]
+  [PASS] Db2 for LUW：非主键列保留库里的真实声明类型  ['INTEGER']
+  [PASS] Db2 for LUW：行数 = COUNT(*) 的真实返回值  7
+  [PASS] Db2 for LUW：外键 = 从表.字段 -> 主表.字段  [['ORDERS', 'USER_ID', 'USERS', 'ID', '外键关联']]
+  [PASS] MySQL：URL 里的主机 / 端口 / 账号 / 库名逐项送到驱动  {'host': '10.0.0.9', 'port': 3307, 'user': 'alice', 'password': 's3cret', 'database': 'analytics'}
+  [PASS] Db2：连接串把库名 / 主机 / 端口 / 超时都拼进去了  DATABASE=SAMPLE;HOSTNAME=db2.local;PORT=50001;PROTOCOL=TCPIP;CONNECTTIMEOUT=10;
+  [PASS] PostgreSQL：连接后设为只读会话（只读结构，不写库）  [{'readonly': True}]
+
+■ 5.10 POST /api/schema/connect（真实驱动连不上就如实上报）
+  [PASS] 连不上时 HTTP 仍是 200（业务结果，不是请求格式错）  HTTP 200
+  [PASS] 连不上时 ok=false 且带真实报错  {'ok': False, 'error': '连接 MySQL 失败：(2003, "Can\'t connect to MySQL server on \'127.0.0.1\' ([WinError 10061] 由于目标计算机积极拒绝，无法连接。)")'}
+  [PASS] 连不上时不返回任何表（绝不伪造表树）  {'ok': False, 'error': '连接 MySQL 失败：(2003, "Can\'t connect to MySQL server on \'127.0.0.1\' ([WinError 10061] 由于目标计算机积极拒绝，无法连接。)")'}
+  [PASS] 报错确实来自真 MySQL 驱动（原样透出）  连接 MySQL 失败：(2003, "Can't connect to MySQL server on '127.0.0.1' ([WinError 10061] 由于目标计算机
+  [PASS] 必填框留空不会被服务端拦下（服务端不做二次校验）  {'ok': False, 'error': '连接 MySQL 失败：(2003, "Can\'t connect to MySQL server on \'localhost\' ([WinError 10061] 由于目标计算机积极拒绝，无法连接。)")'}
+  [PASS] 不认识的类型 -> 200 + ok=false（不抛 500）  {'ok': False, 'error': '暂不支持的数据库类型：Sybase'}
+  [PASS] PUT /api/schema/connect -> 405  HTTP 405
+
+■ 6. 收尾
+  [PASS] 本次校验写进去的 E2E 供应商 / 模型已清理  srv=0 mdl=0
+  [PASS] 基础数据回到基线（srv / mdl 未被污染）  srv=17->17 mdl=16->16
+
+==========================================================================
+结果：全部通过

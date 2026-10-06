@@ -9,7 +9,7 @@
   3. 必填校验原样保留
      -> 把校验相关函数/代码块整体抽出，要求原型与产物逐字节相同；
         锚点可按页配置（prompt.html 的必填校验是内联在「调试」按钮里的）；
-        并确认服务端没有对应校验（server.py 不含 required 检查）。
+        并确认服务端没有对应校验（第二次迭代后看 core/views.py + store.py + chat.py）。
 
 另做两件事：
   - 用 node --check 验证脚本语法；
@@ -47,6 +47,19 @@ def chk(label, ok, detail=""):
 def read(p):
     with open(p, "r", encoding="utf-8") as fp:
         return fp.read()
+
+
+def settings_secrets():
+    """从 config/settings.py 里读回明文密钥（sk-…），用来断言「它没进任何产物页」。
+
+    刻意**不写死字面量** —— 否则这个校验脚本自己就成了泄漏点
+    （verify_django.py 那条「密钥没写死在任何 .py 里」的扫描会把它抓出来）。
+    """
+    try:
+        src = read(os.path.join(HERE, "config", "settings.py"))
+    except OSError:
+        return []
+    return sorted(set(re.findall(r"sk-[A-Za-z0-9]{20,}", src)))
 
 
 def split_script(html):
@@ -95,8 +108,14 @@ CHECKS = {
     "model_add.html": {
         "verify_snippets": [],
         "must_have": ['fetch("/api/mdl", {', 'plat_name: document.getElementById("platform")',
+                      # 平台 / 官方名下拉：HTML 里为空容器，选项由服务器列表（/api/srv）注入
+                      '<div class="combo-menu" id="menuPlatform" data-combo-menu role="listbox"></div>',
+                      'fetch("/api/srv")', 'function fillPlatformMenu(', 'initCombo("comboPlatform")',
                       'REQ_FIELDS', 'function checkUrl(el)', 'function bindNumber(el)'],
-        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:"],
+        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
+                     # 原型里那批写死的假平台项必须已经消失（三个都是「服务器列表里没有的」）
+                     'data-value="硅基流动"', 'data-value="魔搭社区"', 'data-value="OpenAI"',
+                     'data-value="OpenRouter"'],
     },
     "list_server.html": {
         "verify_snippets": [],
@@ -130,17 +149,106 @@ CHECKS = {
                       'function initCombos()', 'initCombos();', 'var comboServer, comboModelType, comboModel;',
                       # 调试已接入真实模型，多轮按轮次依次调用
                       'fetch("/api/chat"', 'function pdFillMetrics(', 'pdRunning',
-                      'function pdRenderAnswers('],
+                      'function pdRenderAnswers(',
+                      # 09-29 新增：链接中占位 / 链接失败红字 + 原因 + 指标清零（原型侧同口径）
+                      '.pb-textarea.is-error',
+                      '$modelOut.value = "正在链接模型";',
+                      'classList.remove("is-error")', 'classList.add("is-error")',
+                      '链接模型失败', "pdFillMetrics(0, 0)"],
         "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
                      # 原型里那段本地造的假输出必须已经消失
                      "（模拟输出", "estTokens(outText)",
                      # 费用不再四舍五入（金额用 fmtNum；单价属性不再走 num2 两位小数）
                      "toFixed(4)", "num2("],
     },
+    # 提示词方案列表：第二次迭代起，方案库的真源是服务端 tp 表
+    "prompt_scheme.html": {
+        "verify_snippets": [],
+        "must_have": [
+            # 列表 / 删除接后端
+            'fetch("/api/tp")', 'apiTpDelete(ids)', 'function pdBoot()', 'pdBoot();',
+            # 原型的示例方案改为由迁移 0002_seed_tp 灌库，页面不再自己播种
+            "var schemes = [];"],
+        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
+                     # 首屏播种本地存储的那段 IIFE 必须已经消失（改由后端提供数据）
+                     "window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(SEED_SCHEMES))"],
+    },
+    # 提示词测试：第二次迭代起接线（HTML / CSS 一字未动，只换数据层）
+    "prompt_test.html": {
+        "verify_snippets": [],
+        "anchors": [
+            # 必填校验内联在「添加测试问题」的确定按钮里（问题不能为空）
+            ('document.getElementById("addConfirm").addEventListener("click", function(){',
+             "  var q = $addQuestion.value.trim();\n",
+             '添加测试问题必填校验'),
+        ],
+        "must_have": [
+            # 左栏方案下拉的真源改成服务端方案库
+            'fetch("/api/tp")', 'function pdNormScheme(',
+            # 「开始调试」= 逐题调真实模型 + 逐题 AI 判定
+            'fetch("/api/chat"', 'fetch("/api/judge"',
+            'function pdRunQuestion(', 'function pdJudgeQuestion(',
+            # 「保存结果」同时落 tst_rec / tst_rec_dtl
+            'fetch("/api/rec"', 'planId:  currentScheme.id'],
+        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
+                     # 原型态的「假输出 + 本地比对」两处调用点必须已经不在了
+                     "pdMockAnswer(t.q, t.ans, seed + i)",
+                     "var ai  = pdAutoJudge(t.ans, fb);",
+                     "setTimeout(step, 160);",
+                     # 方案不再从本地存储读
+                     "schemes = pdReadSchemes();"],
+    },
+    # 数据库表结构提取：第二次迭代起接线（HTML / CSS 一字未动，只换数据层）
+    "Table_Structure_Extraction.html": {
+        "verify_snippets": [],
+        "anchors": [
+            # 连接弹窗的必填 / 端口校验内联在「连接」按钮里，整段原样保留
+            ('  if (connMode === "url"){', "\n  }", 'URL 模式服务器地址必填'),
+            ('  if (connMode === "host"){', "\n  }", '端口号必填 / 1–65535 范围校验'),
+        ],
+        "must_have": [
+            # 演示数据下线，改由后端灌真实库结构
+            "var SCHEMA = [];", "var RELATIONS = [];",
+            # 第二批：结构按库挂（一次连多个库，同名表不串）
+            "function pdFillDb(", "db.map", "db.rels",
+            "function schemaOf(name, db){", "schemaOf(tbl.name, db)",
+            "function mockTables(kind, name, sch){",
+            "function pdMergeDesc(",
+            # 第二批：主机 / URL 连接真接驱动
+            "function pdConnectDb(", 'fetch("/api/schema/connect"',
+            # 打开页面连真实库；提取前先补「库里没有注释」的表 / 字段说明
+            "function pdBoot(", "pdBoot();", 'fetch("/api/schema")',
+            "function pdFetchDesc(", 'fetch("/api/schema/desc"', "function pdRunExtract(",
+            # SQLite 选文件改成真上传
+            'method: "POST", body: fd'],
+        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
+                     # 演示种子与演示表结构必须已经下线
+                     "demo_shop.sqlite", 'desc:"用户主表"', '["orders","user_id","users","id"',
+                     # 第二批：「其余类型未实现」的占位提示 + 单库全局变量必须已经下线
+                     "本机暂只支持 SQLite 直连", "pdApplySchema", "PD_DB",
+                     # ⚠️ 新增同名函数会被原型里「后写的那个」盖掉 ⇒ 必须原地替换
+                     #    （踩过：addDb 出现两份，原版生效 ⇒ 左栏 0 张表）
+                     "function addDb(name, kind, silent){"],
+    },
 }
 
-# 本期无「原样托管」页（prompt.html 已接入数据层）
-VERBATIM = []
+# 「原样托管」页：本轮不接后端，原样复制到 static/（侧栏跳转能正常打开）
+VERBATIM = [
+    "prompt_test_results_list.html",
+]
+
+# 服务端「不做二次校验」的断言要扫的文件（第二次迭代：Starlette 的 server.py
+# 换成了 Django 的 core/views.py + core/store.py + core/chat.py；
+# 本轮把 core/schema.py 也纳入 —— 它是表结构提取的唯一后端实现）
+SERVER_FILES = [
+    os.path.join(HERE, "core", "views.py"),
+    os.path.join(HERE, "core", "store.py"),
+    os.path.join(HERE, "core", "chat.py"),
+    os.path.join(HERE, "core", "schema.py"),
+    # 第二批：真接驱动的实现（MySQL/PG/SQL Server/Oracle/Db2）也纳入
+    # 「服务端不做二次校验」的扫描范围
+    os.path.join(HERE, "core", "dbx.py"),
+]
 
 
 def js_syntax_ok(code, tag):
@@ -221,12 +329,27 @@ def main():
 
     w("")
     w("=" * 78)
-    w("服务端校验口径：")
-    srv = read(os.path.join(HERE, "server.py"))
-    chk("server.py 无必填校验（无 required/checkRequired）",
+    w("产物页不得含明文密钥（第二次迭代：说明生成只在服务端，页面一个 sk- 都不该有）")
+    secrets = settings_secrets()
+    chk("能从 config/settings.py 读到 DeepSeek 密钥（供本项比对）", bool(secrets),
+        "%d 把" % len(secrets))
+    hit = []
+    for name in list(CHECKS) + list(VERBATIM):
+        body = read(os.path.join(OUT_DIR, name))
+        for s in secrets:
+            if s in body:
+                hit.append(name)
+    chk("所有产物页都搜不到明文密钥", not hit, "命中 %s" % sorted(set(hit)))
+
+    w("")
+    w("=" * 78)
+    w("服务端校验口径（第二次迭代：Starlette 的 server.py 已换成 Django 的 core/*.py）：")
+    srv = "\n".join(read(p) for p in SERVER_FILES)
+    chk("服务端无必填校验（无 required/checkRequired）",
         "required" not in srv and "checkRequired" not in srv)
-    chk("server.py 无网址格式校验", "URL_RE" not in srv and "is-invalid" not in srv)
-    w("  说明：db.create_srv / db.create_mdl 直接落库，仅做 空串->NULL、字符串->数值 的类型归一。")
+    chk("服务端无网址格式校验", "URL_RE" not in srv and "is-invalid" not in srv)
+    w("  说明：store.create_srv / create_mdl / save_tp 直接落库，"
+      "仅做 空串->NULL 的类型归一。")
     w("        /api/chat 也只做「组装 messages -> 转发 -> 归一返回」，不复现前端的必填校验。")
 
     w("")

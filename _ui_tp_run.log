@@ -1,0 +1,91 @@
+==========================================================================
+PromptDeck（Django 版）· 保存 → tst_plan 三张表 → 跳方案列表页（真实浏览器）
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db（tst_plan 基线 5 条）
+==========================================================================
+
+[1] 清掉浏览器本地存储，再打开「提示词方案」页（证数据来自 /api/tp）
+    页面：5 行 / meta=共 5 条记录；本地镜像=5
+  [PASS] 列表行数 == 库内 tst_plan 行数  page=5 db=5
+  [PASS] meta-bar / 表尾计数与行数一致  共 5 条记录 / 共 5 条记录
+  [PASS] 页面已把库里的方案回写成本地镜像（供测试页复用）  镜像=5
+  [PASS] 列表里能看到迁移灌入的示例方案
+
+[2] 打开「提示词构造」页，三个下拉的选项应来自库内 srv / mdl
+    下拉项数：服务器 17 / 类型 6 / 模型 20
+  [PASS] 服务器下拉项数 == 库内 srv 条数  page=17 db=17
+  [PASS] 模型下拉项数 == 库内 mdl 条数  page=20 db=20
+  [PASS] 已选中服务器  OpenAI
+
+[3] 服务器 → 模型类型 → 模型 逐级联动（联动逻辑本身未改动）
+    类型=文本生成 模型=gpt-4o Base_url=https://api.openai.com/v1
+  [PASS] 已选中模型类型  文本生成
+  [PASS] 已选中模型  gpt-4o
+  [PASS] Base_url 跟随服务器自动填充  https://api.openai.com/v1
+
+[4] 填提示词 → 点「保存」→ 原型的保存弹窗按原样弹出
+    弹窗回显：server=OpenAI base=https://api.openai.com/v1 model=gpt-4o
+  [PASS] 保存弹窗已弹出（.mask.show）
+  [PASS] 弹窗回显服务器 / 请求地址 / 模型  OpenAI / https://api.openai.com/v1 / gpt-4o
+  [PASS] 弹窗回显系统提示词与用户提示词
+  [PASS] API_key 只给遮掩形态（明文中段不外露）  sk--········cdef
+
+[5] 填「方案命名」→ 点「保存方案」→ POST /api/tp → 自动跳列表页
+    当前地址：/prompt_scheme.html
+  [PASS] 保存后已跳转到提示词方案列表页  /prompt_scheme.html
+    列表：6 行 / meta=共 6 条记录
+  [PASS] 跳转后条数 = 基线 + 1  page=6 期望=6
+  [PASS] 新保存的方案出现在列表里
+  [PASS] 本地镜像同步为库内条数  镜像=6
+
+[6] 落库核对（断言以库为准，不看页面）
+  [PASS] 接口条数 == 库内 tst_plan 行数  接口 6 / 库 6
+  [PASS] 库内 tst_plan 行数 = 基线 + 1  库 6
+  [PASS] 接口里能找到新方案
+    库内：{'id': 11, 'plan_name': 'UI复现方案-1790771937', 'srv_name': 'OpenAI', 'base_url': 'https://api.openai.com/v1', 'mdl_name': 'gpt-4o', 'api_key': 'sk-ui-check-0123456789abcdef'}
+  [PASS] 主表 tst_plan 字段逐项核对  UI复现方案-1790771937
+  [PASS] 提示词 / 密钥两张子表也落对了（1 条系统 + 1 条用户 + 1 把密钥）  prompt=2 key=1
+
+[7] 多轮会话：第 1 轮 + 追加 2 轮 → 逐轮落 tst_plan_prompt
+    勾选多轮会话：追加轮次 1 个 / 多轮区展开=True / 加轮按钮可见=True
+  [PASS] 勾选多轮会话自动带出 1 轮  {'extra': 1, 'hidden': False, 'addHidden': False}
+  [PASS] 多轮区展开且「+ 添加一轮」可用
+    点「+ 添加一轮」后追加轮次：2 个（连第 1 轮共 3 轮）
+  [PASS] 点「+ 添加一轮」后追加轮次变 2 个  2
+    弹窗用户提示词回显：第 1 轮：把这句话改得更正式。 | —— 下一轮 —— | 第 2 轮：再压缩到 10 字以内。 | —— 下一轮 —— | 第 3 轮：最后加上一个感叹
+  [PASS] 多轮保存弹窗已弹出
+  [PASS] 原型 collectUserPrompts() 收集到 3 轮且顺序正确  ['第 1 轮：把这句话改得更正式。', '第 2 轮：再压缩到 10 字以内。', '第 3 轮：最后加上一个感叹号。']
+  [PASS] 弹窗把 3 轮逐轮回显（含「下一轮」分隔）  第 1 轮：把这句话改得更正式。
+—— 下一轮 ——
+第 2 轮：再压缩到 10 字以内。
+—— 下一轮 ——
+第 3 轮：最后加上一个感叹号。
+    当前地址：/prompt_scheme.html
+  [PASS] 多轮方案保存后同样跳到提示词方案列表页  /prompt_scheme.html
+  [PASS] 多轮方案已落库并出现在 /api/tp
+    tst_plan_prompt：[(0, 'system'), (1, 'user'), (2, 'user'), (3, 'user')]
+    库内：srv=OpenAI base=https://api.openai.com/v1 mdl=gpt-4o api_key=sk-ui-multi-0123456789abcdef
+  [PASS] 系统提示词 seq_no=0 / 用户提示词 seq_no=1..N  [(0, 'system'), (1, 'user'), (2, 'user'), (3, 'user')]
+  [PASS] 多轮用户提示词逐轮落库，顺序与页面一致  ['第 1 轮：把这句话改得更正式。', '第 2 轮：再压缩到 10 字以内。', '第 3 轮：最后加上一个感叹号。']
+  [PASS] 提示词明细行数 = 1 条系统 + 3 条用户  4
+  [PASS] 主表字段仍逐项对得上
+  [PASS] 多轮方案按 user 条数还原成 multi=true（不单独落库）  True
+  [PASS] 密钥仍是一把  1
+
+[8] 列表页点该行「删除」→ 二次确认 → 行与库内同步删掉
+  [PASS] 删除确认弹窗已弹出
+    列表：6 行；库内 tst_plan：6 条
+  [PASS] 列表条数回落 1 行（删的是这一行）  page=6
+  [PASS] 新方案已从列表消失
+  [PASS] 库内 tst_plan 行数回落（删除真落库）  库 6
+  [PASS] 库内已无该行
+  [PASS] 删除后两张子表无残留（级联生效）  残留 0 行
+  [PASS] 另一行（多轮方案）未受牵连，仍留在库里
+  [PASS] 多轮方案删除后主表回到基线、子表无残留  库 5 / 残留 0
+
+[9] JS 异常
+    页面 error：[]；CDP 捕获异常：0 条
+  [PASS] 无页面 JS 异常
+
+==========================================================================
+结果：全部通过
+

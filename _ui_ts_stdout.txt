@@ -1,0 +1,102 @@
+==============================================================================
+PromptDeck · 「数据库表结构提取」页端到端校验（真实 Edge + CDP）
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+应用：http://127.0.0.1:8505（本脚本自起）  模型：mock http://127.0.0.1:8793（不打真网）
+口径：库里没有注释的表 / 字段，由 DeepSeek 补说明；页面字段 / 排版 / CSS 一字未动
+==============================================================================
+  [PASS] mock 模型服务已就绪（http://127.0.0.1:8793）  GET 不支持也没关系，能起监听即可
+  [PASS] 自起的应用实例已就绪  http://127.0.0.1:8505/Table_Structure_Extraction.html
+  [PASS] settings.py 里能读到 DeepSeek 密钥（本轮要证明它被真的用了）  sk-••••••••4a88
+  [PASS] Edge devtools 已就绪  port=9353
+
+■ [1] 打开页面 → 左栏是库里真实的表（不是演示数据）
+    页面：http://127.0.0.1:8505/Table_Structure_Extraction.html
+  [PASS] 左栏渲染出 8 张真实表（库里共 8 张）  实际 8 张
+  [PASS] 表清单 = 库内真实表清单  页面=['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']
+  [PASS] 库名 / 类型来自后端  prompt_test_DB_twe.db / SQLite
+  [PASS] 每张表的行数 = 库里真实行数  []
+  [PASS] 还没勾选任何表 ⇒ 「提取表结构」是灰的
+  [PASS] 演示种子已下线（左栏不是 demo_shop 那 6 张表）
+
+■ [2] 说明只在「提取」时生成 —— 页面打开阶段模型一次都不该被调用
+  [PASS] 打开页面后模型调用次数为 0  实际 0
+
+■ [3] 勾选 ['srv', 'tst_plan'] → 点「提取表结构」→ 只调一次模型
+  [PASS] 勾上了 2 张表  {'hit': 2, 'on': ['srv', 'tst_plan'], 'extractDisabled': False, 'picked': '已选 2 张表'}
+  [PASS] 勾选后「提取表结构」可用  {'hit': 2, 'on': ['srv', 'tst_plan'], 'extractDisabled': False, 'picked': '已选 2 张表'}
+  [PASS] 「提取表结构」被点（点击瞬间进入忙态）  {'clicked': True, 'disabled': True}
+  [PASS] 模型被调用 1 次  实际 1 次
+  [PASS] 请求里 model = deepseek-v4-pro（需求指定）  deepseek-v4-pro
+  [PASS] 请求用的是 settings.py 里那把 key（不是空值 / 也不是别的）  sk-••••••••4a88
+  [PASS] system 人设是「结构说明生成器」且限定了「只说存的是什么」  你是数据库结构说明生成器。给定「表名 + 字段名 + 字段类型」，为这张表和它需
+  [PASS] 请求里只有勾选的 2 张表  ['srv', 'tst_plan']
+  [PASS] 库里没注释的字段全都标成了「需说明」（共 8 个）  实际 8 个
+
+■ [4] 「表结构」面板：表说明 / 字段说明 / 主键标记
+  [PASS] 面板渲染出 2 张表  实际 2
+  [PASS] srv 的表说明 = 模型生成（表说明·srv）  '表说明·srv'
+  [PASS] srv 的 5 个字段说明全部来自模型  []
+  [PASS] tst_plan 的表说明 = 模型生成（表说明·tst_plan）  '表说明·tst_plan'
+  [PASS] tst_plan 的 5 个字段说明全部来自模型  []
+  [PASS] 主键列仍然标着「主键」（原型口径未被破坏）  [{'col': 'id', 'typ': 'INTEGER', 'pk': True, 'note': '字段说明·id'}]
+  [PASS] 主键类型仍是方言映射出来的 INTEGER（原型 TYPE_MAP 生效）  {'col': 'id', 'typ': 'INTEGER', 'pk': True, 'note': '字段说明·id'}
+  [PASS] 计数文案对得上（2 张表 · 1 条关系）  '2 张表 · 1 条关系'
+  [PASS] 提取完成后「重新生成 / 清空」可用、面板仍在「表结构」页  {'n': 2, 'tables': [{'name': 'srv', 'desc': '表说明·srv', 'rows': [{'col': 'id', 'typ': 'INTEGER', 'pk': True, 'note': '字段说明·id'}, {'col': 'plat_name', 'typ': 'VARCHAR(255)', 'pk': False, 'note': '字段说明·plat_name'}, {'col': 'base_url', 'typ': 'VARCHAR(512)', 'pk': False, 'note': '字段说明·base_url'}, {'col': 'comp_name', 'typ': 'VARCHAR(255)', 'pk': False, 'note': '字段说明·comp_name'}, {'col': 'home_url', 'typ': 'VARCHAR(512)', 'pk': False, 'note': '字段说明·home_url'}]}, {'name': 'tst_plan', 'desc': '表说明·tst_plan', 'rows': [{'col': 'id', 'typ': 'INTEGER', 'pk': True, 'note': '字段说明·id'}, {'col': 'plan_name', 'typ': 'VARCHAR(255)', 'pk': False, 'note': '字段说明·plan_name'}, {'col': 'base_url', 'typ': 'VARCHAR(512)', 'pk': False, 'note': '字段说明·base_url'}, {'col': 'srv_id', 'typ': 'INTEGER', 'pk': False, 'note': '字段说明·srv_id'}, {'col': 'mdl_id', 'typ': 'INTEGER', 'pk': False, 'note': '字段说明·mdl_id'}]}], 'count': '2 张表 · 1 条关系', 'text': '数据库 prompt_test_DB_twe.db（SQLite）\n\n表 srv\n注释: 表说明·srv\n字段:\n  - id                (INTEGER     ) [主键] 字段说明·id\n  - plat_name         (VARCHAR(255)) 字段说明·plat_name\n  - base_url          (VARCHAR(512)) 字段说明·base_url\n  - comp_name         (VARCHAR(255)) 字段说明·comp_name\n  - home_url          (VARCHAR(512)) 字段说明·home_url\n\n表 tst_plan\n注释: 表说明·tst_plan\n字段:\n  - id                (INTEGER     ) [主键] 字段说明·id\n  - plan_name         (VARCHAR(255)) 字段说明·plan_name\n  - base_url          (VARCHAR(512)) 字段说明·base_url\n  - srv_id            (INTEGER     ) 字段说明·srv_id\n  - mdl_id            (INTEGER     ) 字段说明·mdl_id\n\n表间关系：\n  tst_plan.srv_id → srv.id\u3000外键关联\u3000（prompt_test_DB_twe.db）', 'paneSchemaHidden': False, 'paneContentHidden': True, 'copyDisabled': False, 'regenDisabled': False, 'clearDisabled': False, 'errors': []}
+
+■ [5] 「表内容」纯文本：表说明 / 字段说明 / 表间关系都在
+  [PASS] 文本里有表块「表 srv」  数据库 prompt_test_DB_twe.db（SQLite）\n\n表 srv\n注释: 表说明·srv\n字段:\n  -
+  [PASS] 文本里有表说明（注释: 表说明·srv）
+  [PASS] 文本里有字段说明（字段说明·id）
+  [PASS] 文本里有表间关系段  关系段=有
+  [PASS] 文本里没有演示数据的痕迹（users / products）
+
+■ [6] 再点「重新生成」→ 命中服务端缓存 ⇒ 不再调模型，结果一致
+  [PASS] 重新生成没有再调模型（仍 1 次）  实际 1 次
+  [PASS] 重新生成后面板内容与会话一致  表说明·srv
+
+■ [7] 改勾选 ⇒ 展示栏按原型口径重置；换一组再提取 ⇒ 第 2 次调用只含新表
+  [PASS] 勾选一变，展示栏回到空态（原型口径保留）  count='—' n=0
+  [PASS] 空态时「清空」不可用、面板回到「表结构」页  {'n': 0, 'tables': [], 'count': '—', 'text': None, 'paneSchemaHidden': False, 'paneContentHidden': True, 'copyDisabled': False, 'regenDisabled': True, 'clearDisabled': True, 'errors': []}
+  [PASS] 换成 ['mdl', 'tst_api_key'] 后勾选正确  {'hit': 2, 'on': ['mdl', 'tst_api_key'], 'extractDisabled': False, 'picked': '已选 2 张表'}
+  [PASS] 模型第 2 次被调用  实际 2 次
+  [PASS] 第 2 次请求只含新勾选的 ['mdl', 'tst_api_key']  ['mdl', 'tst_api_key']
+  [PASS] 面板换成 B 组两张表  ['mdl', 'tst_api_key']
+
+■ [8] JS 异常
+    页面 error：[]
+  [PASS] 无页面 JS 异常  []
+
+■ [8.1] 「连接数据库」弹窗 → 真调驱动（连不上如实报错，绝不伪造表树）
+  [PASS] 选「MySQL」后弹出「连接数据库」弹窗（标题带所选类型）  {'kind': 'MySQL', 'connShown': True, 'fileShown': False, 'picked': 'MySQL'}
+  [PASS] 此时打开的是「连接」弹窗，不是「SQLite 选文件」弹窗  {'kind': 'MySQL', 'connShown': True, 'fileShown': False, 'picked': 'MySQL'}
+  [PASS] 弹窗类型仍是 MySQL（按原型字段填连接信息）  {'kind': 'MySQL'}
+  [PASS] 连不上时如实提示 MySQL 驱动的真实报错  ['连接 MySQL 失败：(2003, "Can\'t connect to MySQL server on \'127.0.0.1\' ([WinError 10061] 由于目标计算机积极拒绝，无法连接。)")']
+  [PASS] 连不上时左栏没有多出库（绝不伪造表树）  1 -> 1
+  [PASS] 连不上时也没往左栏塞任何表
+  [PASS] 前端真的调了 POST /api/schema/connect  ['/api/schema/connect']
+  [PASS] 请求体按原型字段把连接信息送全（kind/mode/host/port/user/pwd/dbname/url）  {'kind': 'MySQL', 'mode': 'host', 'host': '127.0.0.1', 'port': '3999', 'user': 'root', 'pwd': 'x', 'dbname': '', 'url': '127.0.0.1'}
+
+■ [8.2] 真上传第二个 .sqlite → 左栏两个库，同名表结构互不串（按库隔离）
+  [PASS] 选「SQLite」后打开的是「选文件」弹窗（不是连接弹窗）  {'kind': 'MySQL', 'connShown': False, 'fileShown': True, 'picked': 'SQLite'}
+  [PASS] 文件已挂到原型的 #fileInput 上  pd_verify_other.sqlite
+  [PASS] 上传后左栏变成 2 个库  [{'name': 'prompt_test_DB_twe.db', 'kind': 'SQLite', 'tables': ['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']}, {'name': 'pd_verify_other.sqlite', 'kind': 'SQLite', 'tables': ['only_here', 'srv']}]
+  [PASS] 第 2 个库就是刚上传的那个文件  ['prompt_test_DB_twe.db', 'pd_verify_other.sqlite']
+  [PASS] 第 2 个库的表清单 = 该库里真实的表  {'srv', 'only_here'}
+  [PASS] 两个库的 srv 都勾上了（靠 db 区分，不是靠表名）  ['prompt_test_DB_twe.db|mdl', 'prompt_test_DB_twe.db|srv', 'prompt_test_DB_twe.db|tst_api_key', 'pd_verify_other.sqlite|srv']
+  [PASS] 两个库的同名表各自渲染自己的字段（按库隔离，不串）  面板=[['base_url', 'comp_name', 'home_url', 'id', 'plat_name'], ['srv_alias', 'srv_id', 'srv_zone']] 应用库=['id', 'plat_name', 'base_url', 'comp_name', 'home_url'] 上传库=['srv_id', 'srv_alias', 'srv_zone']
+  [PASS] 上传库的结构里能看到它自己的表说明（注释来自该库的 DDL）  [('mdl', '表说明·mdl'), ('srv', '表说明·srv'), ('tst_api_key', '表说明·tst_api_key'), ('srv', '另一台机器的服务器表')]
+  [PASS] 新增流程无 JS 异常
+
+■ [9] 收尾：库表计数回到基线（本页只读库，不写任何表）
+  [PASS] srv 回到基线  17 -> 17
+  [PASS] mdl 回到基线  16 -> 16
+  [PASS] tst_plan 回到基线  0 -> 0
+  [PASS] tst_plan_prompt 回到基线  0 -> 0
+  [PASS] tst_api_key 回到基线  1 -> 1
+  [PASS] tst_rec 回到基线  0 -> 0
+  [PASS] tst_rec_dtl 回到基线  0 -> 0
+
+==============================================================================
+结果：全部通过
+==============================================================================
+

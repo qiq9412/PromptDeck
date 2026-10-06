@@ -1,0 +1,3556 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>提示词测试 · PromptDeck</title>
+<style>
+  :root{
+    --cream-1:#F2E8E0;
+    --cream-2:#E7DACE;
+    --ink:#17130F;
+    --text:#241E19;
+    --text-2:#7C7269;
+    --text-3:#A99F95;
+    --purple:#1C1712;
+    --purple-deep:#000000;
+    --purple-soft:#F3EBE1;
+    --mint:#8FB05F;
+    --mint-soft:#E9F2DA;
+    --orange:#D8452C;
+    --orange-soft:#FBEBE5;
+    --gold:#E0A93F;
+    --fill:#F5F0EA;
+    --fill-2:#EDE5DC;
+    --line:#F1EAE2;
+    --line-2:#E4DACF;
+    --r-sm:10px;
+    --r-app:30px;
+    --r-lg:22px;
+    --r-md:14px;
+    --sh-app:0 60px 120px -60px rgba(88,58,42,.42);
+    --sh-card:0 24px 54px -42px rgba(60,40,28,.42);
+    --sh-btn:0 12px 26px -16px rgba(23,19,15,.7);
+    --sans:"Plus Jakarta Sans","Poppins",-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:ui-monospace,"SFMono-Regular","SF Mono",Consolas,"Cascadia Mono","Liberation Mono",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:14px;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 720px at 8% -12%, #FBF4EE 0%, rgba(251,244,238,0) 62%),
+      radial-gradient(940px 660px at 105% 105%, #E6D8CB 0%, rgba(230,216,203,0) 62%),
+      linear-gradient(150deg,var(--cream-1) 0%,var(--cream-2) 100%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;text-decoration:none;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#E3D9CE;border-radius:99px;}
+  ::-webkit-scrollbar-thumb:hover{background:#D3C7B9;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  /* ---------- 应用外框（浮动白色圆角卡片） ---------- */
+  .app{
+    display:flex;
+    height:calc(100vh - 40px);
+    margin:20px;
+    background:#FBF7F2;
+    border-radius:var(--r-app);
+    box-shadow:var(--sh-app);
+    overflow:hidden;
+    position:relative;
+  }
+
+  /* ---------- 侧边栏 ---------- */
+  .sidebar{
+    width:252px;flex:0 0 252px;
+    background:transparent;
+    display:flex;flex-direction:column;
+    padding:22px 14px 16px;
+    position:relative;z-index:30;
+  }
+  .sidebar::before{display:none;}
+
+  .brand{
+    display:flex;align-items:center;gap:11px;
+    padding:2px 10px 24px;
+    position:relative;z-index:2;
+  }
+  .brand-logo{flex:0 0 auto;display:block;border-radius:11px;}
+  .brand-txt{display:flex;flex-direction:column;gap:3px;min-width:0;}
+  .brand-name{
+    font-size:19px;font-weight:800;letter-spacing:-.4px;
+    font-family:var(--sans);
+    color:var(--ink);
+    line-height:1;
+  }
+  .brand-sub{
+    font-size:9.5px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:700;
+  }
+
+  .nav{padding:0;overflow-y:auto;flex:1;position:relative;z-index:2;}
+  .nav-label{
+    font-size:10px;letter-spacing:1.3px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+    padding:0 12px 10px;
+  }
+  .nav-group{margin-bottom:2px;}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;
+    padding:11px 12px;border-radius:var(--r-md);
+    color:var(--text-2);cursor:pointer;
+    font-size:14px;font-weight:600;
+    transition:background .18s ease,color .18s ease;
+    user-select:none;
+  }
+  .nav-item:hover{background:var(--fill);color:var(--ink);}
+  .nav-item .ic{
+    flex:0 0 18px;width:18px;height:18px;
+    display:flex;align-items:center;justify-content:center;
+    color:inherit;
+  }
+  .nav-item .caret{
+    margin-left:auto;width:12px;height:12px;color:var(--text-3);
+    transition:transform .22s ease;
+  }
+  .nav-group.open > .nav-item .caret{transform:rotate(90deg);}
+  .nav-item.is-parent{color:var(--ink);font-weight:800;}
+
+  .subnav{
+    list-style:none;margin:2px 0 8px;padding:0 0 0 5px;
+    display:none;
+  }
+  .nav-group.open .subnav{display:block;}
+  .subnav a{
+    display:flex;align-items:center;
+    position:relative;
+    padding:10px 14px;border-radius:var(--r-md);
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .subnav a::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:3px;height:0;border-radius:3px;background:var(--purple);
+    transition:height .2s ease;
+  }
+  .subnav a:hover{background:var(--fill);color:var(--ink);}
+  .subnav a.active{
+    background:var(--purple-soft);color:var(--purple-deep);font-weight:800;
+  }
+  .subnav a.active::before{height:18px;}
+
+  .sidebar-foot{
+    position:relative;z-index:2;
+    margin-top:12px;
+    padding:13px 15px;
+    background:var(--fill);border-radius:var(--r-md);
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.5px;
+    color:var(--text-2);display:flex;align-items:center;gap:8px;
+  }
+  .dot{
+    width:7px;height:7px;border-radius:50%;flex:0 0 auto;
+    background:var(--mint);box-shadow:0 0 0 3px rgba(79,189,182,.2);
+  }
+
+  /* ---------- 主区 ---------- */
+  .main{
+    flex:1;min-width:0;display:flex;flex-direction:column;
+    overflow-y:auto;
+    border-left:0;
+    padding:0 16px 16px;
+  }
+
+  .topbar{
+    flex:0 0 auto;
+    display:flex;align-items:center;gap:14px;
+    padding:20px 0 18px;
+    background:#FBF7F2;
+    border-bottom:0;
+    position:sticky;top:0;z-index:20;
+  }
+  .hamburger{
+    display:none;width:40px;height:40px;border:0;
+    border-radius:var(--r-md);background:var(--fill);cursor:pointer;
+    align-items:center;justify-content:center;color:var(--text-2);
+    transition:background .18s ease,color .18s ease;
+  }
+  .hamburger:hover{background:var(--fill-2);color:var(--ink);}
+  .crumb{
+    font-size:14px;color:var(--text-3);font-weight:600;
+    display:flex;align-items:center;gap:9px;min-width:0;
+  }
+  .crumb b{color:var(--ink);font-weight:800;font-size:16px;letter-spacing:-.2px;}
+  .crumb .sep{color:#D8CEC2;}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .chip{
+    font-size:11px;letter-spacing:.7px;font-weight:700;
+    padding:8px 14px;border-radius:999px;
+    border:1px solid var(--line-2);
+    color:var(--text-2);background:#fff;
+  }
+  .chip.live{
+    color:#5C7F33;background:#E7F1D8;border-color:#D7E6C0;
+    display:flex;align-items:center;gap:7px;
+  }
+
+  .content{
+    flex:1;padding:26px 30px 34px;
+    background:#FFFFFF;
+    border-radius:26px;
+    box-shadow:0 34px 80px -72px rgba(70,45,30,.8);
+  }
+
+  .page-head{margin-bottom:22px;display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;}
+  .page-head-txt{min-width:0;}
+  .page-head .actions{margin-left:auto;align-items:center;}
+  .page-head h1{
+    margin:0 0 8px;font-size:25px;font-weight:800;letter-spacing:-.6px;
+    color:var(--ink);
+    display:flex;align-items:center;gap:10px;
+  }
+  .page-head p{margin:0;color:var(--text-2);font-size:13.5px;font-weight:500;line-height:1.6;}
+  .page-head code{
+    font-family:var(--mono);font-size:12px;background:var(--fill);
+    padding:3px 8px;border-radius:8px;color:#7A6A58;
+  }
+
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:var(--r-lg);
+    box-shadow:var(--sh-card);
+    overflow:hidden;
+  }
+
+  /* ---------- 搜索 / 操作 ---------- */
+  .panel-top{
+    display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap;
+    padding:22px 24px;
+    border-bottom:1px solid var(--line);
+  }
+  .search-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;flex:1 1 100%;}
+  .search-form .field{flex:1 1 240px;}
+  .field{display:flex;flex-direction:column;gap:8px;min-width:190px;}
+  .field label{
+    font-size:10.5px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;
+  }
+  .field input{
+    height:46px;padding:0 16px;
+    border:1px solid #F1E8DF;border-radius:var(--r-md);
+    background:#F7F2EC;
+    font-size:14px;font-family:var(--sans);font-weight:600;color:var(--ink);
+    outline:none;width:100%;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .field input::placeholder{color:#B3A79A;font-weight:500;}
+  .field input:focus{
+    background:#fff;border-color:#E0D2C2;
+    box-shadow:0 0 0 4px rgba(28,23,18,.07);
+  }
+
+  .btn{
+    height:46px;padding:0 22px;border-radius:999px;
+    border:1px solid transparent;
+    font-size:14px;font-weight:700;font-family:var(--sans);
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    cursor:pointer;white-space:nowrap;
+    transition:background .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,transform .18s ease;
+  }
+  .btn svg{flex:0 0 auto;}
+  .btn-primary{
+    background:var(--ink);color:#fff;
+    box-shadow:0 16px 30px -18px rgba(23,19,15,.85);
+  }
+  .btn-primary:hover{background:#000;transform:translateY(-1px);}
+  .btn-ghost{
+    background:#fff;border-color:var(--line-2);color:var(--text-2);
+  }
+  .btn-ghost:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+  .btn-danger{
+    background:#fff;border-color:#F6D8CF;color:var(--orange);
+  }
+  .btn-danger:hover:not(:disabled){background:var(--orange-soft);border-color:#F0B9A4;}
+  .btn:disabled,.btn.is-disabled{
+    background:var(--fill);border-color:transparent;color:#BDB2A6;
+    box-shadow:none;cursor:not-allowed;transform:none;
+  }
+  .btn-add{
+    background:var(--ink);color:#fff;border-color:transparent;
+    box-shadow:var(--sh-btn);
+  }
+  .btn-add:hover{background:#000;transform:translateY(-1px);}
+
+  .actions{display:flex;gap:12px;align-items:flex-end;margin-left:auto;flex-wrap:wrap;}
+
+  .meta-bar{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:14px 24px;
+    background:#fff;border-bottom:1px solid var(--line);
+    font-size:12.5px;font-weight:700;letter-spacing:.2px;color:var(--text-3);
+  }
+  .meta-bar .sel{
+    color:var(--purple-deep);background:var(--purple-soft);
+    padding:5px 12px;border-radius:999px;border:0;
+  }
+  .meta-bar .grow{flex:1;}
+
+  /* ---------- 表格 ---------- */
+  .table-wrap{width:100%;overflow-x:auto;}
+  table{width:100%;min-width:860px;border-collapse:collapse;}
+  thead th{
+    text-align:left;
+    padding:15px 22px;
+    background:#FBF7F2;
+    border-bottom:1px solid var(--line);
+    font-size:10.5px;letter-spacing:1.1px;text-transform:uppercase;
+    color:var(--text-3);font-weight:800;white-space:nowrap;
+  }
+  tbody td{
+    padding:17px 22px;border-bottom:1px solid var(--line);
+    vertical-align:middle;font-size:14px;font-weight:600;color:var(--ink);
+  }
+  tbody tr{transition:background .18s ease;}
+  tbody tr:hover{background:#FBF7F2;}
+  tbody tr.is-checked{background:var(--purple-soft);}
+  tbody tr:last-child td{border-bottom:none;}
+
+  .col-check{width:54px;}
+  .col-platform{width:23%;}
+  .col-company{width:26%;}
+  .col-api{width:auto;}
+  tbody td.col-check{position:relative;padding-left:22px;}
+  tbody td.col-check::before{
+    content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);
+    width:4px;height:26px;border-radius:0 4px 4px 0;background:#ECA9B6;
+  }
+  tbody tr:nth-child(4n+1) td.col-check::before{background:#ECA9B6;}
+  tbody tr:nth-child(4n+2) td.col-check::before{background:#EFC05A;}
+  tbody tr:nth-child(4n+3) td.col-check::before{background:#A9CBE8;}
+  tbody tr:nth-child(4n+4) td.col-check::before{background:#2C4A66;}
+
+  /* 方形复选框 */
+  input[type="checkbox"]{
+    appearance:none;-webkit-appearance:none;
+    width:20px;height:20px;border-radius:4px;
+    border:1.8px solid #D9CEC1;background:#fff;
+    cursor:pointer;position:relative;display:block;margin:0;
+    transition:background .16s ease,border-color .16s ease;
+  }
+  input[type="checkbox"]:hover{border-color:var(--purple);}
+  input[type="checkbox"]::after{
+    content:"";position:absolute;left:0;right:0;top:0;bottom:0;margin:auto;
+    width:4px;height:8px;
+    border:2px solid #fff;border-top:0;border-left:0;
+    transform:rotate(42deg);opacity:0;
+    transition:opacity .14s ease;
+  }
+  input[type="checkbox"]:checked,
+  input[type="checkbox"]:indeterminate{
+    background:var(--purple);border-color:var(--purple);
+  }
+  input[type="checkbox"]:checked::after{opacity:1;}
+  input[type="checkbox"]:indeterminate::after{
+    width:8px;height:2px;border:0;border-radius:2px;
+    background:#fff;transform:none;opacity:1;
+  }
+
+  .link{
+    color:var(--purple);font-weight:700;
+    display:inline-flex;align-items:center;gap:6px;
+    transition:color .16s ease;
+    word-break:break-word;
+  }
+  .link:hover{
+    color:var(--purple-deep);
+    text-decoration:underline;text-underline-offset:3px;text-decoration-thickness:1.5px;
+  }
+  .link .ext{opacity:.45;flex:0 0 auto;transition:opacity .16s ease;}
+  .link:hover .ext{opacity:1;}
+  .link-company{color:var(--ink);font-weight:600;}
+  .link-company:hover{color:var(--purple);}
+
+  .api{
+    font-family:var(--mono);font-size:12.5px;font-weight:500;color:#7A6A58;
+    background:#F7F1EA;border:1px solid #EFE5D9;
+    padding:7px 13px;border-radius:999px;display:inline-block;
+    max-width:100%;overflow-wrap:anywhere;
+  }
+
+  .empty-cell{text-align:center;padding:64px 16px;color:var(--text-3);}
+  .empty-cell .big{font-size:15px;color:var(--ink);margin-bottom:8px;font-weight:800;}
+  .empty-cell .small{font-size:12.5px;font-weight:600;color:var(--text-3);}
+
+  .panel-foot{
+    display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+    padding:16px 24px;border-top:1px solid var(--line);
+    background:#fff;
+    font-size:12.5px;font-weight:700;color:var(--text-3);
+  }
+  .pager{margin-left:auto;display:flex;align-items:center;gap:8px;}
+  .pager button{
+    height:34px;padding:0 14px;border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);font-family:var(--sans);font-size:12.5px;font-weight:700;
+    color:var(--text-2);cursor:pointer;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .pager button:hover:not(:disabled){background:var(--fill);color:var(--ink);}
+  .pager button:disabled{color:#C4B9AC;cursor:not-allowed;background:var(--fill);border-color:transparent;}
+  .pager .page-now{
+    height:34px;min-width:34px;padding:0 10px;
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:var(--r-sm);background:var(--ink);color:#fff;
+    font-size:12.5px;font-weight:800;
+  }
+
+  /* ---------- 弹窗 ---------- */
+  .mask{
+    position:fixed;inset:0;z-index:80;
+    background:rgba(50,34,26,.34);
+    backdrop-filter:blur(6px);
+    display:none;align-items:center;justify-content:center;padding:20px;
+  }
+  .mask.show{display:flex;animation:fade .18s ease;}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .modal{
+    width:100%;max-width:440px;background:#fff;border-radius:24px;
+    border:0;
+    box-shadow:0 46px 100px -44px rgba(50,34,26,.62);
+    padding:28px 28px 22px;
+    animation:pop .2s ease;
+  }
+  @keyframes pop{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:none}}
+  .modal-ic{
+    width:50px;height:50px;border-radius:16px;
+    background:var(--orange-soft);border:0;
+    display:flex;align-items:center;justify-content:center;color:var(--orange);
+    margin-bottom:16px;
+  }
+  .modal h3{margin:0 0 10px;font-size:18.5px;font-weight:800;letter-spacing:-.3px;color:var(--ink);}
+  .modal p{margin:0;color:var(--text-2);font-size:14px;font-weight:500;line-height:1.7;}
+  .modal p b{color:var(--ink);font-weight:800;}
+  .modal .names{
+    margin-top:14px;padding:12px 14px;background:var(--fill);
+    border:0;border-radius:var(--r-md);
+    font-family:var(--mono);font-size:12px;font-weight:500;color:var(--text-2);
+    line-height:2;max-height:110px;overflow:auto;
+  }
+  .modal-foot{display:flex;justify-content:flex-end;gap:10px;margin-top:24px;}
+  .modal-foot .btn{height:44px;}
+  .btn-danger-solid{
+    background:var(--orange);color:#fff;
+    box-shadow:0 16px 32px -18px rgba(242,99,61,.95);
+  }
+  .btn-danger-solid:hover{background:#BE3A23;transform:translateY(-1px);}
+
+  /* ---------- 轻提示 ---------- */
+  .toast-wrap{position:fixed;right:24px;bottom:24px;z-index:90;display:flex;flex-direction:column;gap:10px;}
+  .toast{
+    background:#fff;border:0;border-radius:var(--r-md);
+    padding:13px 17px;
+    box-shadow:0 26px 56px -26px rgba(50,34,26,.5);
+    font-size:13.5px;font-weight:600;color:var(--text-2);max-width:330px;
+    display:flex;align-items:center;gap:10px;
+    animation:slide .22s ease;
+  }
+  .toast::before{
+    content:"";flex:0 0 auto;width:8px;height:8px;border-radius:50%;
+    background:var(--purple);
+  }
+  .toast.ok::before{background:var(--mint);}
+  .toast.warn::before{background:var(--gold);}
+  @keyframes slide{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+
+  /* ---------- 响应式 ---------- */
+  /* ---------- 操作列 · 修改弹窗（列表页通用，追加；上方规则一行未动） ---------- */
+  .col-op{width:104px;text-align:right;}
+  .btn-op{
+    height:34px;padding:0 16px;
+    border:1px solid var(--line-2);background:#fff;
+    border-radius:var(--r-sm);
+    font-family:var(--sans);font-size:12.5px;font-weight:700;color:var(--text-2);
+    cursor:pointer;white-space:nowrap;
+    transition:background .16s ease,color .16s ease,border-color .16s ease;
+  }
+  .btn-op:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
+
+  /* 修改弹窗：复用 .mask / .modal，只放宽宽度 + 给表单留纵向间距。
+     弹窗里放了下拉框（absolute 定位），所以弹窗体不能裁切；超高时由 #editMask 整体滚动兜底 */
+  #editMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #editMask .modal{max-width:560px;margin:auto 0;}
+  .edit-body{
+    display:flex;flex-direction:column;gap:16px;
+    margin-top:18px;
+  }
+  .edit-body .field{min-width:0;}
+
+  /* ---------- 弹窗内的字段控件：与「新增服务器」页同一套外观（下拉 / 必填星号 / 字段说明） ---------- */
+  .field-hint{font-size:11.5px;font-weight:600;color:var(--text-3);line-height:1.5;}
+  .field label .req{
+    font-style:normal;font-weight:800;font-size:13px;line-height:1;
+    color:var(--orange);margin-left:4px;
+    display:inline-block;vertical-align:top;transform:translateY(-2px);
+  }
+  .combo{position:relative;}
+  /* 与 .field input 同一套视觉，保证「选择提示词方案」框和页面其他文本框一致 */
+  .combo input{
+    height:46px;padding:0 48px 0 16px;
+    border:1px solid #F1E8DF;border-radius:var(--r-md);
+    background:#F7F2EC;
+    font-size:14px;font-family:var(--sans);font-weight:600;color:var(--ink);
+    outline:none;width:100%;box-sizing:border-box;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .combo input::placeholder{color:#B3A79A;font-weight:500;}
+  .combo input:focus{
+    background:#fff;border-color:#E0D2C2;
+    box-shadow:0 0 0 4px rgba(28,23,18,.07);
+  }
+  .combo-btn{
+    position:absolute;right:6px;top:50%;transform:translateY(-50%);
+    width:34px;height:34px;border:0;border-radius:10px;
+    background:transparent;color:var(--text-3);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .16s ease,color .16s ease,transform .22s ease;
+  }
+  .combo-btn:hover{background:var(--fill-2);color:var(--ink);}
+  .combo.open .combo-btn{transform:translateY(-50%) rotate(180deg);color:var(--purple);}
+  .combo-menu{
+    position:absolute;left:0;right:0;top:calc(100% + 8px);z-index:40;
+    background:#fff;border:1px solid var(--line);
+    border-radius:var(--r-md);
+    box-shadow:0 30px 60px -28px rgba(60,40,28,.32);
+    padding:6px;display:none;max-height:240px;overflow:auto;
+  }
+  .combo.open .combo-menu{display:block;animation:pop .16s ease;}
+  .combo-item{
+    display:flex;align-items:center;gap:10px;
+    padding:11px 12px;border-radius:10px;
+    font-size:13.5px;font-weight:600;color:var(--text-2);
+    cursor:pointer;transition:background .14s ease,color .14s ease;
+  }
+  .combo-item:hover{background:var(--purple-soft);color:var(--purple-deep);}
+  .combo-item.is-picked{background:var(--fill);color:var(--ink);}
+  .combo-empty{
+    padding:16px 12px;text-align:center;
+    font-size:12.5px;font-weight:600;color:var(--text-3);
+  }
+  .tag-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;display:block;}
+  .d-purple{background:var(--purple);}
+  .d-mint{background:var(--mint);}
+  .d-orange{background:var(--orange);}
+  .d-gold{background:var(--gold);}
+
+  @media (max-width:1100px){
+    .sidebar{width:226px;flex-basis:226px;}
+    .content{padding:24px;}
+    .topbar{padding:18px 0 16px;}
+  }
+  @media (max-width:900px){
+    .app{height:100vh;margin:0;border-radius:0;}
+    .sidebar{
+      position:absolute;left:0;top:0;bottom:0;z-index:40;
+      width:262px;flex-basis:262px;
+      transform:translateX(-100%);
+      transition:transform .24s ease;
+      box-shadow:0 0 70px -20px rgba(50,34,26,.55);
+    }
+    body.nav-open .sidebar{transform:none;}
+    .main{border-left:0;padding:0 12px 12px;}
+    .hamburger{display:inline-flex;}
+    .scrim{position:absolute;inset:0;background:rgba(40,28,22,.32);z-index:35;display:none;}
+    body.nav-open .scrim{display:block;}
+    .content{padding:18px;}
+    .topbar{padding:16px 0 14px;}
+    .page-head h1{font-size:21px;}
+    .search-form{flex-basis:100%;}
+    .field{min-width:0;flex:1 1 160px;}
+    .actions{margin-left:0;width:100%;}
+    .actions .btn{flex:1 1 auto;}
+    .page-head{gap:14px;}
+    .page-head .actions{margin-left:0;width:100%;}
+    .toast-wrap{left:18px;right:18px;bottom:18px;}
+    .toast{max-width:none;}
+  }
+
+  /* ================= 提示词测试 · 专用样式（追加，上方基座规则一行未动） ================= */
+  /* 当前页是一级页（不属于任何二级分组），一级菜单自持 active 高亮 —— 与「提示词构造」页同款 */
+  .nav-item.active{background:var(--purple-soft);color:var(--purple-deep);font-weight:800;}
+
+  /* 表格列宽（选择 / 问题 / 答案 / 测试反馈答案 / 判断）
+     ⚠️ 必须用 table-layout:fixed：auto 布局下 <th> 上的 width 只是「提示」，
+     浏览器会按内容重新分配（实测判断列被压窄、五列比例全走形）。fixed 才让下面这组宽度逐字生效。
+     ⚠️ 选择列是固定 px，其余四列的百分比合计必须 = 100%：fixed 布局里
+     若百分比合计不足 100%，多出来的余量会全部塞给「第一个百分比列」
+     （踩过一次：25+21+23+19=88%，余下 82.6px 全落到选择列，把它从 52px 撑到 135px）。
+     ⚠️ .col-check 仍要显式给宽：无宽度的那一列会吞掉全部剩余宽度。 */
+  #testPanel table{min-width:0;table-layout:fixed;width:100%;}
+  #testPanel .col-check{width:52px;}
+  #testPanel .col-question{width:27%;}
+  #testPanel .col-answer{width:25%;}
+  #testPanel .col-feedback{width:28%;}
+  /* 判断列 20%：fixed 布局下放得下「对 / 错」两个圆形胶囊（td 左右内边距各 9px，实测约 214px） */
+  #testPanel .col-judge{width:20%;}
+
+  /* 缩小列间距：本表用紧凑内边距（基座 td 是 22px 左右内边距，判断列会因此换行） */
+  #testPanel .table-wrap th,
+  #testPanel .table-wrap td{padding-left:9px;padding-right:9px;}
+  #testPanel .table-wrap th{padding-top:12px;padding-bottom:12px;}
+  #testPanel .table-wrap td{padding-top:12px;padding-bottom:12px;}
+  #testPanel tbody td.col-check{padding-left:14px;}
+  /* fixed 布局里单元格内容可能顶破列宽，统一允许换行、长串强行断行 */
+  #testPanel td,#testPanel th{overflow-wrap:break-word;word-break:break-word;}
+
+  /* 问题列：纯文本 */
+  .txt-cell{
+    font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.62;
+    white-space:pre-wrap;word-break:break-word;
+  }
+
+  /* 答案列：固定文字（答案的录入只在「添加测试问题」弹窗与「导入 Excel」里进行） */
+  .ans-cell{
+    font-size:13px;font-weight:600;color:var(--text-2);line-height:1.62;
+    white-space:pre-wrap;word-break:break-word;
+    max-height:132px;overflow:auto;
+  }
+  .ans-cell.is-empty{color:var(--text-3);font-weight:500;font-size:12.5px;}
+
+  /* 测试反馈答案列：来自「提示词构造」页调试结果的只读文本块 */
+  .fb-cell{
+    font-size:13px;font-weight:600;color:var(--text-2);line-height:1.62;
+    white-space:pre-wrap;word-break:break-word;
+    max-height:132px;overflow:auto;
+    background:#FBFAF8;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  }
+  .fb-cell.is-empty{color:var(--text-3);font-weight:500;font-size:12.5px;}
+
+
+  /* ---------- 未选方案：测试问题列表置灰不可用 ----------
+     口径：先选好左栏的提示词方案，右栏才匹配出该方案已保存的问题内容；
+     没选方案时表格整体压暗、内容打码，行内勾选与判断一并禁用。
+     ⚠️ .panel-foot 不在打码范围内：状态条 / 分页的数字与文案仍要看得清。 */
+  #testPanel .stat-bar,
+  #testPanel .table-wrap{transition:opacity .18s ease;}
+  #testPanel.is-locked .stat-bar,
+  #testPanel.is-locked .table-wrap{opacity:.42;filter:grayscale(.72);}
+  #testPanel.is-locked .table-wrap{pointer-events:none;}
+  #testPanel.is-locked .ans-cell,
+  #testPanel.is-locked .fb-cell{
+    color:transparent;background:linear-gradient(90deg,#EDE7E0,#E4DCD3);
+    border-radius:6px;user-select:none;
+  }
+  #testPanel.is-locked .ans-cell.is-empty,
+  #testPanel.is-locked .fb-cell.is-empty{background:none;color:transparent;}
+  #testPanel.is-locked .txt-cell{opacity:.62;filter:blur(1.6px);user-select:none;}
+  #testPanel.is-locked .jd-cell,#testPanel.is-locked .row-check{
+    pointer-events:none;opacity:.55;cursor:not-allowed;
+  }
+  #testPanel.is-locked .btn-add,
+  #testPanel.is-locked .btn{pointer-events:none;}
+
+  /* 两个入口按钮在未选方案时置灰不可点（点下去只提示，不执行） */
+  .btn.is-disabled,
+  .btn[disabled]{cursor:not-allowed;opacity:.45;box-shadow:none;}
+  .btn.is-disabled:hover,
+  .btn[disabled]:hover{transform:none;filter:none;}
+
+  /* ---------- 弹窗内的多行文本域（基座只定义了 .field input） ---------- */
+  .field textarea{
+    width:100%;min-width:0;box-sizing:border-box;display:block;
+    min-height:96px;padding:13px 15px;
+    border:1px solid #F1E8DF;border-radius:var(--r-md);background:#F7F2EC;
+    font-family:var(--sans);font-size:13.5px;font-weight:600;line-height:1.66;color:var(--ink);
+    resize:vertical;outline:none;
+    transition:background .18s ease,border-color .18s ease,box-shadow .18s ease;
+  }
+  .field textarea::placeholder{color:#B3A79A;font-weight:500;}
+  .field textarea:focus{background:#fff;border-color:var(--line-2);box-shadow:0 0 0 4px rgba(28,23,18,.06);}
+
+  /* ---------- 方案详情弹窗：多轮用户提示词逐轮展示 ---------- */
+  .dt-row.dt-row-stack{display:none;}            /* 旧单框在有多轮时隐藏，单轮时仍用同一套样式 */
+  .dt-rounds{display:flex;flex-direction:column;gap:10px;margin-top:2px;}
+  .dt-rounds[hidden]{display:none;}
+  .dt-round{display:flex;flex-direction:column;gap:7px;}
+  .dt-round-k{
+    font-size:11px;font-weight:800;letter-spacing:.4px;color:var(--text-3);
+  }
+  .dt-round-v{
+    padding:11px 13px;border:1px solid var(--line);border-radius:var(--r-sm);background:#FDFCFA;
+    font-size:12.5px;font-weight:600;line-height:1.75;color:var(--ink);
+    white-space:pre-wrap;word-break:break-word;max-height:150px;overflow:auto;
+  }
+
+  /* ---------- 添加测试问题弹窗 ---------- */
+  #addMask .modal{max-width:580px;}
+  .add-body{display:flex;flex-direction:column;gap:18px;margin-top:18px;}
+
+  /* ---------- 导入 Excel 弹窗 ---------- */
+  #impMask .modal{max-width:560px;}
+  .imp-body{display:flex;flex-direction:column;gap:16px;margin-top:18px;}
+  .imp-row{display:flex;gap:10px;flex-wrap:wrap;}
+  .imp-row .btn{height:42px;padding:0 18px;font-size:13.5px;}
+  .imp-file{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:14px 16px;border:1px dashed var(--line-2);border-radius:var(--r-md);
+    background:#FDFCFA;
+    font-size:12.5px;font-weight:700;color:var(--text-2);
+  }
+  .imp-file .nm{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink);word-break:break-all;}
+  .imp-file .tag{
+    font-size:11px;font-weight:800;letter-spacing:.6px;
+    padding:4px 10px;border-radius:999px;
+    background:var(--mint-soft);color:#5C7F33;
+  }
+  .imp-file .tag.is-warn{background:var(--orange-soft);color:var(--orange);}
+  .imp-hint{font-size:11.5px;font-weight:600;color:var(--text-3);line-height:1.6;}
+  .imp-preview{
+    margin:0;padding:12px 14px;background:var(--fill);border-radius:var(--r-md);
+    font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--text-2);
+    line-height:1.9;max-height:150px;overflow:auto;white-space:pre-wrap;word-break:break-all;
+  }
+  .imp-preview[hidden]{display:none;}
+
+  /* 隐藏的原生文件选择框（由「添加 Excel 文件」按钮触发） */
+  .visually-hidden{
+    position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+    overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+  }
+
+  @media (max-width:900px){
+    .add-body,.imp-body{gap:14px;}
+    .imp-row .btn{flex:1 1 auto;}
+    /* 五列挤在窄屏里，内边距与字号再收一档，避免出现横向滚动条 */
+    #testPanel .table-wrap th,
+    #testPanel .table-wrap td{padding-left:6px;padding-right:6px;}
+    #testPanel tbody td.col-check{padding-left:11px;}
+    .txt-cell,.ans-cell,.fb-cell{font-size:12.5px;}
+  }
+
+  /* ================= 左栏方案区 + 统计标签栏（09-29 新增） ================= */
+
+  /* 两列布局：左「提示词方案」固定宽，右「测试问题列表」整体右移 */
+  .pt-layout{display:grid;grid-template-columns:minmax(300px,344px) minmax(0,1fr);gap:22px;align-items:start;}
+  .pt-side{min-width:0;}
+  .pt-main{min-width:0;}
+
+  /* 左栏卡片 */
+  .pt-side .panel{overflow:visible;}
+  .pt-side-head{
+    display:flex;align-items:center;gap:10px;
+    padding:16px 18px;border-bottom:1px solid var(--line);
+  }
+  .pt-side-head h2{margin:0;font-size:14.5px;font-weight:800;letter-spacing:-.2px;color:var(--ink);}
+  .pt-detail{
+    margin-left:auto;display:inline-flex;align-items:center;gap:6px;
+    height:32px;padding:0 13px;border:1px solid var(--line-2);border-radius:999px;
+    background:#fff;font-family:var(--sans);font-size:12px;font-weight:700;color:var(--text-2);
+    cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease;
+  }
+  .pt-detail[hidden]{display:none;}
+  .pt-detail:hover{background:var(--fill-2);color:var(--ink);border-color:#D9CBBB;}
+  .pt-pick{padding:18px 18px 0;}
+  .pt-pick-row{display:flex;gap:8px;align-items:center;}
+  .pt-pick-row .combo{flex:1 1 auto;min-width:0;}
+  .pt-pick-row .btn-reset{
+    flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;
+    height:46px;padding:0 14px;border:1px solid var(--line-2);border-radius:var(--r-md);
+    background:#fff;font-family:var(--sans);font-size:13px;font-weight:700;color:var(--text-2);
+    cursor:pointer;transition:background .16s ease,border-color .16s ease,color .16s ease;
+  }
+  .pt-pick-row .btn-reset:hover{background:var(--fill-2);color:var(--ink);border-color:#D9CBBB;}
+  .pt-side-body{display:flex;flex-direction:column;gap:14px;padding:18px;}
+  .pt-side-body[hidden]{display:none;}
+
+  .pt-fld{display:flex;flex-direction:column;gap:8px;min-width:0;}
+  .pt-fld > label{font-size:12px;font-weight:800;letter-spacing:.2px;color:var(--text-3);}
+  .pt-read{
+    max-height:104px;overflow:auto;
+    padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:#FDFCFA;
+    font-size:12.5px;font-weight:600;line-height:1.7;color:var(--ink);
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .pt-read.mono{font-family:var(--mono);font-size:12px;font-weight:500;color:#7A6A58;}
+  .pt-read.is-empty{color:var(--text-3);font-weight:600;}
+  .pt-read-ta{
+    width:100%;min-width:0;box-sizing:border-box;display:block;
+    height:150px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:#FDFCFA;
+    font-family:var(--mono);font-size:12px;font-weight:500;line-height:1.75;color:var(--ink);
+    resize:vertical;outline:none;white-space:pre;
+  }
+  .pt-read-ta:focus{background:#fff;border-color:var(--line-2);box-shadow:0 0 0 4px rgba(28,23,18,.06);}
+  .pt-empty{
+    padding:18px 16px;border:1px dashed var(--line-2);border-radius:var(--r-sm);background:#FDFCFA;
+    font-size:12.3px;font-weight:600;color:var(--text-3);line-height:1.75;
+  }
+
+  /* 开始调试 + 进度条 */
+  .pt-run-row{display:flex;flex-direction:column;gap:12px;}
+  .pt-run-row > .btn{height:44px;width:100%;justify-content:center;}
+  .pt-prog{display:flex;flex-direction:column;gap:8px;}
+  .pt-prog[hidden]{display:none;}
+  .pt-prog-top{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:700;color:var(--text-2);}
+  .pt-prog-top b{margin-left:auto;color:var(--ink);font-weight:800;}
+  .pt-prog-bar{height:8px;border-radius:999px;background:var(--fill-2);overflow:hidden;}
+  .pt-prog-bar i{
+    display:block;height:100%;width:0;border-radius:999px;
+    background:linear-gradient(90deg,#2E241B,#43331F);
+    transition:width .22s ease;
+  }
+
+  /* 右栏：统计标签栏（替代原搜索栏） */
+  .stat-bar{
+    display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;
+    padding:18px;border-bottom:1px solid var(--line);
+  }
+  .stat{
+    flex:1 1 148px;min-width:0;
+    display:flex;flex-direction:column;gap:7px;
+    padding:13px 15px;border:1px solid var(--line);border-radius:var(--r-md);background:#FDFCFA;
+  }
+  .stat em{font-size:11.5px;font-weight:800;letter-spacing:.2px;color:var(--text-3);font-style:normal;}
+  .stat b{font-size:19px;font-weight:800;letter-spacing:-.4px;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .stat.is-acc{background:var(--purple-soft);border-color:#E5D8C6;}
+  .stat.is-right b{color:#5C7F33;}
+  .stat.is-wrong b{color:var(--orange);}
+  .stat.is-wrong{cursor:pointer;}
+  .stat.is-fix b{color:#9A6B12;}
+
+  /* 状态条右侧的「保存结果」：紧凑尺寸，不撑高 meta-bar */
+  .meta-bar .btn{height:34px;padding:0 16px;font-size:12.5px;font-weight:800;}
+
+  /* 判断列：人工改判 —— 单选圆形（对 / 错 同行互斥，再点一次可取消回到「未判定」），上方标出 AI 判定 */
+  .jd-cell{display:flex;flex-direction:column;gap:8px;align-items:flex-start;}
+  .jd-ai{font-size:11px;font-weight:800;letter-spacing:.2px;color:var(--text-3);}
+  .jd-ai b.ok{color:#5C7F33;}
+  .jd-ai b.bad{color:var(--orange);}
+  .jd-chips{display:flex;gap:8px;flex-wrap:wrap;}
+  .jd{
+    display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+    padding:6px 12px 6px 10px;border:1px solid var(--line-2);border-radius:999px;background:#fff;
+    font-size:12.5px;font-weight:700;color:var(--text-2);
+    transition:background .16s ease,border-color .16s ease,color .16s ease;
+  }
+  .jd:hover{color:var(--ink);border-color:#D9CBBB;}
+  .jd input[type="radio"]{
+    appearance:none;-webkit-appearance:none;
+    width:16px;height:16px;border-radius:50%;flex:0 0 auto;
+    border:1.8px solid #D9CEC1;background:#fff;cursor:pointer;
+    position:relative;display:block;margin:0;
+    transition:background .16s ease,border-color .16s ease;
+  }
+  .jd input[type="radio"]:hover{border-color:var(--purple);}
+  .jd input[type="radio"]::after{
+    content:"";position:absolute;left:0;right:0;top:0;bottom:0;margin:auto;
+    width:6px;height:6px;border-radius:50%;background:#fff;opacity:0;
+    transition:opacity .14s ease;
+  }
+  .jd-right.is-on{background:var(--mint-soft);border-color:#CBDDA8;color:#4F6B2C;}
+  .jd-wrong.is-on{background:var(--orange-soft);border-color:#F0B9A4;color:var(--orange);}
+  .jd-right input[type="radio"]:checked{background:var(--mint);border-color:var(--mint);}
+  .jd-wrong input[type="radio"]:checked{background:var(--orange);border-color:var(--orange);}
+  .jd input[type="radio"]:checked::after{opacity:1;}
+
+  /* 详情弹窗 */
+  #detailMask{align-items:flex-start;overflow:auto;padding:32px 20px;}
+  #detailMask .modal{max-width:680px;margin:auto 0;}
+  #errMask .modal{max-width:960px;margin:auto 0;}
+  .dt-body{display:flex;flex-direction:column;gap:12px;margin-top:18px;}
+  .dt-row{display:flex;align-items:flex-start;gap:12px;font-size:12.8px;font-weight:600;color:var(--text-2);}
+  .dt-row .dt-k{flex:0 0 84px;color:var(--text-3);font-weight:800;letter-spacing:.2px;}
+  .dt-row .dt-v{flex:1 1 auto;min-width:0;color:var(--ink);word-break:break-word;}
+  .dt-row .dt-v.mono{font-family:var(--mono);font-size:12px;font-weight:500;color:#7A6A58;}
+  .dt-row .dt-v.box{
+    max-height:176px;overflow:auto;white-space:pre-wrap;
+    background:#FDFCFA;border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;
+    font-size:12.5px;line-height:1.75;
+  }
+  .dt-row .dt-v.is-empty{color:var(--text-3);font-weight:600;}
+
+  @media (max-width:1080px){
+    .pt-layout{grid-template-columns:1fr;gap:18px;}
+    .pt-read-ta{height:120px;}
+  }
+  @media (max-width:900px){
+    .stat-bar{padding:14px;}
+    .stat{flex:1 1 44%;}
+    .pt-side-body{padding:16px;}
+    .pt-pick{padding:16px 16px 0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ========== 侧边栏 ========== -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg class="brand-logo" width="34" height="34" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="lg" x1="0" y1="0" x2="34" y2="34">
+            <stop stop-color="#2E241B"/>
+            <stop offset=".55" stop-color="#1B1510"/>
+            <stop offset="1" stop-color="#43331F"/>
+          </linearGradient>
+        </defs>
+        <rect x="1" y="1" width="32" height="32" rx="9" fill="url(#lg)"/>
+        <rect x="1" y="1" width="32" height="32" rx="9" stroke="rgba(255,255,255,.35)"/>
+        <path d="M10 11.5 L15.5 17 L10 22.5" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M19 23 h6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".9"/>
+      </svg>
+      <div class="brand-txt">
+        <span class="brand-name">PromptDeck</span>
+        <span class="brand-sub">LLM Workbench</span>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-label">工作台</div>
+
+      <!-- 一级：提示词构造 -->
+      <div class="nav-group">
+        <a class="nav-item" href="prompt.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M2.5 4.2h11M2.5 8h7.5M2.5 11.8h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>提示词构造</span>
+        </a>
+      </div>
+
+      <!-- 一级：服务器配置 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <rect x="1.8" y="2.4" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="1.8" y="9" width="12.4" height="4.6" rx="1.6" stroke="currentColor" stroke-width="1.5"/>
+              <circle cx="4.6" cy="4.7" r=".95" fill="currentColor"/>
+              <circle cx="4.6" cy="11.3" r=".95" fill="currentColor"/>
+            </svg>
+          </span>
+          <span>服务器配置</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="list_server.html">服务器列表</a></li>
+          <li><a href="new_server.html">新增服务器</a></li>
+        </ul>
+      </div>
+
+      <!-- 一级：模型调试 -->
+      <div class="nav-group">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="2.1" stroke="currentColor" stroke-width="1.5"/>
+              <path d="M8 1.6v2.2M8 12.2v2.2M1.6 8h2.2M12.2 8h2.2M3.5 3.5l1.6 1.6M10.9 10.9l1.6 1.6M12.5 3.5l-1.6 1.6M5.1 10.9l-1.6 1.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>模型调试</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="foundation1_models.html">模型列表</a></li>
+          <li><a href="model_add.html">新增模型</a></li>
+        </ul>
+      </div>
+      <!-- 一级：提示词复核（二级：提示词测试 / 提示词方案 / 测试结果列表） -->
+      <div class="nav-group open">
+        <div class="nav-item is-parent" data-toggle>
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <path d="M6.4 2.6h3.2M5.6 2.6H4.4a1.2 1.2 0 0 0-1.2 1.2v9a1.2 1.2 0 0 0 1.2 1.2h7.2a1.2 1.2 0 0 0 1.2-1.2v-9a1.2 1.2 0 0 0-1.2-1.2h-1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M5.7 7.7 L7.1 9.1 L10.3 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span>提示词复核</span>
+          <svg class="caret" viewBox="0 0 12 12" fill="none">
+            <path d="M4.5 2.5 L8 6 L4.5 9.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <ul class="subnav">
+          <li><a href="prompt_test.html" class="active">提示词测试</a></li>
+          <li><a href="prompt_scheme.html">提示词方案</a></li>
+          <li><a href="prompt_test_results_list.html">测试结果列表</a></li>
+        </ul>
+      </div>
+      <!-- 一级：数据库表结构提取 -->
+      <div class="nav-group">
+        <a class="nav-item" href="Table_Structure_Extraction.html">
+          <span class="ic">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <ellipse cx="8" cy="4.1" rx="5.3" ry="2.1" stroke="currentColor" stroke-width="1.4"/>
+              <path d="M2.7 4.1v7.8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1V4.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              <path d="M2.7 8c0 1.16 2.37 2.1 5.3 2.1s5.3-.94 5.3-2.1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span>数据库表结构提取</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="dot"></span>
+      <span>v0.9.2 · PROTOTYPE</span>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ========== 主内容 ========== -->
+  <div class="main">
+
+    <header class="topbar">
+      <button class="hamburger" id="hamburger" aria-label="展开菜单">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2.5 4h11M2.5 8h11M2.5 12h11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+        </svg>
+      </button>
+      <div class="crumb">
+        <b>提示词复核</b>
+        <span class="sep">/</span>
+        <span>提示词测试</span>
+      </div>
+      <div class="topbar-right">
+        <span class="chip">ENV · DEV</span>
+        <span class="chip live"><span class="dot"></span>SERVICE OK</span>
+      </div>
+    </header>
+
+    <main class="content">
+
+            <div class="page-head">
+        <div class="page-head-txt">
+          <h1>提示词测试</h1>
+          <p>维护测试问题与标准答案，收录「提示词构造」的调试反馈，并逐条判定回答是否正确。</p>
+        </div>
+        <div class="actions">
+          <button type="button" class="btn btn-danger" id="btnBatchDelete" disabled>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M2.8 4.1h10.4M6.4 4.1V2.9h3.2v1.2M4.2 4.1l.7 9h6.2l.7-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            删除
+          </button>
+          <button type="button" class="btn btn-add" id="btnAddQuestion">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            添加测试问题
+          </button>
+          <button type="button" class="btn btn-ghost" id="btnImportExcel">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 10.8V2.2M5.1 5.1 L8 2.2 L10.9 5.1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2.6 10.2v2a1.6 1.6 0 0 0 1.6 1.6h7.6a1.6 1.6 0 0 0 1.6-1.6v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            导入 Excel
+          </button>
+        </div>
+      </div>
+
+      <div class="pt-layout">
+
+        <!-- ========== 左栏：选择提示词方案 ========== -->
+        <aside class="pt-side">
+          <section class="panel">
+            <div class="pt-side-head">
+              <h2>选择提示词方案</h2>
+              <button type="button" class="pt-detail" id="btnDetail" hidden>
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                  <circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M8 7.2v4M8 4.9v.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                </svg>
+                详情
+              </button>
+            </div>
+
+            <div class="pt-pick">
+              <div class="pt-pick-row">
+                <div class="combo" id="comboScheme">
+                  <input type="text" id="schemeInput" placeholder="选择提示词方案…"
+                         aria-label="选择提示词方案" autocomplete="off" />
+                  <button type="button" class="combo-btn" tabindex="-1" aria-label="展开方案列表">
+                    <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 4.6 L6 7.6 L9 4.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </button>
+                  <div class="combo-menu" role="listbox" aria-label="提示词方案"></div>
+                </div>
+                <button type="button" class="btn-reset" id="btnResetPick" aria-label="重置方案选择">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                    <path d="M13.4 8a5.4 5.4 0 1 1-1.6-3.8M13.4 2.6v2.6h-2.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  重置
+                </button>
+              </div>
+            </div>
+
+            <!-- 已选方案：服务器 / 模型 / 提示词（可滚动文本） -->
+            <div class="pt-side-body" id="schemeBody" hidden>
+              <div class="pt-fld">
+                <label>平台 / 官方名</label>
+                <div class="pt-read" id="scServer">—</div>
+              </div>
+              <div class="pt-fld">
+                <label>请求地址</label>
+                <div class="pt-read mono" id="scBase">—</div>
+              </div>
+              <div class="pt-fld">
+                <label>模型</label>
+                <div class="pt-read" id="scModel">—</div>
+              </div>
+              <div class="pt-fld">
+                <label>提示词</label>
+                <textarea class="pt-read-ta" id="scPrompt" readonly spellcheck="false"
+                          aria-label="方案提示词" placeholder="方案里的系统提示词与用户提示词…"></textarea>
+              </div>
+
+              <div class="pt-run-row">
+                <button type="button" class="btn btn-add" id="btnStartDebug">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M5.4 3.4 L12.4 8 L5.4 12.6 Z" fill="currentColor"/>
+                  </svg>
+                  开始调试
+                </button>
+                <div class="pt-prog" id="ptProg" hidden>
+                  <div class="pt-prog-top">
+                    <span id="ptProgTxt">正在调试 0/0</span>
+                    <b id="ptProgPct">0%</b>
+                  </div>
+                  <div class="pt-prog-bar"><i id="ptProgFill"></i></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 未选择方案 -->
+            <div class="pt-side-body" id="schemeEmpty">
+              <div class="pt-empty">
+                还没有可用的提示词方案。<br/>
+                先到「提示词构造」页配好服务器、模型与提示词，点「保存」命名方案；保存后回到本页即可直接选用并开始批量调试。
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <!-- ========== 右栏：测试问题列表（整体右移） ========== -->
+        <div class="pt-main">
+      <section class="panel pt-panel" id="testPanel">
+
+        <!-- 统计标签栏（替代原搜索栏） -->
+        <div class="stat-bar" id="statBar">
+          <span class="stat is-acc"><em>本次测试准确率</em><b id="statAcc">—</b></span>
+          <span class="stat"><em>本次测试总数量</em><b id="statTotal">0</b></span>
+          <span class="stat is-right"><em>AI 测试正确数量</em><b id="statRight">0</b></span>
+          <span class="stat is-wrong"><em>AI 测试错误数量</em><b id="statWrong">0</b></span>
+          <span class="stat is-fix"><em>人工矫正错误数量</em><b id="statFix">0</b></span>
+        </div>
+
+        <!-- 状态条 -->
+        <div class="meta-bar">
+          <span id="metaTotal">共 0 条记录</span>
+          <span class="grow"></span>
+          <span class="sel" id="metaSelected" style="display:none;">已选 0 项</span>
+          <button type="button" class="btn btn-ghost" id="btnEditScheme">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M11.3 2.6l2.1 2.1M2.6 13.4l.6-2.7 7.6-7.6 2.1 2.1-7.6 7.6-2.7.6z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            修改
+          </button>
+          <button type="button" class="btn btn-add" id="btnSaveResult">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <path d="M8 2.2v8.4M5.1 7.8 L8 10.7 L10.9 7.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2.6 10.2v2a1.6 1.6 0 0 0 1.6 1.6h7.6a1.6 1.6 0 0 0 1.6-1.6v-2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            保存结果
+          </button>
+        </div>
+
+        <!-- 表格 -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="col-check">
+                  <input type="checkbox" id="checkAll" title="全选 / 取消全选" />
+                </th>
+                <th class="col-question">问题</th>
+                <th class="col-answer">答案</th>
+                <th class="col-feedback">测试反馈答案</th>
+                <th class="col-judge">判断</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="panel-foot">
+          <span id="footCount">共 0 条记录</span>
+          <div class="pager">
+            <button type="button" disabled>上一页</button>
+            <span class="page-now">1</span>
+            <button type="button" disabled>下一页</button>
+          </div>
+        </div>
+
+      </section>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ========== 提示词方案详情弹窗 ========== -->
+<div class="mask" id="detailMask" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+  <div class="modal">
+    <h3 id="detailTitle">提示词方案详情</h3>
+    <p>方案 <b id="dtName">—</b> 保存的完整内容（服务器 / 模型 / 提示词）。</p>
+    <div class="dt-body">
+      <div class="dt-row"><span class="dt-k">平台 / 官方名</span><span class="dt-v" id="dtServer">—</span></div>
+      <div class="dt-row"><span class="dt-k">请求地址</span><span class="dt-v mono" id="dtBase">—</span></div>
+      <div class="dt-row"><span class="dt-k">模型</span><span class="dt-v" id="dtModel">—</span></div>
+      <div class="dt-row"><span class="dt-k">模型类型</span><span class="dt-v" id="dtType">—</span></div>
+      <div class="dt-row"><span class="dt-k">系统提示词</span><span class="dt-v box" id="dtSys">—</span></div>
+      <div class="dt-row dt-row-stack"><span class="dt-k">用户提示词</span><span class="dt-v box" id="dtUser">—</span></div>
+      <div class="dt-rounds" id="dtRounds" hidden></div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="detailClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 删除确认弹窗 ========== -->
+<div class="mask" id="delMask" role="dialog" aria-modal="true" aria-labelledby="delTitle">
+  <div class="modal">
+    <div class="modal-ic">
+      <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+        <path d="M2.8 4.1h10.4M6.4 4.1V2.9h3.2v1.2M4.2 4.1l.7 9h6.2l.7-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h3 id="delTitle">确认删除</h3>
+    <p>确定要删除已选中的 <b id="delCount">0</b> 条测试问题吗？删除后该问题与对应的答案、测试反馈答案将从列表中移除，此操作不可撤销。</p>
+    <div class="names" id="delNames"></div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="delCancel">取消</button>
+      <button type="button" class="btn btn-danger-solid" id="delConfirm">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 添加测试问题弹窗 ========== -->
+<div class="mask" id="addMask" role="dialog" aria-modal="true" aria-labelledby="addTitle">
+  <div class="modal">
+    <h3 id="addTitle">添加测试问题</h3>
+    <p>填写问题与答案后加入列表；列表里的答案是固定内容，只做展示。</p>
+    <div class="add-body">
+      <div class="field">
+        <label for="addQuestion">问题</label>
+        <textarea id="addQuestion" placeholder="输入需要测试的问题…"></textarea>
+      </div>
+      <div class="field">
+        <label for="addAnswer">答案</label>
+        <textarea id="addAnswer" placeholder="输入该问题的正确答案（可留空，稍后在列表中补填）…"></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="addCancel">取消</button>
+      <button type="button" class="btn btn-add" id="addConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== 导入 Excel 弹窗 ========== -->
+<div class="mask" id="impMask" role="dialog" aria-modal="true" aria-labelledby="impTitle">
+  <div class="modal">
+    <h3 id="impTitle">导入 Excel</h3>
+    <p>模板第一列是 <b>问题</b>、第二列是 <b>答案</b>；支持 <b>.xlsx / .xls / .csv</b>。</p>
+    <div class="imp-body">
+      <div class="imp-row">
+        <button type="button" class="btn btn-add" id="btnPickFile">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          添加 Excel 文件
+        </button>
+        <button type="button" class="btn btn-ghost" id="btnTpl">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2.2v8.6M5.1 7.9 L8 10.8 L10.9 7.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M2.6 10.4v1.8a1.6 1.6 0 0 0 1.6 1.6h7.6a1.6 1.6 0 0 0 1.6-1.6v-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          下载 Excel 模板
+        </button>
+      </div>
+      <div class="imp-file" id="impFile"><span>尚未选择文件</span></div>
+      <div class="imp-hint">选择文件后会自动解析并在下方预览前几行，点「确认导入」写入当前列表。</div>
+      <pre class="imp-preview" id="impPreview" hidden></pre>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="impCancel">取消</button>
+      <button type="button" class="btn btn-add" id="impConfirm">确认导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== AI 错误列表弹窗（第二十六轮） ========== -->
+<div class="mask" id="errMask" role="dialog" aria-modal="true" aria-labelledby="errTitle">
+  <div class="modal">
+    <h3 id="errTitle">AI 测试错误明细</h3>
+    <div class="table-wrap" style="margin-top:12px;max-height:420px;overflow:auto;">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-check"><input type="checkbox" id="errCheckAll" title="全选 / 取消全选" /></th>
+            <th class="col-question">问题</th>
+            <th class="col-answer">答案</th>
+            <th class="col-feedback">测试反馈答案</th>
+            <th class="col-judge">判断</th>
+          </tr>
+        </thead>
+        <tbody id="errTbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="errClose">关闭</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="impFileInput" class="visually-hidden" accept=".xlsx,.xls,.csv,.txt" />
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* =======================================================================
+   提示词测试 · 数据层（原型态用 localStorage，方案与「提示词构造」页共享）
+   存储键 1  PD_TEST_KEY = "pd_prompt_tests"：数组，每项 { id, q, ans, fb, ai, judge }
+             首启（键为空）会一次性写入 SEED_TESTS 示例；若库内仍旧版 4 条示例，会自动升级为 124 条。
+     q     问题            ← 手工添加 / Excel 导入
+     ans   答案            ← 标准答案（列表内可编辑）
+     fb    测试反馈答案    ← 本页「开始调试」跑出来的模型回答
+     ai    AI 自动判定     ← "right" | "wrong" | ""（自动比对「答案」与「测试反馈答案」）
+     judge 人工判定        ← "right" | "wrong" | ""（调试后默认跟随 ai，可人工改判）
+   存储键 2  PD_SCHEME_KEY = "pd_prompt_schemes"：提示词方案（「提示词方案」页与
+             「提示词构造」页共用），本页左栏「选择提示词方案」下拉读取；
+             首次打开本页若还没有这个键，会先把下面的 SEED_SCHEMES 写入存储（与方案库页同一批）；
+             每项 { id, name, server, base, model, modelType, sys, user[], multi, savedAt }
+   存储键 3  PD_RESULT_KEY = "pd_test_results"：本页「保存结果」写入的测试结果，
+             与「测试结果列表」页（prompt_test_results_list.html）共用；
+             每项 { id, name, problems:[ { q, ans, out, ai, judge } ] }，
+             其中 out = 本页的 fb「测试反馈答案」；题数 / 准确率 / 错误数 / 人工矫正数
+             不单独存，全部由该页按 problems 实时算出（保证两处数字永远一致）。
+   ======================================================================= */
+var PD_TEST_KEY   = "pd_prompt_tests";
+var PD_SCHEME_KEY = "pd_prompt_schemes";
+var PD_RESULT_KEY = "pd_test_results";
+
+/* 示例方案（与 prompt_scheme.html 的 SEED_SCHEMES 保持一致，两个页面各自独立，
+   改提示词示例时请两边同步）。首次打开本页时会一次性写入 PD_SCHEME_KEY，
+   这样左栏下拉与「提示词方案」页看到的是同一批方案。 */
+var SEED_SCHEMES = [
+  { id:1, name:"电商客服回复方案",  server:"DeepSeek 深度求索", base:"https://api.deepseek.com/v1",
+    model:"deepseek-chat",     modelType:"文本生成",
+    sys:"你是电商客服助手。回答要礼貌、简洁，先回应客户情绪，再给出可执行的下一步建议。",
+    user:["客户问：我买的口红收到了，但颜色和图片不一样，能换吗？"], multi:false,
+    apiKey:"sk-deepseek-ec9f2a7b6c5d4e3f" },
+  { id:2, name:"商品标题生成方案",  server:"通义千问 Qwen",     base:"https://dashscope.aliyuncs.com/api/v1",
+    model:"qwen-max",          modelType:"文本生成",
+    sys:"你是电商文案助手。只输出一句话标题，不超过 20 字，不要任何解释。",
+    user:["请为「纯棉宽松短袖T恤 男女同款」写一条促销标题"], multi:false,
+    apiKey:"sk-qwen-title-8b7c6d5e4f3a2b1c" },
+  { id:3, name:"发票信息抽取方案",  server:"讯飞星火 Spark",    base:"https://spark-api-open.xf-yun.com/v1",
+    model:"spark-max",         modelType:"多模态",
+    sys:"你是票据信息抽取器。按 JSON 输出三个字段：发票号、金额、开票日期。",
+    user:["（图片）帮我从这张增值税发票里抽取关键信息", "只保留「金额」和「开票日期」两个字段"], multi:true,
+    apiKey:"sk-spark-inv-1a2b3c4d5e6f7a8b" },
+  { id:4, name:"合同风险审阅方案",  server:"智谱 GLM",          base:"https://open.bigmodel.cn/api/paas/v4",
+    model:"glm-4-plus",        modelType:"推理模型",
+    sys:"你是法务助理。逐条指出合同中对甲方不利的条款，并给出修改建议与风险等级。",
+    user:["（附件）审阅这份 12 页的服务采购合同"], multi:false,
+    apiKey:"sk-glm-legal-9e8d7c6b5a4f3e2d" },
+  { id:5, name:"会议纪要整理方案",  server:"Kimi 月之暗面",     base:"https://api.moonshot.cn/v1",
+    model:"moonshot-v1-128k",  modelType:"文本生成",
+    sys:"你是会议记录员。按「议题 / 结论 / 待办（负责人 + 截止时间）」三段输出。",
+    user:[], multi:false,
+    apiKey:"sk-moonshot-min-4d5e6f7a8b9c0d1e" }
+];
+
+/* 首次打开（存储里还没有 PD_SCHEME_KEY）时把示例方案一次性落库；
+   已有数据（哪怕是空数组 []）一律以存储为准，不再回填。 */
+/* 「测试结果列表」页点「重新测试」时会带上这个标记，测试页据此保留它打包好的问题，
+   不再按方案覆盖。标记一次性消费（读到即清除）。 */
+var PD_RETEST_FLAG = "pd_retest_flag";
+var PD_RETEST_SCHEME_KEY = "pd_retest_scheme";   /* 结果页跳转时带上要选中的方案名 */
+function pdTakeRetestFlag(){
+  var v = null;
+  try{ v = window.localStorage.getItem(PD_RETEST_FLAG); window.localStorage.removeItem(PD_RETEST_FLAG); }catch (e){ return false; }
+  return v === "1";
+}
+
+/* 第二十三轮升级：库里已有方案但缺 apiKey 的（旧版示例 / 早期保存的）自动补上——
+   与新版示例同名的用示例里的模拟密钥，其余按 id 补一枚演示密钥；已有 apiKey 的一律不动。
+   口径：只补缺，不覆盖；跑一次写回存储后即永久生效（幂等）。 */
+function pdUpgradeSchemeApiKeys(){
+  var raw = null;
+  try{ raw = window.localStorage.getItem(PD_SCHEME_KEY); }catch (e){ return; }
+  if (raw === null) return;
+  var arr = null;
+  try{ arr = JSON.parse(raw); }catch (e){ return; }
+  if (!arr || typeof arr.length !== "number") return;
+  var byName = {};
+  for (var i = 0; i < SEED_SCHEMES.length; i++){
+    if (SEED_SCHEMES[i].apiKey) byName[SEED_SCHEMES[i].name] = SEED_SCHEMES[i].apiKey;
+  }
+  var changed = false;
+  for (var j = 0; j < arr.length; j++){
+    var r = arr[j];
+    if (r && !String(r.apiKey || "").trim()){
+      r.apiKey = byName[r.name] ||
+                 ("sk-demo-" + ("0000" + (r.id || (j + 1))).slice(-4) + "-a1b2c3d4e5f6a7b8");
+      changed = true;
+    }
+  }
+  if (changed){
+    try{ window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(arr)); }catch (e){}
+  }
+}
+
+function pdSeedSchemes(){
+  var raw = null;
+  try{ raw = window.localStorage.getItem(PD_SCHEME_KEY); }catch (e){ return; }
+  if (raw === null){
+    try{ window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(SEED_SCHEMES)); }catch (e){}
+    return;
+  }
+  pdUpgradeSchemeApiKeys();   /* 旧数据补 apiKey（键已存在时不播种，这里兜住） */
+}
+
+/* =======================================================================
+   按提示词方案生成对应的专业性问题（原型态模拟）
+   口径：每个示例方案配一组贴合它业务的问题 + 标准答案；选中方案后
+   右栏列表即替换成该方案的专业问题，并立刻跑出模拟反馈与判定，
+   让「本次测试」的四个指标出数。方案不在题库里则回退通用题库。
+   ===================================================================== */
+var PD_SCHEME_QA = {
+  "电商客服回复方案": [
+    { q: "客户问：我买的口红收到了，但颜色和图片不一样，能换吗？",
+      ans: "先致歉并安抚情绪，说明色差可能来自屏幕显示，告知 7 天无理由换货流程，并请客户提供订单号与实物照片。" },
+    { q: "客户问：下单三天了还没发货，是不是忘了？",
+      ans: "致歉并说明当前发货时效，查询订单状态后告知预计发货时间；已超时则主动给出补偿方案。" },
+    { q: "客户问：这个面膜孕妇能用吗？",
+      ans: "不做绝对化的功效承诺，说明成分表并建议客户咨询医生后再使用。" },
+    { q: "客户问：能开专用发票吗？税率多少？",
+      ans: "说明可开票类型，提示税率以实际开票为准，引导客户提供完整开票信息。" },
+    { q: "客户问：满 199 减 50 的券能和会员折扣一起用吗？",
+      ans: "说明优惠叠加规则；不可叠加时主动给出对客户更划算的使用方案。" },
+    { q: "客户问：收货地址填错了怎么办？",
+      ans: "未发货可协助修改收货地址；已发货则引导联系快递改派或拒收后重新寄出。" }
+  ],
+  "商品标题生成方案": [
+    { q: "请为「纯棉宽松短袖T恤 男女同款」写一条促销标题",
+      ans: "纯棉宽松短袖T恤 男女同款 限时直降" },
+    { q: "请为「陶瓷不粘炒锅 32cm」写一条促销标题",
+      ans: "陶瓷不粘炒锅32cm 无油烟 家用炒菜锅" },
+    { q: "请为「便携折叠露营桌 铝合金」写一条促销标题",
+      ans: "便携折叠露营桌 铝合金 轻量承重 户外野餐桌" },
+    { q: "请为「智能电动牙刷 声波款」写一条促销标题",
+      ans: "智能声波电动牙刷 五档模式 长续航" },
+    { q: "请为「真丝眼罩 遮光透气」写一条促销标题",
+      ans: "真丝眼罩 遮光透气 助眠午睡眼罩" }
+  ],
+  "发票信息抽取方案": [
+    { q: "（图片）帮我从这张增值税发票里抽取关键信息",
+      ans: "发票号：042001900111；金额：11,300.00；开票日期：2026-03-18" },
+    { q: "只保留「金额」和「开票日期」两个字段",
+      ans: "金额：11,300.00；开票日期：2026-03-18" },
+    { q: "（图片）这张差旅发票的销售方名称是什么？",
+      ans: "销售方名称：北京云逸信息技术有限公司" },
+    { q: "把上一张发票的税额单独抽出来",
+      ans: "税额：678.00" },
+    { q: "（图片）这沓发票一共有几张？合计金额多少？",
+      ans: "共 3 张；合计金额：28,900.00" }
+  ],
+  "合同风险审阅方案": [
+    { q: "（附件）审阅这份 12 页的服务采购合同",
+      ans: "第 4.2 条付款条件约定「验收后 90 日付款」，周期过长，建议压到 30 日；风险等级：中。" },
+    { q: "帮我把合同里的违约责任条款逐条列出来",
+      ans: "第 7.1 条甲方逾期付款按日万分之五计违约金；第 7.2 条乙方逾期交付按合同总额 5% 一次性赔偿。" },
+    { q: "合同里有没有对甲方不利的自动续约条款？",
+      ans: "有。第 9.3 条约定到期未书面异议即自动续约一年，建议改为「双方书面确认后生效」；风险等级：高。" },
+    { q: "帮我看下知识产权归属是怎么约定的",
+      ans: "第 6.1 条约定交付成果知识产权归甲方，但乙方保留通用组件权利，表述模糊，建议明确成果范围。" },
+    { q: "这份合同能不能约定争议由我方所在地法院管辖？",
+      ans: "可以。第 11.2 条现约定为乙方所在地管辖，建议改为甲方所在地法院管辖，对甲方更有利。" }
+  ],
+  "会议纪要整理方案": [
+    { q: "把这段会议记录整理成纪要",
+      ans: "议题：Q3 增长复盘；结论：聚焦复购；待办：运营出方案（负责人：张敏，截止 10-08）。" },
+    { q: "待办事项要带上负责人和截止时间",
+      ans: "议题：风控流程对齐；结论：分级审批；待办：法务补条款（负责人：李昊，截止 10-10）。" },
+    { q: "这段录音里有三处结论，都整理出来",
+      ans: "结论一：预算维持；结论二：暂停投放；结论三：成立专项小组。" },
+    { q: "给每条待办标上优先级",
+      ans: "待办一：补需求文档（优先级：高）；待办二：排期评审（优先级：中）。" }
+  ]
+};
+
+/* 方案名 → 题库：精确匹配优先；再按关键词做一次模糊匹配；都没有则返回 null */
+function pdSchemeQAByName(name){
+  var n = String(name == null ? "" : name);
+  if (PD_SCHEME_QA[n]) return PD_SCHEME_QA[n];
+  var words = [["客服", "电商"], ["标题", "文案"], ["发票", "票据", "抽取"], ["合同", "法务", "审阅"], ["纪要", "会议"]];
+  var keys  = ["电商客服回复方案", "商品标题生成方案", "发票信息抽取方案", "合同风险审阅方案", "会议纪要整理方案"];
+  for (var i = 0; i < words.length; i++){
+    for (var j = 0; j < words[i].length; j++){
+      if (n.indexOf(words[i][j]) >= 0) return PD_SCHEME_QA[keys[i]];
+    }
+  }
+  return null;
+}
+
+/* 选中方案后：把右栏测试问题列表替换成该方案的专业问题，并跑出模拟反馈与判定。
+   保证「选中方案即替换列表」，演示时无需额外操作就能看到整套效果。 */
+function pdFillTestsForScheme(s){
+  var qa = pdSchemeQAByName(s && s.name);
+  if (!qa) return;                                  /* 不在题库里 → 保留现有列表 */
+  var seed = pdHash(String((s && s.name) || ""));
+  var list = [];
+  for (var i = 0; i < qa.length; i++){
+    var fb = pdMockAnswer(qa[i].q, qa[i].ans, seed + i);
+    list.push({
+      id: i + 1,
+      q:   qa[i].q,
+      ans: qa[i].ans,
+      fb:  fb,
+      ai:  pdAutoJudge(qa[i].ans, fb),
+      judge: ""
+    });
+  }
+  for (var k = 0; k < list.length; k++){ if (!list[k].judge) list[k].judge = list[k].ai; }
+  tests    = list;
+  selected = {};
+  debugged = true;              /* 已按方案跑出模拟结果 ⇒ 统计栏出数 */
+  pdSave(tests);
+}
+
+var SEED_TESTS = [
+  { id:1, q:"用一句话说明 PromptDeck 的用途",
+    ans:"用于管理模型服务端、维护模型清单并调试提示词的本地工作台。",
+    fb:"用于管理模型服务端、维护模型清单并调试提示词的本地工作台。", ai:"right", judge:"right" },
+  { id:2, q:"把「今天天气很好」翻译成英文",
+    ans:"The weather is nice today.",
+    fb:"It is a beautiful day today.", ai:"wrong", judge:"wrong" },
+  { id:3, q:"列出三条提示词编写的最佳实践",
+    ans:"",
+    fb:"1. 明确角色与任务；2. 指定输出格式；3. 给出少量示例。", ai:"", judge:"" },
+  { id:4, q:"说明 token 费用的计算方式",
+    ans:"按 tokens ÷ 1000 × 单价，分别计算输入与输出费用后相加。",
+    fb:"", ai:"", judge:"" },
+  { id:5, q:"什么是大语言模型（LLM）？",
+    ans:"基于海量文本训练、能按上下文生成文本的深度学习模型。",
+    fb:"一种把文本翻译成其他语言的机器翻译引擎。", ai:"wrong", judge:"wrong" },
+  { id:6, q:"什么是上下文窗口？",
+    ans:"模型单次推理能处理的最大 token 数，包含输入与输出。",
+    fb:"模型单次推理能处理的最大 token 数，包含输入与输出。", ai:"right", judge:"right" },
+  { id:7, q:"temperature 参数的作用是什么？",
+    ans:"控制输出随机性，值越低越确定、越高越发散。",
+    fb:"控制输出文本的最大长度，值越大输出越长。", ai:"wrong", judge:"wrong" },
+  { id:8, q:"top_p 与 temperature 是什么关系？",
+    ans:"两者都影响采样随机性，一般只调其中一个，不建议同时大改。",
+    fb:"", ai:"", judge:"" },
+  { id:9, q:"什么是 token？",
+    ans:"模型处理文本的最小单位，一个汉字通常约 1–2 个 token。",
+    fb:"用户登录接口时使用的身份令牌。", ai:"wrong", judge:"wrong" },
+  { id:10, q:"API_KEY 的作用是什么？",
+    ans:"调用服务商接口的身份凭证，必须保密。",
+    fb:"调用服务商接口的身份凭证，必须保密。", ai:"right", judge:"right" },
+  { id:11, q:"BASE_URL 指的是什么？",
+    ans:"",
+    fb:"服务商提供的接口基础地址，调用时在其后拼接具体路径。", ai:"", judge:"" },
+  { id:12, q:"系统提示词与用户提示词有什么区别？",
+    ans:"系统提示词设定角色与全局规则，用户提示词是本次的具体请求。",
+    fb:"系统提示词由平台自动生成，用户提示词由用户手写，二者作用相同。", ai:"wrong", judge:"wrong" },
+  { id:13, q:"什么是零样本（Zero-shot）提示？",
+    ans:"只给任务描述、不给示例，直接让模型作答。",
+    fb:"在不使用任何提示词的情况下调用模型。", ai:"wrong", judge:"wrong" },
+  { id:14, q:"什么是少样本（Few-shot）提示？",
+    ans:"在提示词里给出若干「输入—输出」示例，引导模型按示例格式作答。",
+    fb:"在提示词里给出若干「输入—输出」示例，引导模型按示例格式作答。", ai:"right", judge:"right" },
+  { id:15, q:"什么是思维链（CoT）？",
+    ans:"",
+    fb:"让模型先写出推理步骤再给结论，提升推理类任务的准确率。", ai:"", judge:"" },
+  { id:16, q:"什么是提示词注入攻击？",
+    ans:"用户在输入中夹带指令，诱使模型忽略原有的系统设定。",
+    fb:"用户在输入中夹带指令，诱使模型忽略原有的系统设定。", ai:"right", judge:"right" },
+  { id:17, q:"什么是模型幻觉？",
+    ans:"模型生成了看似合理但实际错误或不存在的内容。",
+    fb:"", ai:"", judge:"" },
+  { id:18, q:"什么是指令微调（Instruction Tuning）？",
+    ans:"用「指令—回答」样本继续训练，让模型更好地遵循用户指令。",
+    fb:"", ai:"", judge:"" },
+  { id:19, q:"模型的上下文长度不够用怎么办？",
+    ans:"精简或分段输入、做摘要压缩，或改用上下文更长的模型。",
+    fb:"精简或分段输入、做摘要压缩，或改用上下文更长的模型。", ai:"right", judge:"right" },
+  { id:20, q:"什么是流式输出（stream）？",
+    ans:"模型边生成边返回，前端可逐字显示，降低等待感。",
+    fb:"模型边生成边返回，前端可逐字显示，降低等待感。", ai:"right", judge:"right" },
+  { id:21, q:"为什么同样的提示词每次输出不一样？",
+    ans:"采样具有随机性；把 temperature 设为 0 会更加稳定。",
+    fb:"采样具有随机性；把 temperature 设为 0 会更加稳定。", ai:"right", judge:"right" },
+  { id:22, q:"什么是对齐（Alignment）？",
+    ans:"让模型的行为符合人类意图与安全规范。",
+    fb:"让模型的行为符合人类意图与安全规范。", ai:"right", judge:"right" },
+  { id:23, q:"什么是模型的最大输出长度？",
+    ans:"单次回答能生成的 token 上限，超出部分会被截断。",
+    fb:"单次回答能生成的 token 上限，超出部分会被截断。", ai:"right", judge:"right" },
+  { id:24, q:"什么是预置提示词模板？",
+    ans:"把常用角色与规则固化成模板，复用时只替换变量部分。",
+    fb:"把常用角色与规则固化成模板，复用时只替换变量部分。", ai:"right", judge:"right" },
+  { id:25, q:"调用模型失败通常有哪些原因？",
+    ans:"KEY 无效、余额不足、地址错误、限流或网络不通。",
+    fb:"KEY 无效、余额不足、地址错误、限流或网络不通。", ai:"right", judge:"right" },
+  { id:26, q:"输入 token 与输出 token 有什么区别？",
+    ans:"分别指请求侧与回答侧消耗的 token，两者单价可以不同。",
+    fb:"输入 token 是上传文件的体积，输出 token 是下载的体积。", ai:"wrong", judge:"right" },
+  { id:27, q:"接口返回 429 表示什么？",
+    ans:"请求过于频繁，被服务端限流。",
+    fb:"请求过于频繁，被服务端限流。", ai:"right", judge:"right" },
+  { id:28, q:"什么是模型类型（文本生成 / 多模态 / 推理 / 向量嵌入）？",
+    ans:"按模型擅长的任务做的分类，决定它能处理什么输入输出。",
+    fb:"模型的版本号，数字越大越新。", ai:"wrong", judge:"wrong" },
+  { id:29, q:"在提示词里设定角色的作用是什么？",
+    ans:"",
+    fb:"让模型以特定身份和语气作答，约束输出的风格。", ai:"", judge:"" },
+  { id:30, q:"为什么建议在提示词里指定输出格式？",
+    ans:"便于程序解析结果，减少无关内容。",
+    fb:"便于程序解析结果，减少无关内容。", ai:"right", judge:"right" },
+  { id:31, q:"什么是接口调用的重试策略？",
+    ans:"调用失败时按退避间隔重新请求，缓解偶发的网络或限流问题。",
+    fb:"调用失败时按退避间隔重新请求，缓解偶发的网络或限流问题。", ai:"right", judge:"right" },
+  { id:32, q:"费用标签展示的是什么？",
+    ans:"按输入/输出单价实时估算本次调用成本的展示。",
+    fb:"标记模型所属的计价档位编号。", ai:"wrong", judge:"wrong" },
+  { id:33, q:"什么是掩码显示？",
+    ans:"把 API_KEY 等敏感信息隐藏为圆点，避免泄露。",
+    fb:"把未通过校验的输入框标红。", ai:"wrong", judge:"wrong" },
+  { id:34, q:"什么是裸域名？",
+    ans:"没有协议头的域名（如 example.com），使用时需要补上 https://。",
+    fb:"不带 www 的二级域名。", ai:"wrong", judge:"wrong" },
+  { id:35, q:"把「今天天气很好」翻译成英文",
+    ans:"The weather is nice today.",
+    fb:"Today's weather is very good.", ai:"wrong", judge:"wrong" },
+  { id:36, q:"把「请确认订单信息」翻译成英文",
+    ans:"Please confirm the order details.",
+    fb:"Please confirm the order details.", ai:"right", judge:"right" },
+  { id:37, q:"把「会议推迟到下周一」翻译成英文",
+    ans:"The meeting is postponed to next Monday.",
+    fb:"The meeting is postponed to next Monday.", ai:"right", judge:"right" },
+  { id:38, q:"把「库存不足」翻译成日文",
+    ans:"在庫が不足しています。",
+    fb:"在庫が不足しています。", ai:"right", judge:"right" },
+  { id:39, q:"把「欢迎试用本产品」翻译成英文",
+    ans:"Welcome to try our product.",
+    fb:"", ai:"", judge:"" },
+  { id:40, q:"把「请稍候」翻译成英文",
+    ans:"",
+    fb:"Please wait a moment.", ai:"", judge:"" },
+  { id:41, q:"把「感谢您的反馈」翻译成英文",
+    ans:"Thank you for your feedback.",
+    fb:"Thank you for your feedback.", ai:"right", judge:"wrong" },
+  { id:42, q:"把「已发货」翻译成英文",
+    ans:"The order has been shipped.",
+    fb:"The order has been shipped.", ai:"right", judge:"right" },
+  { id:43, q:"把「发票已开具」翻译成英文",
+    ans:"The invoice has been issued.",
+    fb:"The invoice has been issued.", ai:"right", judge:"wrong" },
+  { id:44, q:"把「请核对收货地址」翻译成英文",
+    ans:"Please verify the shipping address.",
+    fb:"Please check your address.", ai:"wrong", judge:"wrong" },
+  { id:45, q:"把「该功能暂不可用」翻译成英文",
+    ans:"This feature is temporarily unavailable.",
+    fb:"This function cannot be used now.", ai:"wrong", judge:"wrong" },
+  { id:46, q:"把「谢谢惠顾」翻译成英文",
+    ans:"Thank you for your patronage.",
+    fb:"Thank you for your patronage.", ai:"right", judge:"right" },
+  { id:47, q:"把「请提供订单号」翻译成英文",
+    ans:"Please provide your order number.",
+    fb:"Please provide your order number.", ai:"right", judge:"right" },
+  { id:48, q:"把「我们已收到您的申请」翻译成英文",
+    ans:"We have received your application.",
+    fb:"We have received your application.", ai:"right", judge:"right" },
+  { id:49, q:"把「产品说明书」翻译成英文",
+    ans:"",
+    fb:"product manual", ai:"", judge:"" },
+  { id:50, q:"用一句话总结：客户反馈物流太慢，希望增加次日达选项。",
+    ans:"客户反映物流偏慢，建议增加次日达配送选项。",
+    fb:"客户希望我们加快发货速度并增加配送方式。", ai:"wrong", judge:"right" },
+  { id:51, q:"用一句话总结：本季度销售额环比增长 12%，退货率下降 3 个百分点。",
+    ans:"本季度销售额环比增长 12%，退货率下降 3 个百分点。",
+    fb:"本季度业绩提升，退货情况有所变化。", ai:"wrong", judge:"wrong" },
+  { id:52, q:"用一句话总结：服务器费用上涨，主要来自推理调用量翻倍。",
+    ans:"服务器费用上涨，主因是推理调用量翻倍。",
+    fb:"服务器成本增加，与调用次数有关。", ai:"wrong", judge:"wrong" },
+  { id:53, q:"用一句话总结三天的会议记录（需求评审、排期、验收）",
+    ans:"三天会议依次完成需求评审、排期确认与成果验收。",
+    fb:"三天会议依次完成需求评审、排期确认与成果验收。", ai:"right", judge:"right" },
+  { id:54, q:"用一句话总结：用户抱怨登录太复杂，希望支持微信一键登录。",
+    ans:"用户认为登录流程繁琐，希望支持微信一键登录。",
+    fb:"用户认为登录流程繁琐，希望支持微信一键登录。", ai:"right", judge:"right" },
+  { id:55, q:"用一句话总结：新模型响应更快，但单价提高了 20%。",
+    ans:"",
+    fb:"新模型响应更快，但调用单价上涨了 20%。", ai:"", judge:"" },
+  { id:56, q:"用一句话总结：测试用例 120 条，通过 108 条，失败 12 条。",
+    ans:"共 120 条用例，通过 108 条、失败 12 条。",
+    fb:"共 120 条用例，通过 108 条、失败 12 条。", ai:"right", judge:"right" },
+  { id:57, q:"用一句话总结：客户要求合同增加数据保密条款。",
+    ans:"客户要求在合同中补充数据保密条款。",
+    fb:"客户要求在合同中补充数据保密条款。", ai:"right", judge:"right" },
+  { id:58, q:"用一句话总结：本周新增服务器 3 台，下线旧服务器 1 台。",
+    ans:"本周新增 3 台服务器并下线 1 台旧服务器。",
+    fb:"本周新增 3 台服务器并下线 1 台旧服务器。", ai:"right", judge:"right" },
+  { id:59, q:"把这段客服对话概括成一句话：客户下单后询问什么时候能到。",
+    ans:"客户下单后咨询预计到货时间。",
+    fb:"客户下单后咨询预计到货时间。", ai:"right", judge:"right" },
+  { id:60, q:"用一句话总结：App 崩溃率下降，但启动速度变慢。",
+    ans:"App 崩溃率下降，代价是启动速度变慢。",
+    fb:"App 崩溃率下降，代价是启动速度变慢。", ai:"right", judge:"wrong" },
+  { id:61, q:"用一句话总结：竞品上线了免费版，我们的付费转化承压。",
+    ans:"竞品推出免费版，我方付费转化面临压力。",
+    fb:"竞品推出免费版，我方付费转化面临压力。", ai:"right", judge:"right" },
+  { id:62, q:"用一句话总结：需求延期两周，原因是接口联调受阻。",
+    ans:"需求延期两周，主因是接口联调受阻。",
+    fb:"需求没能按时交付。", ai:"wrong", judge:"wrong" },
+  { id:63, q:"用一句话总结：客户对交付质量满意，但希望对交付周期做优化。",
+    ans:"客户满意交付质量，希望优化交付周期。",
+    fb:"客户对项目有意见。", ai:"wrong", judge:"wrong" },
+  { id:64, q:"用一句话总结：本次升级修复 5 个缺陷、新增 2 个功能。",
+    ans:"本次升级修复 5 个缺陷并新增 2 个功能。",
+    fb:"本次升级做了不少改动。", ai:"wrong", judge:"wrong" },
+  { id:65, q:"从「发票号 0021，金额 1200 元，日期 2026-03-05」抽取三个字段，输出 JSON",
+    ans:"{\"发票号\":\"0021\",\"金额\":\"1200\",\"开票日期\":\"2026-03-05\"}",
+    fb:"{\"no\":\"0021\",\"money\":1200}", ai:"wrong", judge:"wrong" },
+  { id:66, q:"从「张三，男，13800138000，北京」抽取姓名与电话，输出 JSON",
+    ans:"{\"姓名\":\"张三\",\"电话\":\"13800138000\"}",
+    fb:"{\"姓名\":\"张三\",\"电话\":\"13800138000\"}", ai:"right", judge:"right" },
+  { id:67, q:"从「订单 A1001，2026-09-01 下单，已发货」抽取订单号与状态",
+    ans:"{\"订单号\":\"A1001\",\"状态\":\"已发货\"}",
+    fb:"{\"订单号\":\"A1001\",\"状态\":\"已发货\"}", ai:"right", judge:"right" },
+  { id:68, q:"从「客户李四要求退款 299 元」抽取客户与金额",
+    ans:"{\"客户\":\"李四\",\"金额\":\"299\"}",
+    fb:"{\"客户\":\"李四\",\"金额\":\"299\"}", ai:"right", judge:"right" },
+  { id:69, q:"从「合同编号 HT-2026-088，甲方甲公司」抽取编号与甲方",
+    ans:"{\"合同编号\":\"HT-2026-088\",\"甲方\":\"甲公司\"}",
+    fb:"", ai:"", judge:"" },
+  { id:70, q:"从「会议时间 2026-09-30 14:00，地点 3 号会议室」抽取时间与地点",
+    ans:"{\"会议时间\":\"2026-09-30 14:00\",\"地点\":\"3 号会议室\"}",
+    fb:"{\"time\":\"2026-09-30\"}", ai:"wrong", judge:"wrong" },
+  { id:71, q:"从「产品 SKU-889，单价 39.9 元」抽取 SKU 与单价",
+    ans:"{\"SKU\":\"SKU-889\",\"单价\":\"39.9\"}",
+    fb:"{\"SKU\":\"SKU-889\",\"单价\":\"39.9\"}", ai:"right", judge:"right" },
+  { id:72, q:"从「账号 test@demo.com，注册于 2026-01-12」抽取账号与注册日期",
+    ans:"",
+    fb:"{\"账号\":\"test@demo.com\",\"注册日期\":\"2026-01-12\"}", ai:"", judge:"" },
+  { id:73, q:"从「快递单号 SF1234567890，承运商顺丰」抽取单号与承运商",
+    ans:"{\"快递单号\":\"SF1234567890\",\"承运商\":\"顺丰\"}",
+    fb:"{\"快递单号\":\"SF1234567890\",\"承运商\":\"顺丰\"}", ai:"right", judge:"right" },
+  { id:74, q:"从「设备编号 D-07，故障码 E502」抽取设备编号与故障码",
+    ans:"{\"设备编号\":\"D-07\",\"故障码\":\"E502\"}",
+    fb:"{\"设备编号\":\"D-07\",\"故障码\":\"E502\"}", ai:"right", judge:"right" },
+  { id:75, q:"从「员工王五，部门技术部，入职 2025-06-01」抽取姓名与部门",
+    ans:"",
+    fb:"{\"姓名\":\"王五\",\"部门\":\"技术部\"}", ai:"", judge:"" },
+  { id:76, q:"从「课程《产品经理入门》共 24 课时」抽取课程名与课时",
+    ans:"{\"课程名\":\"产品经理入门\",\"课时\":\"24\"}",
+    fb:"{\"course\":\"产品经理入门\"}", ai:"wrong", judge:"right" },
+  { id:77, q:"从「酒店预订：如家，2 晚，680 元」抽取酒店名与总价",
+    ans:"{\"酒店\":\"如家\",\"总价\":\"680\"}",
+    fb:"{\"酒店\":\"如家\",\"总价\":\"680\"}", ai:"right", judge:"right" },
+  { id:78, q:"从「保单号 P-7788，保额 100 万」抽取保单号与保额",
+    ans:"{\"保单号\":\"P-7788\",\"保额\":\"100 万\"}",
+    fb:"", ai:"", judge:"" },
+  { id:79, q:"从「报名信息：赵六，python 班，2026-10-08」抽取姓名与班级",
+    ans:"{\"姓名\":\"赵六\",\"班级\":\"python 班\"}",
+    fb:"{\"姓名\":\"赵六\",\"班级\":\"python 班\"}", ai:"right", judge:"right" },
+  { id:80, q:"为「纯棉宽松短袖T恤 男女同款」写一条不超过 20 字的促销标题",
+    ans:"纯棉宽松短袖T恤 男女同款 限时促销",
+    fb:"纯棉宽松短袖T恤 男女同款 限时促销", ai:"right", judge:"wrong" },
+  { id:81, q:"写一句手机配件店铺的开业欢迎语",
+    ans:"新店开业，全场配件低至五折，欢迎进店选购！",
+    fb:"新店开业，全场配件低至五折，欢迎进店选购！", ai:"right", judge:"wrong" },
+  { id:82, q:"为一款蓝牙耳机写一句卖点",
+    ans:"主动降噪，续航 36 小时，通勤路上更安静。",
+    fb:"音质不错，价格实惠。", ai:"wrong", judge:"wrong" },
+  { id:83, q:"写一条催付短信（不超过 30 字）",
+    ans:"您的订单尚未支付，24 小时内付款可享免运费，请尽快完成支付。",
+    fb:"您的订单尚未支付，24 小时内付款可享免运费，请尽快完成支付。", ai:"right", judge:"wrong" },
+  { id:84, q:"为护肤品写一句不超过 15 字的广告语",
+    ans:"温和不刺激，敏感肌也能安心用。",
+    fb:"这款护肤品效果好，值得购买。", ai:"wrong", judge:"right" },
+  { id:85, q:"写一句健身房招募会员的宣传语",
+    ans:"",
+    fb:"每天一小时，练出更好的自己。", ai:"", judge:"" },
+  { id:86, q:"为咖啡店写一条不超过 20 字的朋友圈文案",
+    ans:"手冲单品上新，今天第二杯半价。",
+    fb:"", ai:"", judge:"" },
+  { id:87, q:"写一句在线课程的开课提醒",
+    ans:"《产品经理入门》今晚 8 点开课，记得准时参加。",
+    fb:"课程马上就要开始了。", ai:"wrong", judge:"wrong" },
+  { id:88, q:"为扫地机器人写一句功能介绍",
+    ans:"激光导航自动规划路线，扫拖一体解放双手。",
+    fb:"激光导航自动规划路线，扫拖一体解放双手。", ai:"right", judge:"right" },
+  { id:89, q:"写一条物流延迟的致歉模板",
+    ans:"因天气原因您的包裹可能延迟 1–2 天，给您带来不便敬请谅解。",
+    fb:"包裹会晚一点到。", ai:"wrong", judge:"wrong" },
+  { id:90, q:"为儿童书包写一句安全卖点",
+    ans:"反光条设计，夜间出行更醒目。",
+    fb:"反光条设计，夜间出行更醒目。", ai:"right", judge:"right" },
+  { id:91, q:"写一句招聘启事标题",
+    ans:"诚聘前端工程师，双休，五险一金。",
+    fb:"我们公司正在招人。", ai:"wrong", judge:"right" },
+  { id:92, q:"为茶饮新品写一句不超过 15 字的推荐语",
+    ans:"冷萃乌龙，回甘不涩，一杯入夏。",
+    fb:"冷萃乌龙，回甘不涩，一杯入夏。", ai:"right", judge:"wrong" },
+  { id:93, q:"写一条会员日优惠通知",
+    ans:"每月 8 日会员日，全场满 199 减 50。",
+    fb:"", ai:"", judge:"" },
+  { id:94, q:"为电动牙刷写一句卖点",
+    ans:"五档模式，30 天续航，一次充电用一月。",
+    fb:"电动牙刷清洁效果好。", ai:"wrong", judge:"wrong" },
+  { id:95, q:"判断「今天下雨了」是陈述句还是疑问句，只回答类型",
+    ans:"陈述句",
+    fb:"陈述句", ai:"right", judge:"right" },
+  { id:96, q:"把「我要退货」归到类别：物流 / 售后 / 商品 / 支付",
+    ans:"售后",
+    fb:"售后", ai:"right", judge:"right" },
+  { id:97, q:"把「快递太慢」归到类别：物流 / 售后 / 商品 / 支付",
+    ans:"物流",
+    fb:"售后", ai:"wrong", judge:"right" },
+  { id:98, q:"把「颜色和图片不一样」归到类别：物流 / 售后 / 商品 / 支付",
+    ans:"商品",
+    fb:"商品", ai:"right", judge:"right" },
+  { id:99, q:"判断下述评论是正面还是负面：「发货很快，包装很好」",
+    ans:"正面",
+    fb:"负面", ai:"wrong", judge:"right" },
+  { id:100, q:"判断下述评论是正面还是负面：「用了两天就坏了」",
+    ans:"负面",
+    fb:"正面", ai:"wrong", judge:"wrong" },
+  { id:101, q:"判断这段文本的语言：Hello, how are you?",
+    ans:"",
+    fb:"英文", ai:"", judge:"" },
+  { id:102, q:"判断这段文本的语言：お元気ですか",
+    ans:"日文",
+    fb:"中文", ai:"wrong", judge:"wrong" },
+  { id:103, q:"把「发票怎么开」归到类别：物流 / 售后 / 商品 / 支付",
+    ans:"支付",
+    fb:"售后", ai:"wrong", judge:"wrong" },
+  { id:104, q:"判断这句话是否包含个人信息：「我叫张三，电话 13800138000」",
+    ans:"是",
+    fb:"否", ai:"wrong", judge:"wrong" },
+  { id:105, q:"判断「请尽快回复」是否为祈使句",
+    ans:"是",
+    fb:"否", ai:"wrong", judge:"wrong" },
+  { id:106, q:"判断「这个方案行不行」是疑问句还是陈述句",
+    ans:"疑问句",
+    fb:"陈述句", ai:"wrong", judge:"wrong" },
+  { id:107, q:"把「想开发票」归到类别：开票 / 退款 / 换货 / 咨询",
+    ans:"",
+    fb:"开票", ai:"", judge:"" },
+  { id:108, q:"判断下述是否为垃圾邮件：「恭喜中奖！点击领取现金」",
+    ans:"是",
+    fb:"是", ai:"right", judge:"right" },
+  { id:109, q:"判断 50 元是否比 30 元大，只回答是或否",
+    ans:"是",
+    fb:"是", ai:"right", judge:"right" },
+  { id:110, q:"一件商品 39.9 元，买 3 件共多少钱？",
+    ans:"119.7 元",
+    fb:"119 元", ai:"wrong", judge:"wrong" },
+  { id:111, q:"单价 18 元/千 token，用了 2000 token，费用是多少？",
+    ans:"36 元",
+    fb:"36 元", ai:"right", judge:"right" },
+  { id:112, q:"库存 100 件，卖出 37 件，还剩多少件？",
+    ans:"",
+    fb:"63 件", ai:"", judge:"" },
+  { id:113, q:"订单金额 299 元，满 199 减 50，实付多少？",
+    ans:"249 元",
+    fb:"299 元", ai:"wrong", judge:"wrong" },
+  { id:114, q:"投影面积 6.24 平方米，单价 1778 元/㎡，总价约多少？",
+    ans:"约 11093 元",
+    fb:"约 11093 元", ai:"right", judge:"right" },
+  { id:115, q:"输入 1000 token、输出 500 token，输入单价 2 元/千、输出 6 元/千，总费用是多少？",
+    ans:"5 元",
+    fb:"8 元", ai:"wrong", judge:"wrong" },
+  { id:116, q:"12 页合同，每页审阅 2 分钟，共需多少分钟？",
+    ans:"24 分钟",
+    fb:"24 分钟", ai:"right", judge:"right" },
+  { id:117, q:"100 元打八折后是多少？",
+    ans:"80 元",
+    fb:"92 元", ai:"wrong", judge:"wrong" },
+  { id:118, q:"周一到周五共几天？",
+    ans:"5 天",
+    fb:"5 天", ai:"right", judge:"right" },
+  { id:119, q:"甲比乙多 20%，乙是 100，甲是多少？",
+    ans:"120",
+    fb:"80", ai:"wrong", judge:"wrong" },
+  { id:120, q:"3 台服务器，每台每天 24 度电，一天共多少度？",
+    ans:"72 度",
+    fb:"27 度", ai:"wrong", judge:"right" },
+  { id:121, q:"一件商品 199 元，两件 8 折，买两件共多少？",
+    ans:"318.4 元",
+    fb:"318.4 元", ai:"right", judge:"right" },
+  { id:122, q:"如果 1 小时完成 8 单，4 小时完成多少单？",
+    ans:"32 单",
+    fb:"32 单", ai:"right", judge:"wrong" },
+  { id:123, q:"500 减去 15% 是多少？",
+    ans:"425",
+    fb:"485", ai:"wrong", judge:"wrong" },
+  { id:124, q:"一个班 45 人，缺席 3 人，出席率约是多少？",
+    ans:"约 93.3%",
+    fb:"约 90%", ai:"wrong", judge:"wrong" }
+];
+
+/* 旧版示例（4 条）——只用来判断「库内是不是还是没动过的旧示例」：
+   若 localStorage 里的问题/答案与这 4 条逐字一致，就认为用户还没动过示例，
+   启动时直接用新版 SEED_TESTS 覆盖；用户自己改过或导入的数据一律不动。 */
+var OLD_SEED_TESTS = [
+  { q:"用一句话说明 PromptDeck 的用途", ans:"用于管理模型服务端、维护模型清单并调试提示词的本地工作台。" },
+  { q:"把「今天天气很好」翻译成英文", ans:"The weather is nice today." },
+  { q:"列出三条提示词编写的最佳实践", ans:"" },
+  { q:"说明 token 费用的计算方式", ans:"按 tokens ÷ 1000 × 单价，分别计算输入与输出费用后相加。" }
+];
+
+/* 首启播种 / 旧示例升级：
+   ① 存储里没有本键 → 写入新版 SEED_TESTS（124 条）；
+   ② 存储里正好是旧的 4 条示例 → 换成新版 SEED_TESTS；
+   ③ 其余情况（含空数组 []、用户自己导入的）一律以存储为准，不回填、不覆盖。 */
+function pdSeedTests(){
+  var raw = null;
+  try{ raw = window.localStorage.getItem(PD_TEST_KEY); }catch (e){ return; }
+  var next = null;
+  if (raw === null){
+    next = SEED_TESTS;                                   /* 首启播种 */
+  } else {
+    var arr = null;
+    try{ arr = JSON.parse(raw); }catch (e){ arr = null; }
+    if (arr && typeof arr.length === "number" && arr.length === OLD_SEED_TESTS.length){
+      var same = true;
+      for (var i = 0; i < arr.length; i++){
+        var r = pdNorm(arr[i]);
+        if (r.q !== OLD_SEED_TESTS[i].q || r.ans !== OLD_SEED_TESTS[i].ans){ same = false; break; }
+      }
+      if (same) next = SEED_TESTS;                        /* 旧示例 → 自动升级 */
+    }
+  }
+  if (!next) return;
+  try{ window.localStorage.setItem(PD_TEST_KEY, JSON.stringify(next)); }catch (e){}
+}
+
+/* localStorage 在 file:// 或隐私模式下可能不可用，用一次探测决定是否提示 */
+var pdStoreOK = (function(){
+  try{
+    window.localStorage.setItem("__pd_probe__", "1");
+    window.localStorage.removeItem("__pd_probe__");
+    return true;
+  } catch (e){ return false; }
+})();
+
+function pdNorm(r){
+  r = r || {};
+  return {
+    id:    (r.id === undefined || r.id === null) ? 0 : r.id,
+    q:     (r.q   === undefined || r.q   === null) ? "" : String(r.q),
+    ans:   (r.ans === undefined || r.ans === null) ? "" : String(r.ans),
+    fb:    (r.fb  === undefined || r.fb  === null) ? "" : String(r.fb),
+    ai:    (r.ai === "right" || r.ai === "wrong") ? r.ai : "",
+    judge: (r.judge === "right" || r.judge === "wrong") ? r.judge : ""
+  };
+}
+
+/* id 兜底：缺失 / 重复一律重排，避免同一行被两处引用 */
+function pdEnsureIds(list){
+  var seen = {}, next = 1;
+  for (var i = 0; i < list.length; i++){
+    var n = Number(list[i].id);
+    if (!n || !isFinite(n) || seen[n]){
+      while (seen[next]) next++;
+      n = next;
+    }
+    seen[n] = 1;
+    list[i].id = n;
+    if (n >= next) next = n + 1;
+  }
+  return list;
+}
+
+function pdRead(){
+  try{
+    var raw = window.localStorage.getItem(PD_TEST_KEY);
+    if (raw === null || raw === "") throw 0;
+    var arr = JSON.parse(raw);
+    if (!arr || typeof arr.length !== "number") throw 0;
+    var out = [];
+    for (var i = 0; i < arr.length; i++) out.push(pdNorm(arr[i]));
+    return pdEnsureIds(out);
+  } catch (e){
+    var seed = [];
+    for (var j = 0; j < SEED_TESTS.length; j++) seed.push(pdNorm(SEED_TESTS[j]));
+    return pdEnsureIds(seed);
+  }
+}
+
+function pdSave(list){
+  try{ window.localStorage.setItem(PD_TEST_KEY, JSON.stringify(list)); return true; }
+  catch (e){ return false; }
+}
+
+function pdNextId(list){
+  var mx = 0;
+  for (var i = 0; i < list.length; i++){
+    var n = Number(list[i].id);
+    if (n > mx) mx = n;
+  }
+  return mx + 1;
+}
+
+/* ================= 状态 ================= */
+pdSeedSchemes();            /* 必须先播种方案：未选方案时右栏是锁定态，要靠方案列表渲染下拉 */
+pdSeedTests();
+var tests    = pdRead();
+var selected = {};          /* id -> true */
+var view     = tests.slice();
+
+var schemes       = [];     /* 「提示词构造」页保存的提示词方案 */
+var currentScheme = null;   /* 当前选中的方案 */
+var lastFilledScheme = null;/* 最近一次已按方案填充过问题列表的方案（避免重复填充） */
+var debugged      = false;  /* 是否已跑过一次调试（后两列常显，这里只决定「准确率」是否出数） */
+var debugging     = false;  /* 调试进行中守卫 */
+
+/* ================= DOM ================= */
+var $tbody     = document.getElementById("tbody");
+var $checkAll  = document.getElementById("checkAll");
+var $btnDel    = document.getElementById("btnBatchDelete");
+var $btnSave   = document.getElementById("btnSaveResult");
+var $metaTotal = document.getElementById("metaTotal");
+var $metaSel   = document.getElementById("metaSelected");
+var $footCount = document.getElementById("footCount");
+
+var $statAcc   = document.getElementById("statAcc");
+var $statTotal = document.getElementById("statTotal");
+var $statRight = document.getElementById("statRight");
+var $statWrong = document.getElementById("statWrong");
+var $statFix   = document.getElementById("statFix");
+
+var $errMask   = document.getElementById("errMask");
+var $errTbody  = document.getElementById("errTbody");
+
+var $testPanel   = document.getElementById("testPanel");
+var $comboRoot   = document.getElementById("comboScheme");
+var $comboMenu   = $comboRoot.querySelector(".combo-menu");
+var $schemeIn    = document.getElementById("schemeInput");
+var $btnReset    = document.getElementById("btnResetPick");
+var $btnEdit     = document.getElementById("btnEditScheme");
+var $schemeBody  = document.getElementById("schemeBody");
+var $schemeEmpty = document.getElementById("schemeEmpty");
+var $scServer    = document.getElementById("scServer");
+var $scBase      = document.getElementById("scBase");
+var $scModel     = document.getElementById("scModel");
+var $scPrompt    = document.getElementById("scPrompt");
+var $btnDebug    = document.getElementById("btnStartDebug");
+var $btnDetail   = document.getElementById("btnDetail");
+var $prog        = document.getElementById("ptProg");
+var $progTxt     = document.getElementById("ptProgTxt");
+var $progPct     = document.getElementById("ptProgPct");
+var $progFill    = document.getElementById("ptProgFill");
+var $btnImp      = document.getElementById("btnImportExcel");
+var $btnAddQ     = document.getElementById("btnAddQuestion");
+var testsLocked  = true;    /* 未选方案时右栏测试问题列表整体禁用（启动时由 refreshLock 判定） */
+
+/* ================= 渲染 ================= */
+function esc(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function findTest(id){
+  for (var i = 0; i < tests.length; i++){ if (tests[i].id === id) return tests[i]; }
+  return null;
+}
+
+/* 判断列：上方标出 AI 自动判定，下方是单选圆形（对 / 错 同行互斥，可人工改判；再点一次取消） */
+function judgeHtml(t, ns){
+  ns = ns || "";
+  var aiTxt = t.ai === "right" ? '<b class="ok">对</b>'
+            : t.ai === "wrong" ? '<b class="bad">错</b>'
+            : '未判定';
+  var nm = ns + 'jd-' + t.id; /* 同一行两个圆形互为一组，行与行之间互不影响 */
+  return ''
+    + '<div class="jd-cell">'
+    +   '<span class="jd-ai">AI 判定：' + aiTxt + '</span>'
+    +   '<div class="jd-chips">'
+    +     '<label class="jd jd-right' + (t.judge === "right" ? ' is-on' : '') + '">'
+    +       '<input type="radio" class="jd-radio" name="' + nm + '" data-judge="right" data-id="' + t.id + '"'
+    +         (t.judge === "right" ? ' checked' : '') + ' />'
+    +       '<span>对</span>'
+    +     '</label>'
+    +     '<label class="jd jd-wrong' + (t.judge === "wrong" ? ' is-on' : '') + '">'
+    +       '<input type="radio" class="jd-radio" name="' + nm + '" data-judge="wrong" data-id="' + t.id + '"'
+    +         (t.judge === "wrong" ? ' checked' : '') + ' />'
+    +       '<span>错</span>'
+    +     '</label>'
+    +   '</div>'
+    + '</div>';
+}
+
+function rowHtml(t, ns){
+  var checked = selected[t.id] ? " checked" : "";
+  var rowCls  = selected[t.id] ? ' class="is-checked"' : "";
+  var fbCls   = t.fb ? "fb-cell" : "fb-cell is-empty";
+  var fbTxt   = t.fb
+    ? esc(t.fb)
+    : "（暂无测试反馈，点左栏「开始调试」后生成）";
+  return ''
+    + '<tr data-id="' + t.id + '"' + rowCls + '>'
+    +   '<td class="col-check"><input type="checkbox" class="row-check"' + checked + ' data-id="' + t.id + '" /></td>'
+    +   '<td class="col-question"><div class="txt-cell">' + (t.q ? esc(t.q) : "—") + '</div></td>'
+    +   '<td class="col-answer"><div class="' + (t.ans ? "ans-cell" : "ans-cell is-empty") + '">' + (t.ans ? esc(t.ans) : "—") + '</div></td>'
+    +   '<td class="col-feedback"><div class="' + fbCls + '">' + fbTxt + '</div></td>'
+    +   '<td class="col-judge">' + judgeHtml(t, ns) + '</td>'
+    + '</tr>';
+}
+
+/* 列表固定 5 列：选择 / 问题 / 答案 / 测试反馈答案 / 判断（后两列常显，不随调试状态隐藏） */
+function render(){
+  if (!view.length){
+    $tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">'
+      + '<div class="big">还没有测试问题</div>'
+      + '<div class="small">先用右上角「添加测试问题」或「导入 Excel」加入问题，再在左栏选择方案并开始调试</div>'
+      + '</td></tr>';
+  } else {
+    var html = "";
+    for (var i = 0; i < view.length; i++){ html += rowHtml(view[i]); }
+    $tbody.innerHTML = html;
+  }
+  syncHeader();
+  updateMeta();
+  refreshLock();
+}
+
+/* 全选框状态（含半选） */
+function syncHeader(){
+  if (!view.length){
+    $checkAll.checked = false;
+    $checkAll.indeterminate = false;
+    return;
+  }
+  var hit = 0;
+  for (var i = 0; i < view.length; i++){ if (selected[view[i].id]) hit++; }
+  $checkAll.checked = hit === view.length;
+  $checkAll.indeterminate = hit > 0 && hit < view.length;
+}
+
+function selectedIds(){
+  var out = [];
+  for (var k in selected){ if (selected[k]) out.push(Number(k)); }
+  return out;
+}
+
+function updateMeta(){
+  var n = selectedIds().length;
+  $metaTotal.textContent = "共 " + view.length + " 条记录";
+  $footCount.textContent = "共 " + view.length + " 条记录";
+  $metaSel.style.display = n ? "inline-block" : "none";
+  $metaSel.textContent = "已选 " + n + " 项";
+  $btnDel.disabled = n === 0;
+  updateStat();
+}
+
+/* ================= 统计标签栏 =================
+   准确率 = 最终判定为「对」的条数 ÷ 本次测试总数量（人工改判优先；未调试时显示 —）。
+   AI 测试正确 / 错误数量 = 「开始调试」后自动比对得到的判定条数。
+   人工矫正错误数量 = 人工判定与 AI 判定不一致的条数（即被人工改掉的那部分）。 */
+function updateStat(){
+  var total = view.length, right = 0, wrong = 0, fix = 0, ok = 0;
+  for (var i = 0; i < view.length; i++){
+    var t = view[i];
+    if (t.ai === "right") right++;
+    else if (t.ai === "wrong") wrong++;
+    if (t.ai && t.judge && t.ai !== t.judge) fix++;
+    if (t.judge === "right") ok++;
+  }
+  $statTotal.textContent = total;
+  $statRight.textContent = right;
+  $statWrong.textContent = wrong;
+  $statFix.textContent   = fix;
+  $statAcc.textContent   = (!debugged || !total) ? "—" : Math.round(ok / total * 100) + "%";
+}
+
+/* 列表恒等于全量（原来的「搜索栏」已换成上面的统计标签栏） */
+function filterList(){ view = tests.slice(); }
+function refreshView(){ filterList(); render(); }
+
+/* ================= 勾选 ================= */
+$checkAll.addEventListener("change", function(){
+  if (testsLocked){ $checkAll.checked = false; lockToast(); return; }
+  var on = $checkAll.checked;
+  for (var i = 0; i < view.length; i++){
+    if (on) selected[view[i].id] = true;
+    else delete selected[view[i].id];
+  }
+  render();
+});
+
+$tbody.addEventListener("change", function(e){
+  var t = e.target;
+
+  /* 行选择框 */
+  if (t.classList && t.classList.contains("row-check")){
+    if (testsLocked){ t.checked = false; lockToast(); return; }
+    var id = Number(t.getAttribute("data-id"));
+    if (t.checked) selected[id] = true; else delete selected[id];
+    var tr = t.closest("tr");
+    if (tr) tr.classList.toggle("is-checked", t.checked);
+    syncHeader();
+    updateMeta();
+    return;
+  }
+
+  /* 判断列的 对 / 错：单选圆形，同行互斥（浏览器自身就互斥），这里只落库 + 同步底色 */
+  if (t.classList && t.classList.contains("jd-radio")){
+    if (testsLocked){ return; }
+    var kind = t.getAttribute("data-judge");
+    applyJudge(findTest(Number(t.getAttribute("data-id"))), t.checked ? kind : "");
+    return;
+  }
+});
+
+/* 写入人工判定，并同步这一行两个圆形的选中态与胶囊底色 */
+function applyJudge(row, kind){
+  if (testsLocked) return;      /* 未选方案时判断列只读：这里是唯一的写入路径，拦在这一层最稳 */
+  if (!row) return;
+  row.judge = kind;
+  var tr = $tbody.querySelector('tr[data-id="' + row.id + '"]');
+  if (tr){
+    var boxes = tr.querySelectorAll(".jd-radio");
+    for (var i = 0; i < boxes.length; i++){
+      var k = boxes[i].getAttribute("data-judge");
+      var on = (k === kind);
+      boxes[i].checked = on;
+      if (boxes[i].parentNode) boxes[i].parentNode.classList.toggle("is-on", on);
+    }
+  }
+  pdSave(tests);
+  updateStat();
+}
+
+/* 单选圆形再点一次 = 取消（回到「未判定」）：
+   radio 点下去浏览器会立刻把它设为选中，所以在 mousedown 时先记下点击前的状态，
+   再看这次点的是不是「刚选中的那个」。 */
+$tbody.addEventListener("mousedown", function(e){
+  var r = (e.target && e.target.closest) ? e.target.closest(".jd-radio") : null;
+  if (r) r.setAttribute("data-prev", r.checked ? "1" : "0");
+});
+
+$tbody.addEventListener("click", function(e){
+  var r = (e.target && e.target.closest) ? e.target.closest(".jd-radio") : null;
+  if (!r || r.getAttribute("data-prev") !== "1") return;
+  applyJudge(findTest(Number(r.getAttribute("data-id"))), "");
+});
+
+$tbody.addEventListener("click", function(e){
+  /* 表格里全是可交互控件，逐类放行 */
+  if (e.target.tagName === "A") return;
+  if (e.target.closest && e.target.closest(".row-check")) return;
+  if (e.target.closest && e.target.closest(".jd")) return;
+  var tr = e.target.closest ? e.target.closest("tr") : null;
+  if (!tr) return;
+  var cb = tr.querySelector(".row-check");
+  if (cb){ cb.checked = !cb.checked; cb.dispatchEvent(new Event("change", { bubbles:true })); }
+});
+
+/* ================= 批量删除 ================= */
+var $delMask  = document.getElementById("delMask");
+var $delCount = document.getElementById("delCount");
+var $delNames = document.getElementById("delNames");
+
+function openDelModal(){
+  var ids = selectedIds();
+  if (!ids.length) return;
+  $delCount.textContent = ids.length;
+  var names = view.filter(function(t){ return selected[t.id]; }).map(function(t){
+    var q = (t.q || "").replace(/\s+/g, " ");
+    return "· " + (q.length > 34 ? q.slice(0, 34) + "…" : q);
+  });
+  $delNames.innerHTML = names.join("<br/>");
+  $delNames.style.display = names.length > 1 ? "block" : "none";
+  $delMask.classList.add("show");
+}
+function closeDelModal(){ $delMask.classList.remove("show"); }
+
+$btnDel.addEventListener("click", openDelModal);
+document.getElementById("delCancel").addEventListener("click", closeDelModal);
+$delMask.addEventListener("click", function(e){ if (e.target === $delMask) closeDelModal(); });
+
+document.getElementById("delConfirm").addEventListener("click", function(){
+  var n = selectedIds().length;
+  tests = tests.filter(function(t){ return !selected[t.id]; });
+  selected = {};
+  closeDelModal();
+  refreshView();
+  pdSave(tests);
+  toast("已删除 " + n + " 条测试问题", "ok");
+});
+
+/* ================= AI 错误列表弹窗（第二十六轮） ================= */
+function openErrModal(){
+  var list = view.filter(function(t){ return t.ai === "wrong"; });
+  if (!list.length){ toast("当前没有 AI 判定为错误的记录", "warn"); return; }
+  var html = "";
+  for (var i = 0; i < list.length; i++){ html += rowHtml(list[i], "err-"); }
+  $errTbody.innerHTML = html;
+  $errMask.classList.add("show");
+}
+function closeErrModal(){ $errMask.classList.remove("show"); }
+
+$statWrong.closest(".stat").addEventListener("click", openErrModal);
+document.getElementById("errClose").addEventListener("click", closeErrModal);
+$errMask.addEventListener("click", function(e){ if (e.target === $errMask) closeErrModal(); });
+
+/* 弹窗内的事件委托：复用主表格同一套交互（勾选 + 判定），
+   但 radio name 已通过 ns 参数隔离，不会与主表格冲突 */
+$errTbody.addEventListener("change", function(e){
+  var t = e.target;
+  if (t.classList && t.classList.contains("row-check")){
+    if (testsLocked){ t.checked = false; lockToast(); return; }
+    var id = Number(t.getAttribute("data-id"));
+    if (t.checked) selected[id] = true; else delete selected[id];
+    var tr = t.closest("tr");
+    if (tr) tr.classList.toggle("is-checked", t.checked);
+    syncHeader(); updateMeta();
+    return;
+  }
+  if (t.classList && t.classList.contains("jd-radio")){
+    if (testsLocked){ return; }
+    var kind = t.getAttribute("data-judge");
+    applyJudge(findTest(Number(t.getAttribute("data-id"))), t.checked ? kind : "");
+    return;
+  }
+});
+$errTbody.addEventListener("mousedown", function(e){
+  var r = (e.target && e.target.closest) ? e.target.closest(".jd-radio") : null;
+  if (!r) return;
+  var prev = r.checked;
+  r.setAttribute("data-prev", prev ? "1" : "0");
+});
+$errTbody.addEventListener("click", function(e){
+  var r = (e.target && e.target.closest) ? e.target.closest(".jd-radio") : null;
+  if (!r || r.getAttribute("data-prev") !== "1") return;
+  applyJudge(findTest(Number(r.getAttribute("data-id"))), "");
+  r.checked = false;
+  if (r.parentNode) r.parentNode.classList.remove("is-on");
+  e.preventDefault(); e.stopPropagation();
+});
+
+/* ================= 测试问题列表：必须先选方案 =================
+   口径：左栏选定提示词方案后，右栏才匹配出该方案保存好的问题内容；
+   没选方案时整表置灰、内容打码，行内勾选与判断、右上角两个入口一并禁用。
+   ⚠️ 只改「可用不可用」，不动问题数据本身（存储键与内容一律原样）。 */
+/* ================= 重置方案选择（第十九轮） =================
+   口径：恢复输入框占位文字「选择提示词方案…」，同时清空右栏问题清单并回到
+   「未选方案」的置灰锁定态；lastFilledScheme 一并清掉，重置后重新选同一个
+   方案会重新按方案灌题（与首次选择一致）。 */
+$btnReset.addEventListener("click", function(){
+  currentScheme    = null;
+  lastFilledScheme = null;
+  tests            = [];
+  selected         = {};
+  debugged         = false;      /* 重置后本次测试无效，准确率回到「—」 */
+  pdResetProgress();
+  $prog.hidden     = true;
+  closeSchemeMenu();
+  fillSchemeView();              /* currentScheme 为 null ⇒ 输入框清空、显示空态、refreshLock */
+  refreshView();
+  buildSchemeMenu();
+  pdSave(tests);
+  toast("已重置方案选择，问题清单已清空", "ok");
+});
+
+/* ================= 修改（第二十二轮 · 与「提示词方案」页编辑同款跳转覆盖流） =================
+   左栏已选方案 ⇒ 带整份方案（含 apiKey）跳「提示词构造」页回填；保存按 id 覆盖原方案，
+   「测试结果列表」按方案名现查方案库，内容自动联动。未选方案 ⇒ 点按时提示。 */
+$btnEdit.addEventListener("click", function(){
+  if (!currentScheme){ toast("请先在左侧选择提示词方案，再修改提示词", "warn"); return; }
+  var s = currentScheme;
+  try{
+    window.sessionStorage.setItem("pd_edit_snapshot", JSON.stringify({
+      id: s.id, name: s.name,
+      server: s.server || "", base: s.base || "",
+      model: s.model || "", modelType: s.modelType || "",
+      sys: s.sys || "",
+      user: (s.user && typeof s.user.length === "number") ? s.user : [],
+      multi: !!s.multi, apiKey: s.apiKey || ""
+    }));
+  }catch (e){
+    toast("无法写入会话存储，无法跳转修改", "warn");
+    return;
+  }
+  /* 在方案库记录上打 pendingEdit 标记（与「提示词方案」页编辑同口径） */
+  try{
+    var arr = JSON.parse(window.localStorage.getItem(PD_SCHEME_KEY) || "null");
+    if (arr && typeof arr.length === "number"){
+      for (var i = 0; i < arr.length; i++){
+        if (Number(arr[i] && arr[i].id) === Number(s.id)){ arr[i].pendingEdit = true; break; }
+      }
+      window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(arr));
+    }
+  }catch (e){}
+  toast("已带上方案内容，正在跳转「提示词构造」…", "ok");
+  setTimeout(function(){
+    location.href = "prompt.html?pdSchemeId=" + encodeURIComponent(String(s.id)) + "&pdEntry=prompt.html";
+  }, 420);
+});
+function lockToast(){
+  toast("请先在左侧选择提示词方案，再添加测试问题", "warn");
+}
+
+function refreshLock(){
+  var locked = !currentScheme;
+  testsLocked = locked;
+  $testPanel.classList.toggle("is-locked", locked);
+  $btnAddQ.classList.toggle("is-disabled", locked);
+  $btnAddQ.disabled = locked;
+  $btnImp.classList.toggle("is-disabled", locked);
+  $btnImp.disabled = locked;
+  if (locked){
+    selected = {};
+    $btnDel.disabled = true;
+    $metaSel.style.display = "none";
+    if ($checkAll){ $checkAll.checked = false; $checkAll.indeterminate = false; }
+  }
+}
+
+/* ================= 添加测试问题 ================= */
+var $addMask     = document.getElementById("addMask");
+var $addQuestion = document.getElementById("addQuestion");
+var $addAnswer   = document.getElementById("addAnswer");
+
+function openAddModal(){
+  if (testsLocked){ lockToast(); return; }
+  $addQuestion.value = "";
+  $addAnswer.value = "";
+  $addMask.classList.add("show");
+  $addQuestion.focus();
+}
+function closeAddModal(){ $addMask.classList.remove("show"); }
+
+document.getElementById("btnAddQuestion").addEventListener("click", openAddModal);
+document.getElementById("addCancel").addEventListener("click", closeAddModal);
+$addMask.addEventListener("click", function(e){ if (e.target === $addMask) closeAddModal(); });
+
+document.getElementById("addConfirm").addEventListener("click", function(){
+  var q = $addQuestion.value.trim();
+  if (!q){ toast("请先填写问题", "warn"); $addQuestion.focus(); return; }
+  tests.push({ id: pdNextId(tests), q: q, ans: $addAnswer.value.trim(), fb: "", judge: "" });
+  pdSave(tests);
+  closeAddModal();
+  refreshView();
+  toast("已添加 1 条测试问题", "ok");
+});
+
+/* ================= 导入 Excel ================= */
+var $impMask    = document.getElementById("impMask");
+var $impFile    = document.getElementById("impFile");
+var $impPreview = document.getElementById("impPreview");
+var $impInput   = document.getElementById("impFileInput");
+var impRows     = [];   /* 解析结果：[[问题, 答案], …] */
+
+function openImpModal(){
+  if (testsLocked){ lockToast(); return; }
+  impRows = [];
+  $impInput.value = "";
+  $impFile.innerHTML = "<span>尚未选择文件</span>";
+  $impPreview.hidden = true;
+  $impPreview.textContent = "";
+  $impMask.classList.add("show");
+}
+function closeImpModal(){ $impMask.classList.remove("show"); }
+
+document.getElementById("btnImportExcel").addEventListener("click", openImpModal);
+document.getElementById("impCancel").addEventListener("click", closeImpModal);
+$impMask.addEventListener("click", function(e){ if (e.target === $impMask) closeImpModal(); });
+
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape"){ closeDelModal(); closeAddModal(); closeImpModal(); }
+});
+
+document.getElementById("btnPickFile").addEventListener("click", function(){ $impInput.click(); });
+$impInput.addEventListener("change", function(){
+  var f = $impInput.files && $impInput.files[0];
+  if (f) readImportFile(f);
+});
+
+/* ---------- 解析：xlsx（真 ZIP + sharedStrings） ---------- */
+function u16(dv, o){ return dv.getUint16(o, true); }
+function u32(dv, o){ return dv.getUint32(o, true); }
+
+function zipIndex(buf){
+  var dv = new DataView(buf), len = buf.byteLength, eocd = -1;
+  var min = Math.max(0, len - 22 - 65535);
+  for (var i = len - 22; i >= min; i--){
+    if (u32(dv, i) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("不是有效的 xlsx 文件（未找到 ZIP 结构）");
+  var n = u16(dv, eocd + 10), off = u32(dv, eocd + 16);
+  var dec = new TextDecoder("utf-8"), files = {};
+  for (var k = 0; k < n; k++){
+    if (u32(dv, off) !== 0x02014b50) break;
+    var method = u16(dv, off + 10);
+    var csize  = u32(dv, off + 20);
+    var nameLen = u16(dv, off + 28), extraLen = u16(dv, off + 30), cmtLen = u16(dv, off + 32);
+    var name = dec.decode(new Uint8Array(buf, off + 46, nameLen));
+    var lho  = u32(dv, off + 42);
+    var lNameLen = u16(dv, lho + 26), lExtraLen = u16(dv, lho + 28);
+    files[name] = { method: method, start: lho + 30 + lNameLen + lExtraLen, size: csize };
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  return files;
+}
+
+function zipRead(buf, files, name){
+  var f = files[name];
+  if (!f) return Promise.resolve(null);
+  var raw = new Uint8Array(buf, f.start, f.size);
+  if (f.method === 0) return Promise.resolve(new TextDecoder("utf-8").decode(raw));
+  if (f.method !== 8) return Promise.reject(new Error("暂不支持该 xlsx 的压缩方式"));
+  if (typeof DecompressionStream !== "function") return Promise.reject(new Error("当前浏览器不支持解压 xlsx，请另存为 .csv 后导入"));
+  var stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Response(stream).text();
+}
+
+function colIndex(ref){
+  var m = /^([A-Z]+)/.exec(String(ref || ""));
+  if (!m) return 0;
+  var s = m[1], n = 0;
+  for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64);
+  return n - 1;
+}
+
+function parseXlsx(buf){
+  var files = zipIndex(buf);
+  var sheet = null;
+  for (var k in files){
+    if (/^xl\/worksheets\/sheet\d+\.xml$/.test(k)){
+      if (!sheet || k < sheet) sheet = k;
+    }
+  }
+  if (!sheet) return Promise.reject(new Error("xlsx 中没有可用的工作表"));
+
+  return zipRead(buf, files, "xl/sharedStrings.xml").then(function(ss){
+    var shared = [];
+    if (ss){
+      var sdoc = new DOMParser().parseFromString(ss, "application/xml");
+      var si = sdoc.getElementsByTagName("si");
+      for (var i = 0; i < si.length; i++){
+        var ts = si[i].getElementsByTagName("t"), s = "";
+        for (var j = 0; j < ts.length; j++) s += ts[j].textContent;
+        shared.push(s);
+      }
+    }
+    return zipRead(buf, files, sheet).then(function(sx){
+      var doc  = new DOMParser().parseFromString(sx, "application/xml");
+      var rows = doc.getElementsByTagName("row"), out = [];
+      for (var r = 0; r < rows.length; r++){
+        var cells = rows[r].getElementsByTagName("c"), arr = [];
+        for (var c = 0; c < cells.length; c++){
+          var t = cells[c].getAttribute("t"), val = "";
+          if (t === "inlineStr"){
+            var its = cells[c].getElementsByTagName("t");
+            val = its.length ? its[0].textContent : "";
+          } else {
+            var vs = cells[c].getElementsByTagName("v");
+            var raw = vs.length ? vs[0].textContent : "";
+            val = (t === "s") ? (shared[parseInt(raw, 10)] || "") : raw;
+          }
+          arr[colIndex(cells[c].getAttribute("r"))] = val;
+        }
+        out.push([arr[0] == null ? "" : arr[0], arr[1] == null ? "" : arr[1]]);
+      }
+      return cleanRows(out);
+    });
+  });
+}
+
+/* ---------- 解析：.xls（Excel 可直接打开的 HTML 表格） ---------- */
+function parseHtmlXls(text){
+  var t = String(text).replace(/^\ufeff/, "");
+  if (!/<table/i.test(t)) throw new Error("文件里没有找到表格，请确认第一列是「问题」、第二列是「答案」");
+  var doc = new DOMParser().parseFromString(t, "text/html");
+  var trs = doc.getElementsByTagName("tr"), out = [];
+  for (var i = 0; i < trs.length; i++){
+    var tds = trs[i].getElementsByTagName("td");
+    if (!tds.length) tds = trs[i].getElementsByTagName("th");
+    if (!tds.length) continue;
+    var arr = [];
+    for (var j = 0; j < tds.length && j < 2; j++) arr.push(tds[j].textContent);
+    out.push(arr);
+  }
+  return cleanRows(out);
+}
+
+/* ---------- 解析：.csv / .txt ---------- */
+function parseCsv(text){
+  var t = String(text).replace(/^\ufeff/, "");
+  var head = t.split(/\r?\n/)[0] || "";
+  var sep = (head.indexOf("\t") > -1 && head.indexOf(",") < 0) ? "\t" : ",";
+  var rows = [], cur = [], field = "", inQ = false;
+  for (var i = 0; i < t.length; i++){
+    var ch = t[i];
+    if (inQ){
+      if (ch === '"'){
+        if (t[i + 1] === '"'){ field += '"'; i++; } else inQ = false;
+      } else field += ch;
+    } else if (ch === '"'){
+      inQ = true;
+    } else if (ch === sep){
+      cur.push(field); field = "";
+    } else if (ch === "\n"){
+      cur.push(field); rows.push(cur); cur = []; field = "";
+    } else if (ch !== "\r"){
+      field += ch;
+    }
+  }
+  if (field !== "" || cur.length){ cur.push(field); rows.push(cur); }
+  return cleanRows(rows);
+}
+
+/* 统一清洗：跳过表头行与空行，只保留前两列 */
+function cleanRows(rows){
+  var out = [];
+  for (var i = 0; i < rows.length; i++){
+    var a = (rows[i][0] == null) ? "" : String(rows[i][0]).replace(/^\ufeff/, "").trim();
+    var b = (rows[i][1] == null) ? "" : String(rows[i][1]).trim();
+    if (i === 0 && /^(问题|问题\*|question)$/i.test(a)) continue;
+    if (!a && !b) continue;
+    out.push([a, b]);
+  }
+  return out;
+}
+
+/* ---------- 读取 + 预览 ---------- */
+function readImportFile(f){
+  var name = f.name || "未命名文件", lower = name.toLowerCase(), p;
+  $impFile.innerHTML = '<span>正在解析 <b class="nm">' + esc(name) + '</b>…</span>';
+  $impPreview.hidden = true;
+
+  if (/\.xlsx$/.test(lower)){
+    p = f.arrayBuffer().then(function(b){ return parseXlsx(b); });
+  } else if (/\.xls$/.test(lower)){
+    p = f.text().then(function(txt){ return parseHtmlXls(txt); });
+  } else {
+    p = f.text().then(function(txt){ return parseCsv(txt); });
+  }
+
+  p.then(function(rows){
+    impRows = rows;
+    if (!rows.length){
+      $impFile.innerHTML = '<span class="tag is-warn">无有效数据</span>'
+        + '<b class="nm">' + esc(name) + '</b><span>未解析到「问题 / 答案」两列内容</span>';
+      return;
+    }
+    $impFile.innerHTML = '<span class="tag">已解析</span><b class="nm">' + esc(name) + '</b>'
+      + '<span>共 ' + rows.length + ' 行（问题 · 答案）</span>';
+    var lines = [];
+    for (var i = 0; i < Math.min(rows.length, 5); i++){
+      lines.push((i + 1) + ". " + truncate(rows[i][0], 40) + "  ｜  " + truncate(rows[i][1], 40));
+    }
+    if (rows.length > 5) lines.push("… 其余 " + (rows.length - 5) + " 行");
+    $impPreview.textContent = lines.join("\n");
+    $impPreview.hidden = false;
+  }).catch(function(err){
+    impRows = [];
+    $impFile.innerHTML = '<span class="tag is-warn">解析失败</span>'
+      + '<b class="nm">' + esc(name) + '</b><span>' + esc((err && err.message) || err) + '</span>';
+  });
+}
+
+function truncate(s, n){
+  s = String(s == null ? "" : s).replace(/\s+/g, " ");
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
+document.getElementById("impConfirm").addEventListener("click", function(){
+  if (!impRows.length){ toast("请先添加并解析 Excel 文件", "warn"); return; }
+  var next = pdNextId(tests), n = 0;
+  for (var i = 0; i < impRows.length; i++){
+    var q = String(impRows[i][0] || "").trim();
+    var a = String(impRows[i][1] || "").trim();
+    if (!q && !a) continue;
+    tests.push({ id: next++, q: q, ans: a, fb: "", judge: "" });
+    n++;
+  }
+  pdSave(tests);
+  closeImpModal();
+  refreshView();
+  toast("已导入 " + n + " 条测试问题", "ok");
+});
+
+/* ---------- 下载 Excel 模板（生成真正的 .xlsx，零依赖） ---------- */
+var CRC_TABLE = (function(){
+  var t = [], c, n, k;
+  for (n = 0; n < 256; n++){
+    c = n;
+    for (k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(u8){
+  var c = 0xFFFFFFFF;
+  for (var i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+/* 只用「存储（不压缩）」方式写 ZIP，无需任何压缩库 */
+function zipStore(files){
+  var enc = new TextEncoder(), chunks = [], central = [], offset = 0;
+  var d = new Date();
+  var dosTime = ((d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2)) & 0xFFFF;
+  var dosDate = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+
+  for (var i = 0; i < files.length; i++){
+    var nb   = enc.encode(files[i].name);
+    var data = files[i].data;
+    var crc  = crc32(data);
+
+    var lh = new Uint8Array(30 + nb.length), dv = new DataView(lh.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);          /* 文件名为 UTF-8 */
+    dv.setUint16(8, 0, true);               /* method = 0 存储 */
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, nb.length, true);
+    dv.setUint16(28, 0, true);
+    lh.set(nb, 30);
+    chunks.push(lh, data);
+
+    var ce = new Uint8Array(46 + nb.length), dv2 = new DataView(ce.buffer);
+    dv2.setUint32(0, 0x02014b50, true);
+    dv2.setUint16(4, 20, true);
+    dv2.setUint16(6, 20, true);
+    dv2.setUint16(8, 0x0800, true);
+    dv2.setUint16(10, 0, true);
+    dv2.setUint16(12, dosTime, true);
+    dv2.setUint16(14, dosDate, true);
+    dv2.setUint32(16, crc, true);
+    dv2.setUint32(20, data.length, true);
+    dv2.setUint32(24, data.length, true);
+    dv2.setUint16(28, nb.length, true);
+    dv2.setUint32(42, offset, true);
+    ce.set(nb, 46);
+    central.push(ce);
+
+    offset += lh.length + data.length;
+  }
+
+  var cdSize = 0;
+  for (var j = 0; j < central.length; j++) cdSize += central[j].length;
+  var eocd = new Uint8Array(22), dv3 = new DataView(eocd.buffer);
+  dv3.setUint32(0, 0x06054b50, true);
+  dv3.setUint16(8, central.length, true);
+  dv3.setUint16(10, central.length, true);
+  dv3.setUint32(12, cdSize, true);
+  dv3.setUint32(16, offset, true);
+
+  return new Blob(chunks.concat(central, [eocd]), {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  });
+}
+
+function xmlEsc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&apos;")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, "");
+}
+
+function colName(i){
+  var s = "";
+  i = i + 1;
+  while (i > 0){
+    var m = (i - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    i = Math.floor((i - 1) / 26);
+  }
+  return s;
+}
+
+/* rows: [[问题, 答案], …]（含表头） */
+function xlsxBlob(rows){
+  var enc = new TextEncoder();
+  var flat = [], idx = [], seen = {};
+  for (var r = 0; r < rows.length; r++){
+    for (var c = 0; c < 2; c++){
+      var v = String(rows[r][c] == null ? "" : rows[r][c]);
+      if (seen[v] === undefined){ seen[v] = flat.length; flat.push(v); }
+      idx.push(seen[v]);
+    }
+  }
+
+  var sst = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' + idx.length + '" uniqueCount="' + flat.length + '">';
+  for (var i = 0; i < flat.length; i++) sst += "<si><t xml:space=\"preserve\">" + xmlEsc(flat[i]) + "</t></si>";
+  sst += "</sst>";
+
+  var sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+    + '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+    + '<dimension ref="A1:B' + rows.length + '"/><sheetData>';
+  var p = 0;
+  for (var r2 = 0; r2 < rows.length; r2++){
+    sheet += '<row r="' + (r2 + 1) + '">';
+    for (var c2 = 0; c2 < 2; c2++){
+      sheet += '<c r="' + colName(c2) + (r2 + 1) + '" t="s"><v>' + idx[p++] + '</v></c>';
+    }
+    sheet += "</row>";
+  }
+  sheet += "</sheetData></worksheet>";
+
+  var parts = [
+    { name: "[Content_Types].xml", xml:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+      + '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+      + '<Default Extension="xml" ContentType="application/xml"/>'
+      + '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+      + '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+      + '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
+      + '</Types>' },
+    { name: "_rels/.rels", xml:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+      + '</Relationships>' },
+    { name: "xl/workbook.xml", xml:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+      + ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+      + '<sheets><sheet name="测试问题" sheetId="1" r:id="rId1"/></sheets></workbook>' },
+    { name: "xl/_rels/workbook.xml.rels", xml:
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+      + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+      + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+      + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'
+      + '</Relationships>' },
+    { name: "xl/worksheets/sheet1.xml", xml: sheet },
+    { name: "xl/sharedStrings.xml", xml: sst }
+  ];
+
+  var files = [];
+  for (var k = 0; k < parts.length; k++){
+    files.push({ name: parts[k].name, data: enc.encode(parts[k].xml) });
+  }
+  return zipStore(files);
+}
+
+function downloadBlob(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 1500);
+}
+
+document.getElementById("btnTpl").addEventListener("click", function(){
+  var rows = [
+    ["问题", "答案"],
+    ["用一句话介绍 PromptDeck", "PromptDeck 是用于管理与调试大模型提示词的本地工作台。"],
+    ["把「今天天气很好」翻译成英文", "The weather is nice today."],
+    ["列出三条提示词编写的最佳实践", ""]
+  ];
+  downloadBlob(xlsxBlob(rows), "提示词测试模板.xlsx");
+  toast("已下载 Excel 模板", "ok");
+});
+
+/* ================= 左栏：选择提示词方案 =================
+   方案由「提示词构造」页点「保存」写入 localStorage 的 pd_prompt_schemes；
+   本页只读展示，选中后把服务器 / 模型 / 提示词填进左栏的滚动文本框，
+   「详情」弹窗里可查看完整内容。 */
+function pdReadSchemes(){
+  try{
+    var raw = window.localStorage.getItem(PD_SCHEME_KEY);
+    if (!raw) return [];
+    var arr = JSON.parse(raw);
+    if (!arr || typeof arr.length !== "number") return [];
+    var out = [];
+    for (var i = 0; i < arr.length; i++){
+      var s = arr[i] || {};
+      if (!s.name) continue;
+      out.push({
+        id:        s.id,
+        name:      String(s.name),
+        server:    String(s.server    || ""),
+        base:      String(s.base      || ""),
+        model:     String(s.model     || ""),
+        modelType: String(s.modelType || ""),
+        sys:       String(s.sys       || ""),
+        user:      (s.user && typeof s.user.length === "number") ? s.user : [],
+        multi:     !!s.multi,
+        apiKey:    String(s.apiKey || "")   /* 第十八轮：随方案带出，仅供详情弹窗遮掩展示 */
+      });
+    }
+    return out;
+  } catch (e){ return []; }
+}
+
+var PT_DOTS = ["d-purple", "d-mint", "d-orange", "d-gold"];
+
+/* 方案下拉：可输入 + 模糊匹配（第十九轮）。输入关键字按「方案名称包含关键字」过滤
+   （不区分大小写）；清空输入或点输入框展开时恢复全量。data-idx 始终是 schemes 里的
+   原始下标，过滤不影响选中。每次重绘整体重建菜单，避免重复绑定监听。 */
+function buildSchemeMenu(kw){
+  if (!schemes.length){
+    $comboMenu.innerHTML = '<div class="combo-empty">暂无提示词方案，请先到「提示词构造」页保存</div>';
+    return;
+  }
+  var k = String(kw == null ? "" : kw).trim().toLowerCase();
+  var shown = 0, h = "";
+  for (var i = 0; i < schemes.length; i++){
+    var s = schemes[i];
+    if (k && String(s.name).toLowerCase().indexOf(k) < 0) continue;
+    shown++;
+    var on = (currentScheme && String(currentScheme.name) === s.name) ? " is-picked" : "";
+    h += '<div class="combo-item' + on + '" data-idx="' + i + '" data-value="' + esc(s.name) + '" role="option">'
+      +    '<i class="tag-dot ' + PT_DOTS[i % PT_DOTS.length] + '"></i>'
+      +    '<span>' + esc(s.name) + '</span>'
+      +  '</div>';
+  }
+  if (!shown){
+    $comboMenu.innerHTML = '<div class="combo-empty">无匹配「' + esc(k) + '」的提示词方案</div>';
+    return;
+  }
+  $comboMenu.innerHTML = h;
+}
+
+function openSchemeMenu(){
+  if (!schemes.length){ toast("还没有提示词方案，请先到「提示词构造」页保存", "warn"); return; }
+  $comboRoot.classList.add("open");
+}
+function closeSchemeMenu(){ $comboRoot.classList.remove("open"); }
+
+$comboRoot.querySelector(".combo-btn").addEventListener("click", function(e){
+  e.stopPropagation();
+  if ($comboRoot.classList.contains("open")) closeSchemeMenu(); else openSchemeMenu();
+});
+$schemeIn.addEventListener("click", function(){
+  buildSchemeMenu("");                 /* 点输入框展开：恢复全量列表 */
+  openSchemeMenu();
+});
+/* 可输入 + 模糊匹配：按输入内容过滤方案名（包含即命中，不区分大小写） */
+$schemeIn.addEventListener("input", function(){
+  openSchemeMenu();
+  buildSchemeMenu($schemeIn.value);
+});
+document.addEventListener("click", function(e){ if (!$comboRoot.contains(e.target)) closeSchemeMenu(); });
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") closeSchemeMenu(); });
+
+$comboMenu.addEventListener("mousedown", function(e){
+  var it = e.target.closest ? e.target.closest(".combo-item") : null;
+  if (!it) return;
+  e.preventDefault();
+  pickScheme(Number(it.getAttribute("data-idx")));
+});
+
+function scRead(el, v){
+  var t = String(v || "");
+  el.textContent = t ? t : "—";
+  el.classList.toggle("is-empty", !t);
+}
+
+/* 方案里的提示词全文（系统提示词 + 各轮用户提示词），供左栏文本框与详情弹窗共用 */
+function pdSchemePromptText(s){
+  var parts = ['【系统提示词】\n' + (String(s.sys || "").trim() || "（空）")];
+  var us = [];
+  for (var i = 0; i < s.user.length; i++){
+    if (String(s.user[i] || "").trim()) us.push(String(s.user[i]));
+  }
+  parts.push('【用户提示词】\n' + (us.length ? us.join("\n—— 下一轮 ——\n") : "（空）"));
+  return parts.join("\n\n");
+}
+
+function fillSchemeView(){
+  if (!currentScheme){
+    $schemeIn.value     = "";
+    $schemeEmpty.hidden = false;
+    $schemeBody.hidden  = true;
+    $btnDetail.hidden   = true;
+    refreshLock();
+    return;
+  }
+  $schemeIn.value     = currentScheme.name;
+  $schemeEmpty.hidden = true;
+  $schemeBody.hidden  = false;
+  $btnDetail.hidden   = false;
+  scRead($scServer, currentScheme.server);
+  scRead($scBase,   currentScheme.base);
+  scRead($scModel,  currentScheme.model
+                    + (currentScheme.modelType ? "（" + currentScheme.modelType + "）" : ""));
+  $scPrompt.value = pdSchemePromptText(currentScheme);
+}
+
+function pickScheme(idx){
+  var s = schemes[idx];
+  if (!s) return;
+  currentScheme = s;
+  closeSchemeMenu();
+  buildSchemeMenu();
+  fillSchemeView();
+  refreshLock();          /* 选好方案 ⇒ 右栏测试问题列表匹配出内容并解锁 */
+  /* 按选中的方案生成对应的专业性问题，替换进右栏测试问题列表（含模拟反馈与判定）。
+     注：「测试结果列表」页点「重新测试」跳回来时，存储里已经带着那批问题，
+     由该页写入的 PD_RETEST_FLAG 标记，这里就不再覆盖。 */
+  if (s !== lastFilledScheme && !pdTakeRetestFlag()){
+    pdFillTestsForScheme(s);
+    lastFilledScheme = s;
+    refreshView();
+  }
+  pdResetProgress();
+  $prog.hidden = true;
+}
+
+/* 重载方案列表（打开页面 / 另一个标签页保存过 / 存储变化时）。
+   第二次迭代：方案库的真源在服务端三张表（tst_plan / tst_plan_prompt / tst_api_key），
+   这里改成 GET /api/tp 拉取。字段名与原型的方案对象一字不差，所以下游
+   buildSchemeMenu / fillSchemeView / pickScheme 全部零改动。
+   返回 Promise —— 启动段据此等方案到位，再跑「重新测试」与 render()。 */
+function pdNormScheme(s){
+  return {
+    id:        s.id,
+    name:      String(s.name      || ""),
+    server:    String(s.server    || ""),
+    base:      String(s.base      || ""),
+    model:     String(s.model     || ""),
+    modelType: String(s.modelType || ""),
+    sys:       String(s.sys       || ""),
+    user:      (s.user && typeof s.user.length === "number") ? s.user : [],
+    multi:     !!s.multi,
+    apiKey:    String(s.apiKey || "")
+  };
+}
+
+function loadSchemes(){
+  var keep = currentScheme ? String(currentScheme.name) : "";
+  return fetch("/api/tp").then(function(r){ return r.json(); }).then(function(list){
+    list = (list && typeof list.length === "number") ? list : [];
+    var out = [];
+    for (var i = 0; i < list.length; i++){
+      var s = pdNormScheme(list[i]);
+      if (!s.name) continue;
+      if (!s.id) s.id = i + 1;
+      out.push(s);
+    }
+    schemes = out;
+    currentScheme = null;
+    for (var j = 0; j < schemes.length; j++){
+      if (String(schemes[j].name) === keep){ currentScheme = schemes[j]; break; }
+    }
+    buildSchemeMenu();
+    fillSchemeView();
+  }).catch(function(){
+    toast("加载提示词方案失败，请确认服务已启动", "warn");
+  });
+}
+
+/* ================= 详情弹窗：查看方案里完整的提示词内容 ================= */
+var $detailMask = document.getElementById("detailMask");
+var $dtName   = document.getElementById("dtName");
+var $dtServer = document.getElementById("dtServer");
+var $dtBase   = document.getElementById("dtBase");
+var $dtModel  = document.getElementById("dtModel");
+var $dtType   = document.getElementById("dtType");
+var $dtSys    = document.getElementById("dtSys");
+var $dtUser   = document.getElementById("dtUser");
+var $dtRounds = document.getElementById("dtRounds");
+
+function dtSet(el, v, mono){
+  var t = String(v == null ? "" : v);
+  el.textContent = t ? t : "—";
+  el.classList.toggle("is-empty", !t);
+  if (mono) el.classList.add("mono");
+}
+
+/* API_key 遮掩（第十八轮口径：全站列表 / 详情只给遮挡形态，不给查看入口） */
+function ptMaskKey(k){
+  var v = String(k || "").trim();
+  if (!v) return "";
+  if (v.length <= 8) return "sk-" + new Array(Math.max(v.length, 4) + 1).join("•");
+  return v.slice(0, 3) + "-" + new Array(9).join("•") + v.slice(-4);
+}
+
+function openDetail(){
+  if (!currentScheme){ toast("请先在左侧选择提示词方案", "warn"); return; }
+  var s = currentScheme;
+  $dtName.textContent = s.name;
+  dtSet($dtServer, s.server);
+  dtSet($dtBase,   s.base, true);
+  dtSet($dtModel,  s.model);
+  dtSet($dtType,   s.modelType);
+  dtSet($dtSys,    s.sys);
+  var us = [];
+  for (var i = 0; i < s.user.length; i++){
+    if (String(s.user[i] || "").trim()) us.push(String(s.user[i]));
+  }
+  /* 用户提示词：一轮一个文本框，逐轮标注「第 N 轮对话内容」。
+     只有一轮（或没有）时，仍用原来的单框，保持弹窗简洁。 */
+  if (us.length > 1){
+    var rh = "";
+    for (var k = 0; k < us.length; k++){
+      rh += '<div class="dt-round">'
+          +   '<span class="dt-round-k">第 ' + (k + 1) + ' 轮对话内容</span>'
+          +   '<div class="dt-round-v">' + esc(us[k]) + '</div>'
+          + '</div>';
+    }
+    $dtRounds.innerHTML = rh;
+    $dtRounds.hidden = false;
+    $dtRounds.previousElementSibling.hidden = true;   /* 隐藏旧单框行 */
+  } else {
+    $dtRounds.hidden = true;
+    $dtRounds.innerHTML = "";
+    $dtRounds.previousElementSibling.hidden = false;
+    dtSet($dtUser, us.length ? us[0] : "");
+  }
+  $detailMask.classList.add("show");
+}
+function closeDetail(){ $detailMask.classList.remove("show"); }
+
+$btnDetail.addEventListener("click", openDetail);
+document.getElementById("detailClose").addEventListener("click", closeDetail);
+$detailMask.addEventListener("click", function(e){ if (e.target === $detailMask) closeDetail(); });
+
+/* ================= 自动判定：模型反馈答案 ↔ 输入答案 =================
+   原型态没有真实模型语义，用「归一化 + 字符二元组重合度」模拟判定：
+   去空白/标点/大小写后完全一致 → 对；重合度 ≥ 0.82 → 对；其余 → 错；
+   答案或反馈为空 → 未判定（不给结论，等人工）。
+   判定只是给人工的初判，列表里随时可以改判。 */
+function pdNormText(s){
+  return String(s == null ? "" : s).toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/[。，、；：！？,.;:!?（）()「」【】\[\]"'“”‘’—\-_*#`>]/g, "");
+}
+function pdBigrams(s){
+  var m = {};
+  for (var i = 0; i < s.length - 1; i++){
+    var g = s.substr(i, 2);
+    m[g] = (m[g] || 0) + 1;
+  }
+  return m;
+}
+function pdSimilarity(a, b){
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.length < 2 || b.length < 2) return 0;
+  var ma = pdBigrams(a), mb = pdBigrams(b), inter = 0, na = 0, nb = 0, k;
+  for (k in ma) na += ma[k];
+  for (k in mb){
+    nb += mb[k];
+    if (ma[k]) inter += Math.min(ma[k], mb[k]);
+  }
+  return (2 * inter) / (na + nb);
+}
+function pdAutoJudge(ans, fb){
+  var a = pdNormText(ans), b = pdNormText(fb);
+  if (!a || !b) return "";
+  return pdSimilarity(a, b) >= 0.82 ? "right" : "wrong";
+}
+
+/* 原型态模拟模型输出：按「方案 + 问题」算出可复现的回答。
+   接入真实服务时，把这里换成 POST /api/chat 即可（见 promptdeck/server.py）。 */
+function pdHash(s){
+  var h = 5381;
+  s = String(s);
+  for (var i = 0; i < s.length; i++){ h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; }
+  return h % 100000;
+}
+function pdMockAnswer(q, ans, seed){
+  var a = String(ans == null ? "" : ans);
+  if (!a.trim()){
+    return "（模拟模型输出）关于「" + String(q || "").slice(0, 28)
+         + "」的回答：已知信息不足，建议补充业务上下文后再提问。";
+  }
+  if (pdHash(q + "||" + seed) % 100 < 62) return a;
+  var cut = Math.max(4, Math.floor(a.length * 0.5));
+  return a.slice(0, cut).replace(/[。，、；]$/, "") + "（回答不完整）";
+}
+
+/* ================= 开始调试：逐题跑一遍 + 进度条 ================= */
+function pdResetProgress(){
+  $progFill.style.width = "0%";
+  $progPct.textContent  = "0%";
+  $progTxt.textContent  = "正在调试 0/0";
+}
+function pdSetProgress(done, total){
+  var pct = total ? Math.round(done / total * 100) : 0;
+  $progFill.style.width = pct + "%";
+  $progPct.textContent  = pct + "%";
+  $progTxt.textContent  = "正在调试 " + done + "/" + total + (done >= total ? "（已完成）" : "");
+}
+
+/* 边跑边刷新单行的反馈 / 判断，避免整表重绘带来的闪动 */
+function pdPatchRow(t){
+  var tr = $tbody.querySelector('tr[data-id="' + t.id + '"]');
+  if (!tr) return;
+  var fb = tr.querySelector(".col-feedback");
+  if (fb) fb.innerHTML = '<div class="fb-cell">' + esc(t.fb) + '</div>';
+  var jd = tr.querySelector(".col-judge");
+  if (jd) jd.innerHTML = judgeHtml(t);
+  updateStat();
+}
+
+/* 数据层接线（第二次迭代）：一道题 = 两次调用
+     ① /api/chat —— 用选定方案的「模型 + API_key + 系统提示词」把题目当用户提示词发出去，
+        返回的文本就是「测试反馈答案」列（= 模型答案列）要显示的内容；
+     ② /api/judge —— 拿「标准答案 ↔ 模型答案」走固定判定模型（DeepSeek）做语义一致性判定，
+        结论写进「判断」列。判定模型调不动时该题只显示模型答案、判定留空（未判定）。 */
+function pdJudgeQuestion(t, out){
+  return fetch("/api/judge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ans: String(t.ans == null ? "" : t.ans), out: out })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    return { fb: out, ai: (res && res.ok && res.ai) ? res.ai : "", failed: false };
+  }).catch(function(){
+    return { fb: out, ai: "", failed: false };
+  });
+}
+
+function pdRunQuestion(t){
+  return fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      base_url: currentScheme.base,
+      api_key:  currentScheme.apiKey,
+      model:    currentScheme.model,
+      system:   currentScheme.sys,
+      rounds:   [String(t.q == null ? "" : t.q)]
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      return { fb: "（调用失败）" + ((res && res.error) || "未知错误"), ai: "", failed: true };
+    }
+    var out = (res.answers && res.answers.length) ? res.answers[0] : (res.text || "");
+    return pdJudgeQuestion(t, out);
+  }).catch(function(err){
+    return { fb: "（调用失败）" + err, ai: "", failed: true };
+  });
+}
+
+$btnDebug.addEventListener("click", function(){
+  if (debugging) return;
+  if (!currentScheme){ toast("请先在左侧选择提示词方案", "warn"); return; }
+  if (!tests.length){ toast("请先导入或添加测试问题", "warn"); return; }
+
+  debugging = true;
+  debugged  = true;                 /* 跑过一次后统计栏才开始出「准确率」 */
+  $prog.hidden = false;
+  pdResetProgress();
+  refreshView();
+
+  var total = tests.length, i = 0;
+  var hitRight = 0, hitWrong = 0, hitFail = 0;
+
+  function step(){
+    if (i >= total){
+      debugging = false;
+      pdSetProgress(total, total);
+      pdSave(tests);
+      refreshView();
+      toast("调试完成：共 " + total + " 题，AI 判对 " + hitRight + " 题、判错 " + hitWrong
+            + " 题" + (hitFail ? "，" + hitFail + " 题调用失败" : "") + "，可在列表里人工改判", "ok");
+      return;
+    }
+    var t = tests[i];
+    pdRunQuestion(t).then(function(r){
+      var old = t.ai;
+      /* 人工改判过的行（判定与上一轮 AI 结论不同）保留人工结论，其余跟随本轮 AI 判定 */
+      var manual = !!(old && t.judge && t.judge !== old);
+      t.fb = r.fb;
+      t.ai = r.ai;
+      if (!manual) t.judge = r.ai;
+      if (r.ai === "right") hitRight++;
+      else if (r.ai === "wrong") hitWrong++;
+      if (r.failed) hitFail++;
+
+      i++;
+      pdSetProgress(i, total);
+      pdSave(tests);
+      pdPatchRow(t);
+      step();
+    });
+  }
+  step();
+});
+
+/* ================= 保存到「测试结果列表」 =================
+   把本次测试的问题与判定打包成一条测试结果记录，写进 PD_RESULT_KEY，
+   与「测试结果列表」页同源（该页每条记录 { id, name, problems:[{ q, ans, out, ai, judge }] }，
+   其中 out = 本页的 fb「测试反馈答案」）。
+   同名方案（逐字相同）→ 覆盖那一条，保留它的 id 与位置；否则新增一条并置顶。
+   四个指标（题数 / 准确率 / 错误数 / 人工矫正数）不用存，结果页由 problems 实时算出。 */
+function pdReadResultsRaw(){
+  try{
+    var raw = window.localStorage.getItem(PD_RESULT_KEY);
+    if (raw === null || raw === "") return null;
+    var arr = JSON.parse(raw);
+    if (!arr || typeof arr.length !== "number") return null;
+    return arr;
+  } catch (e){ return null; }
+}
+
+function pdResNextId(list){
+  var mx = 0;
+  for (var i = 0; i < list.length; i++){
+    var n = Number(list[i] && list[i].id);
+    if (isFinite(n) && n > mx) mx = n;
+  }
+  return mx + 1;
+}
+
+function pdSaveResult(){
+  if (!currentScheme){ toast("请先在左侧选择提示词方案", "warn"); return; }
+  if (!tests.length){ toast("请先导入或添加测试问题", "warn"); return; }
+
+  var name = String(currentScheme.name || "");
+  var problems = [];
+  for (var i = 0; i < tests.length; i++){
+    var t = tests[i];
+    problems.push({
+      q:     String(t.q   == null ? "" : t.q),
+      ans:   String(t.ans == null ? "" : t.ans),
+      out:   String(t.fb  == null ? "" : t.fb),
+      ai:    (t.ai    === "right" || t.ai    === "wrong") ? t.ai    : "",
+      judge: (t.judge === "right" || t.judge === "wrong") ? t.judge : ""
+    });
+  }
+
+  /* 结果列表页还没被打开过 → 这个键还不存在，这里新建 */
+  var list = pdReadResultsRaw();
+  if (list === null) list = [];
+
+  var hit = -1;
+  for (var j = 0; j < list.length; j++){
+    if (String(list[j] && list[j].name) === name){ hit = j; break; }
+  }
+  if (hit >= 0){
+    list[hit].problems = problems;
+    if (!list[hit].id) list[hit].id = pdResNextId(list);
+  } else {
+    list.unshift({ id: pdResNextId(list), name: name, problems: problems });
+  }
+
+  var ok = false;
+  try{ window.localStorage.setItem(PD_RESULT_KEY, JSON.stringify(list)); ok = true; }catch (e){}
+  if (!ok){ toast("保存失败：当前环境无法写入本地存储", "warn"); return; }
+
+  toast((hit >= 0 ? "已更新" : "已保存")
+        + "到「测试结果列表」：" + name + "（共 " + problems.length + " 题）", "ok");
+
+  /* 数据层接线（第二次迭代）：同一次保存再落一份到数据库 ——
+     tst_rec 一条汇总（针对哪个方案 / 用哪把 key / 题数 / 准确率 / 错题数 / 矫正数）
+     + tst_rec_dtl 逐题明细（问题 / 标准答案 / 模型输出 / AI 判定 / 是否人工改判）。
+     本地那份仍然写，「测试结果列表」页继续可用；落库结果由服务端按明细现算。
+     失败只补一条提示，成功不额外打扰（页面原有的成功提示已经给过了）。 */
+  fetch("/api/rec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      planId:  currentScheme.id,
+      details: problems.map(function(p){
+        return { q: p.q, ans: p.ans, out: p.out, ai: p.ai, judge: p.judge };
+      })
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      toast("保存到数据库失败：" + ((res && res.error) || "未知错误"), "warn");
+    }
+  }).catch(function(){
+    toast("保存到数据库失败，请确认服务已启动", "warn");
+  });
+}
+
+$btnSave.addEventListener("click", pdSaveResult);
+
+/* ================= 侧边栏 =================
+   口径：一级菜单的展开 / 关闭只由「点击一级菜单名称」触发；点击二级菜单只做跳页与高亮，
+   不改任何一级菜单的开合状态。一级菜单一旦被点，就把**整栏**的开合快照存进 localStorage，
+   跳页时逐项还原 —— 所以换页面时侧栏不动，也不会被新页面的默认值改掉。 */
+var NAV_OPEN_KEY = "pd_nav_open";
+function navGroupName(g){
+  var el = g.querySelector(".nav-item > span:not(.ic)");
+  return el ? el.textContent.replace(/\s+/g, " ").trim() : "";
+}
+function navReadOpen(){
+  try { return JSON.parse(localStorage.getItem(NAV_OPEN_KEY)) || {}; } catch(e){ return {}; }
+}
+function navWriteOpen(map){
+  try { localStorage.setItem(NAV_OPEN_KEY, JSON.stringify(map)); } catch(e){}
+}
+/* 整栏开合快照：一级菜单被点后记下全部组的开合，跳页时逐项还原 */
+function navSnapshot(){
+  var map = {}, gs = document.querySelectorAll(".nav-group");
+  for (var i = 0; i < gs.length; i++){
+    var k = navGroupName(gs[i]);
+    if (k) map[k] = gs[i].classList.contains("open");
+  }
+  return map;
+}
+/* 载入：库里有记录的组按记录还原；没记录过的组保留本页默认（当前页所在组默认展开） */
+var navOpenMap = navReadOpen();
+document.querySelectorAll(".nav-group").forEach(function(g){
+  var k = navGroupName(g);
+  if (k && Object.prototype.hasOwnProperty.call(navOpenMap, k) === true){
+    g.classList.toggle("open", !!navOpenMap[k]);
+  }
+});
+document.querySelectorAll("[data-toggle]").forEach(function(h){
+  h.addEventListener("click", function(){
+    var g = h.closest(".nav-group");
+    if (!g || h !== g.querySelector(".nav-item")) return;   /* 只认一级菜单名称本身 */
+    g.classList.toggle("open");
+    navWriteOpen(navSnapshot());     /* 记下整栏开合：跳页后逐项保持，点二级菜单不改任何组 */
+  });
+});
+
+document.querySelectorAll("[data-nav]").forEach(function(el){
+  el.addEventListener("click", function(e){
+    if (el.classList.contains("active")) return;
+    e.preventDefault();
+    toast("原型演示：跳转至「" + el.getAttribute("data-nav") + "」页");
+  });
+});
+
+/* 移动端菜单 */
+var hamburger = document.getElementById("hamburger");
+var scrim = document.getElementById("scrim");
+hamburger.addEventListener("click", function(){ document.body.classList.toggle("nav-open"); });
+scrim.addEventListener("click", function(){ document.body.classList.remove("nav-open"); });
+
+/* ================= 轻提示 ================= */
+function toast(msg, type){
+  var el = document.createElement("div");
+  el.className = "toast" + (type ? " " + type : "");
+  el.textContent = msg;
+  document.getElementById("toastWrap").appendChild(el);
+  setTimeout(function(){
+    el.style.transition = "opacity .2s ease,transform .2s ease";
+    el.style.opacity = "0";
+    el.style.transform = "translateX(10px)";
+    setTimeout(function(){ el.remove(); }, 220);
+  }, 2200);
+}
+
+/* ================= 回填入口守卫（第十八轮 · 四页同源） =================
+   口径：带 ?pdEntry=<目标页>&pdSchemeId=<id> 进来时，只有「目标页」自己认领这次编辑；
+   本页若不是目标页（用户从构造页又点走了），就地作废一次性入口 —— 清掉 sessionStorage
+   的待回填快照与「方案库」里该方案的 pendingEdit 标记，顺带清掉第十二轮遗留的
+   pd_retest_scheme / pd_retest_flag，避免下一次进构造页被再入口捡回旧的编辑态。 */
+(function(){
+  var params = null;
+  try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
+  if (!params) return;
+
+  var entry = params.get("pdEntry") || "";
+  var sid   = params.get("pdSchemeId") || "";
+  if (!entry && !sid) return;
+
+  var here = String(location.pathname || "").split("/").pop();
+  if (entry && here === entry) return;   /* 本页就是目标页：交给本页各自的启动逻辑认领 */
+
+  try{
+    window.sessionStorage.removeItem("pd_edit_snapshot");
+    window.sessionStorage.removeItem("pd_edit_scheme");
+  }catch (e){}
+  if (sid !== ""){
+    try{
+      var arr = JSON.parse(window.localStorage.getItem("pd_prompt_schemes") || "[]");
+      if (arr && typeof arr.length === "number"){
+        var hit = false;
+        for (var i = 0; i < arr.length; i++){
+          if (String(Number(arr[i] && arr[i].id)) === String(Number(sid)) && arr[i] && arr[i].pendingEdit){
+            delete arr[i].pendingEdit; hit = true;
+          }
+        }
+        if (hit) window.localStorage.setItem("pd_prompt_schemes", JSON.stringify(arr));
+      }
+    }catch (e){}
+  }
+  try{
+    window.localStorage.removeItem("pd_retest_scheme");
+    window.localStorage.removeItem("pd_retest_flag");
+  }catch (e){}
+})();
+
+/* ================= 跨页同步 =================
+   两个页面同时打开时，「提示词构造」页点「保存」写入方案会触发 storage 事件，
+   这里收到后重载左栏方案下拉；测试问题列表有变化时同步刷新。 */
+window.addEventListener("storage", function(e){
+  if (e.key === PD_SCHEME_KEY){
+    loadSchemes();
+    toast("已同步「提示词构造」页保存的提示词方案", "ok");
+    return;
+  }
+  if (e.key !== PD_TEST_KEY) return;
+  tests = pdRead();
+  var alive = {};
+  for (var i = 0; i < tests.length; i++) alive[tests[i].id] = 1;
+  var next = {};
+  for (var k in selected){ if (alive[k]) next[k] = true; }
+  selected = next;
+  refreshView();
+  toast("已同步测试问题列表", "ok");
+});
+
+/* ================= 启动：方案列表来自后端 /api/tp =================
+   方案是异步拉回来的，所以原型的启动收尾（「重新测试」入口 + render）挪进 then 里。 */
+loadSchemes().then(function(){
+
+/* 「测试结果列表」页点「重新测试」跳过来时：按它带过来的方案名自动选中该方案，
+   让左栏补齐方案内容；那批问题已由该页写进 PD_TEST_KEY，这里不覆盖。 */
+(function(){
+  var want = null;
+  try{ want = window.localStorage.getItem(PD_RETEST_SCHEME_KEY); }catch (e){ want = null; }
+  if (want === null || want === "") return;
+  try{ window.localStorage.removeItem(PD_RETEST_SCHEME_KEY); }catch (e){}
+  try{ window.localStorage.removeItem(PD_RETEST_FLAG); }catch (e){}   /* 跳转标记一次性用掉，别留残余 */
+  for (var i = 0; i < schemes.length; i++){
+    if (String(schemes[i].name) === String(want)){
+      lastFilledScheme = schemes[i];      /* 标记为「已填充」，pickScheme 就不再覆盖问题列表 */
+      pickScheme(i);
+      break;
+    }
+  }
+})();
+
+  render();
+  if (!pdStoreOK){
+    toast("当前环境无法持久化（localStorage 不可用），刷新后新增内容会丢失", "warn");
+  }
+});
+</script>
+</body>
+</html>

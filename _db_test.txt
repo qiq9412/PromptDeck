@@ -1,0 +1,13 @@
+DB 文件: D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db
+首启灌入演示数据: 0 条
+全量查询: 17 条
+首条: {'id': 1, 'plat_name': 'OpenAI', 'base_url': 'https://api.openai.com/v1', 'comp_name': 'OpenAI, Inc.', 'home_url': 'https://openai.com'}
+搜索 platform='deep': ['DeepSeek 深度求索', 'deepseek', 'deepseek']
+搜索 company='腾讯': ['腾讯混元 Hunyuan']
+搜索 platform='deep' + company='月之': []
+新增一条 id=40，总数=18
+回读新增行: {'id': 40, 'plat_name': '测试平台 · UnitTest', 'base_url': 'https://api.unit.test/v1', 'comp_name': '测试公司', 'home_url': 'https://unit.test'}
+挂载模型后 mdl 行数: 1
+删除该服务器: 影响 1 行；mdl 级联后残留 0 行
+删除后总数: 17（应回到 12）
+空 ids 删除: 0（应为 0）

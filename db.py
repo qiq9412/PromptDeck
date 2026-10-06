@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """PromptDeck 数据层。
 
-数据库：SQLite，库名 prompt_test_DB（落盘为 data/prompt_test_DB.db）。
+数据库：SQLite，落盘为 data/prompt_test_DB_twe.db（全项目统一到这一个库文件）。
 表结构由用户提供的 MySQL 建表语句等价转换而来：
     - AUTO_INCREMENT  -> INTEGER PRIMARY KEY AUTOINCREMENT
     - VARCHAR / DECIMAL -> TEXT / DECIMAL（SQLite 为动态类型，仅作亲和性声明）
@@ -14,10 +14,11 @@ import sqlite3
 from contextlib import contextmanager
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 默认落在 data/prompt_test_DB.db（本地开发口径不变）。
+# 默认落在 data/prompt_test_DB_twe.db —— 与 Django 版（config/settings.py）同一个库文件，
+# 换库后全项目只认这一个口径；旧库 data/prompt_test_DB.db 原样保留，只作对照，不再被任何代码引用。
 # 部署到容器时用环境变量 PROMPTDECK_DB 指到持久化目录（如创空间的 /mnt/workspace/…），
 # 因为容器默认文件系统每次重启都会还原。
-DB_PATH = os.environ.get("PROMPTDECK_DB") or os.path.join(BASE_DIR, "data", "prompt_test_DB.db")
+DB_PATH = os.environ.get("PROMPTDECK_DB") or os.path.join(BASE_DIR, "data", "prompt_test_DB_twe.db")
 
 # =========================================
 # 建表语句（对应 srv / mdl 两张表）

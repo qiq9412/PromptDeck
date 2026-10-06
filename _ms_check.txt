@@ -1,52 +1,59 @@
-==========================================================================
-[0] 平台硬性要求（静态检查）
-  [PASS] Dockerfile 在项目根目录
-  [PASS] ms_deploy.json：sdk_type=docker  docker
-  [PASS] ms_deploy.json：port=7860  7860
-  [PASS] 启动命令监听 0.0.0.0
-  [PASS] 启动端口为 7860
-  [PASS] 未使用平台禁用的 8080 端口
-  [PASS] EXPOSE 7860
-  [PASS] 未读取平台保留请求头（入站 Authorization / X-modelscope- / X-studio-）
-  [PASS] 依赖仅运行必需（无 streamlit / 无 websocket-client）
-  [PASS] 持久化：容器内库路径指向 /mnt/workspace
-  [PASS] 容器内库路径可用环境变量覆盖
-  [PASS] 页面接口调用全为相对路径（与部署前缀无关）  相对 13 处 / 绝对残留 []
-  [PASS] 页面导航链接为相对路径
-  [PASS] 首页跳转为相对路径
+==============================================================================
+PromptDeck · 打包产物「容器语义」彩排（直接执行产物里的 start.sh）
+  包目录：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck_modelscope
+  系统 Python：C:\Users\Lenovo\AppData\Local\Programs\Python\Python314\python.exe
+==============================================================================
 
-[1] 按容器入口方式启动产物（0.0.0.0:7860）
-  [PASS] 服务在 7860 启动成功
+■ [1] 上传包静态检查（复用 verify_upload.check_local）
+    · 种子库：17 服务器 / 45 模型 / 密钥 0 行
+    · 已用开发目录 settings.py 里读到的 1 个密钥值做全包比对
+    · 仓库根目录 12 项：.gitignore  .pd_modelscope_pack  Dockerfile  README.md  config  core  data  manage.py  ms_deploy.json  requirements.txt  start.sh  static
+    · 共 34 个文件，最大文件 158.9 KB
+  [PASS] 上传包口径全通过（结构 / 上线补丁 / 9 页 / 种子 / 无密钥）
+  [PASS] 能从开发目录 settings.py 读到密钥做比对（否则「无泄漏」是空断言）
 
-[2] 起子路径反代 /studio/app -> 后端 /（模拟平台前缀）
-  [PASS] 反代就绪
+■ [2] 冷启动：没有任何库 -> 用 data/seed.sqlite 建库
+  [PASS] 起始状态：库不存在
+  [PASS] 服务在 90 秒内起来（/api/health 返回 200）
+  [PASS] 持久化库已建出：prompt_test_DB.db
+  [PASS] 建出的库表结构完整（7 张业务表都在）
+  [PASS] 库里就是种子数据：srv=17 / mdl=45 / 密钥 0 行
+  [PASS] 库旁写下了种子版本标记 = d2ed42bb6714
 
-[3] 经前缀访问（模拟创空间线上）
-    GET /studio/app/ -> 307 Location='foundation1_models.html'
-  [PASS] 首页 307 跳转到相对地址  (307, 'foundation1_models.html')
-  [PASS] 经前缀能打开模型列表页  status=200
-    GET /studio/app/api/srv -> 200 共 17 行
-  [PASS] 经前缀能读服务器接口  rows=17
-    GET /studio/app/api/mdl -> 200 共 20 行
-  [PASS] 经前缀能读模型接口  rows=20
+■ [3] 应用：首页跳转 + 9 个页面 + 6 个接口
+  [PASS] 「/」是跳到页面的重定向（3xx）
+  [PASS] 跳转目标是**相对**路径 prompt.html（平台子路径前缀下才不错）
+  [PASS] 9 个页面全部 200 且 Content-Type 是 text/html、内容含关键词
+  [PASS] /api/health = ok
+  [PASS] /api/srv 返回 17 条且字段齐全
+  [PASS] /api/mdl 返回 45 条且字段齐全
+  [PASS] /api/tp 可访问（方案表；种子为空则给空列表）
+  [PASS] /api/rec 可访问（测试记录表）
+  [PASS] /api/schema 读到真实库结构（7 张业务表都在）
+  [PASS] /api/schema 报的行数与库内一致（srv=17 / mdl=45）
+  [PASS] 9 个页面的响应里没有任何明文密钥
+  [PASS] 运行日志显示监听 0.0.0.0:7861
 
-[4] 经前缀写入：新增平台/模型 -> 回读 -> 删除
-  [PASS] 经前缀新增服务器成功（201）  status=201 {"ok":true,"id":43}
-  [PASS] 经前缀新增模型成功（201）  status=201 {"ok":true,"id":34}
-  [PASS] 新模型已落库且可回读  [{'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824', 'type': '对话', 'inPrice': '1.5', 'outPrice': '3', 'unit': 'K', 'url': ''}]
-  [PASS] 回读字段与写入一致（类型/单价/单位/归属平台）  {'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824', 'type': '对话', 'inPrice': '1.5', 'outPrice': '3', 'unit': 'K', 'url': ''}
-  [PASS] 回读条数 == 原条数 + 1  21 vs 21
-  [PASS] 经前缀修改模型成功（PUT 被反代透传）  status=200 {"ok":true,"updated":1}
-  [PASS] 修改按主键落库且没新增行  [{'id': 34, 'srvId': 43, 'platform': 'MS校验平台-1790565824', 'cUrl': 'https://example.com', 'model': 'MS校验模型-1790565824-改', 'type': '对话', 'inPrice': '4.135', 'outPrice': '0.0005', 'unit': 'K', 'url': ''}]
-  [PASS] 改后名称生效  MS校验模型-1790565824-改
-  [PASS] 计费按原文保存（4.135 / 0.0005 未被四舍五入）  ('4.135', '0.0005')
-  [PASS] PUT 缺 id -> 400  status=400
-  [PASS] 经前缀删除模型成功  status=200
-  [PASS] 删除后条数回落  20
+■ [4] 子路径反代（模拟创空间把应用挂在 /studio/app/… 前缀下）
+  [PASS] 带前缀能打开页面（/studio/app/prompt.html）
+  [PASS] 带前缀能调接口（/studio/app/api/srv 返回 17 条）
+  [PASS] 带前缀时首页跳转仍是相对路径（浏览器会解析成 /studio/app/prompt.html）
+  [PASS] 页面里的接口地址确实是相对的（fetch("api/…）
 
-[5] 产物清洁度
-  [PASS] 不含开发期脚本 / 旧 Streamlit 版  ['.gitignore', '.pd_modelscope_pack', 'db.py', 'Dockerfile', 'ms_deploy.json', 'README.md', 'requirements.txt', 'server.py', 'start.sh', 'data\\prompt_test_DB.db', 'data\\seed.sqlite', 'static\\foundation1_models.html', 'static\\list_server.html', 'static\\model_add.html', 'static\\new_server.html', 'static\\prompt.html']
-  [PASS] 无超过 100MB 的文件（平台要求，否则需 Git LFS）  最大 69.5 KB
+■ [5] 旧版库自愈：只有 srv/mdl 的 Starlette 遗留库 -> 用种子重建
+  [PASS] 已就位一个旧版库（1 平台 / 1 模型 / 无 tst_* 表）
+  [PASS] 旧版库被判不可用并换成种子数据（srv 1->17 / mdl 1->45）
+  [PASS] start.sh 日志里说明了重建原因
 
-==========================================================================
-结果：全部通过
+■ [6] 种子版本变化 -> 刷新持久化库 + 旧库备份 .bak
+  [PASS] start.sh 已按新版种子重建持久化库（版本标记写成新值）
+  [PASS] 哨兵行被新种子冲掉（说明真的刷新了）
+  [PASS] 旧库已备份为 .bak，且备份里保留了哨兵行
+  [PASS] 版本标记已更新为新种子版本
+
+■ [7] PROMPTDECK_SEED_REFRESH=off -> 不动线上库
+  [PASS] 设了 off 之后线上库原样保留（哨兵行还在，且服务照常起来）
+
+==============================================================================
+结果：PASS=32  FAIL=0
+==============================================================================

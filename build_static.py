@@ -1,12 +1,16 @@
 # -*- coding: utf-8 -*-
-"""从工作区根目录的原型页生成 Starlette 静态页面（static/）。
+"""从工作区根目录的原型页生成 Django 托管的静态页面（static/）。
 
 产出：
-    static/foundation1_models.html ← foundation1_models.html 原型 + fetch 数据层（本次重点）
-    static/model_add.html          ← model_add.html          原型 + fetch 数据层（本次重点）
+    static/foundation1_models.html ← foundation1_models.html 原型 + fetch 数据层
+    static/model_add.html          ← model_add.html          原型 + fetch 数据层
     static/list_server.html        ← list_server.html        原型 + fetch 数据层
     static/new_server.html         ← new_server.html         原型 + fetch 数据层
-    static/prompt.html             ← prompt.html             原型 + fetch 数据层（本次重点）
+    static/prompt.html             ← prompt.html             原型 + fetch 数据层
+    static/prompt_scheme.html      ← prompt_scheme.html      原型 + fetch 数据层
+    static/prompt_test.html        ← prompt_test.html        原型 + fetch 数据层（第二次迭代接线）
+    static/Table_Structure_Extraction.html ← 同名原型        原型 + fetch 数据层（第二次迭代接线）
+    另有一页原样托管（VERBATIM）：prompt_test_results_list
 
 硬约束（用户要求，逐条落实）：
   1. 字段 / 风格 / 排版 / CSS 零改动 -> <style> 段与 <body> 结构逐字节保留；
@@ -193,6 +197,59 @@ A_SAVE_NEW = r'''  if (!checkUrl($modelUrl)){
     setTimeout(function(){ window.location.href = "foundation1_models.html"; }, 700);
   });
 });
+'''
+
+# ---------------------------------------------------------------------
+# 「平台 / 官方名」下拉：选项改由服务器列表（srv）提供
+# ---------------------------------------------------------------------
+# 原型里这个下拉曾写死 4 个假平台（硅基流动 / OpenRouter / 魔搭社区 / OpenAI），
+# 会出现「服务器列表里没有、下拉里却有」的错位。现在原型把 <div class="combo-menu">
+# 清空，选项在页面运行时由 /api/srv 注入 —— 与「模型列表」页 initCombo(..., options)
+# 的做法一致（空容器 + 运行期生成，颜色同样按 DOTS 轮转）。
+# 注意顺序：本页 initCombo 会在初始化时固定选项集合，所以必须「先注入、再 initCombo」。
+A_COMBO_OLD = r'''initCombo("comboPlatform");   /* 可编辑 + 可输入自定义 */
+'''
+
+A_COMBO_NEW = r'''/* 平台 / 官方名：下拉选项来自服务器列表（/api/srv），与「服务器列表」页保持一致。
+   HTML 里不再写死平台项，避免出现「列表里没有、下拉里却有」的假选项。
+   本页 initCombo 在初始化时会固定选项集合，所以必须先注入选项、再初始化下拉。 */
+var PD_DOTS = ["d-purple", "d-mint", "d-orange", "d-gold"];
+
+function pdEsc(s){
+  return String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/* 用服务器列表里的「平台 / 官方名」生成选项：顺序与服务器列表一致，同名只留一条 */
+function fillPlatformMenu(servers){
+  var seen = {}, names = [];
+  for (var i = 0; i < servers.length; i++){
+    var n = servers[i] && servers[i].platform;
+    if (n && !seen[n]){ seen[n] = 1; names.push(n); }
+  }
+  var html = "";
+  for (var j = 0; j < names.length; j++){
+    html += '<div class="combo-item" data-value="' + pdEsc(names[j]) + '" role="option">'
+         +  '<i class="tag-dot ' + PD_DOTS[j % PD_DOTS.length] + '"></i>' + pdEsc(names[j]) + '</div>';
+  }
+  document.getElementById("menuPlatform").innerHTML = html;
+}
+
+function boot(){
+  fetch("/api/srv").then(function(r){ return r.json(); }).then(function(rows){
+    fillPlatformMenu(rows || []);
+    initCombo("comboPlatform");   /* 可编辑 + 可输入自定义 */
+  }).catch(function(){
+    /* 接口不可用时保留空下拉（会显示「无匹配选项，可直接使用当前输入」），仍可手输平台名 */
+    initCombo("comboPlatform");
+    toast("加载服务器列表失败，请确认服务已启动", "warn");
+  });
+}
+boot();
 '''
 
 
@@ -461,6 +518,63 @@ PB_BOOT_NEW = "  }, 2200);\n}\n\n" + PB_DATA_LAYER + "\n"
 PB_RUN_HEAD_OLD = r'''/* ================= 调试 ================= */
 function estTokens(s){ return Math.ceil((s || "").length / 2); }
 function fmtTokens(n){ return (n || 0).toLocaleString("en-US"); }
+
+/* ===== 链接模型 / 多轮输出（09-29 新增） =====
+   原型页没有后端，用一次定时器模拟「链接模型 -> 返回结果」的往返；口径与应用侧一致：
+     · 链接中   输出框显示「正在链接模型」，同一次调试未返回前不接受重复点击；
+     · 多轮会话 按「【第 N 轮】」逐轮标注每一轮的模型回答；
+     · 链接失败 输出框整体转红字（.is-error）并写明失败原因，三项费用指标清零。
+   演示失败分支：地址栏加 ?pdFail=401（可选 401/403/404/429/500/timeout），
+   或在控制台执行 PD_FORCE_FAIL = "自定义原因"。不加参数即链接成功。 */
+var pbLinking = false;
+var pbRunSeq  = 0;
+var PB_FAIL_MAP = {
+  "401": "HTTP 401 Unauthorized —— API_key 无效或已过期",
+  "403": "HTTP 403 Forbidden —— 该 API_key 无权访问此模型",
+  "404": "HTTP 404 Not Found —— Base_url 或模型名称不存在",
+  "429": "HTTP 429 Too Many Requests —— 请求频率或额度已超限",
+  "500": "HTTP 500 Internal Server Error —— 服务商侧异常，请稍后重试",
+  "timeout": "请求超时 —— 30s 内未收到服务器响应，请检查 Base_url 与网络"
+};
+function pbFailReason(){
+  if (typeof window.PD_FORCE_FAIL === "string" && window.PD_FORCE_FAIL) return window.PD_FORCE_FAIL;
+  var m = /[?&]pdFail=([^&#]+)/.exec(window.location.search || "");
+  if (!m) return "";
+  var k = decodeURIComponent(m[1]);
+  return PB_FAIL_MAP[k] || ("请求失败 —— " + k);
+}
+/* 模拟单轮回答（接入真实服务后，这段由后端返回的真实文本取代） */
+function pbAnswer(round){
+  var ctx = round > 1 ? "，并带入前 " + (round - 1) + " 轮上下文" : "";
+  return "模拟输出 · " + currentModel.name + "\n" +
+    "已按服务器 " + currentServer.name + "（" + currentServer.base + "）提交第 " + round + " 轮请求" + ctx + "。\n" +
+    "这里是第 " + round + " 轮的模型示例回复内容，用于演示调试结果的展示效果；接入真实服务后，此区域显示模型的实际返回文本。";
+}
+/* 多轮时按「第 N 轮」逐轮标注；单轮时直接就是回答原文（口径与应用侧一致） */
+function pbRenderRounds(answers){
+  if (!answers || !answers.length) return "";
+  if (answers.length === 1) return answers[0];
+  var parts = [];
+  for (var i = 0; i < answers.length; i++){
+    parts.push("【第 " + (i + 1) + " 轮】\n" + answers[i]);
+  }
+  return parts.join("\n\n");
+}
+/* 链接失败的文案：已拿到的回答接在前面，失败原因写在后面 */
+function pbFailText(reason, answers){
+  var tail = "链接模型失败\n\n原因：" + reason;
+  return (answers && answers.length) ? (pbRenderRounds(answers) + "\n\n" + tail) : tail;
+}
+/* 原型按字符数估算 token；接入真实服务后改用后端返回的真实 usage */
+function pbFillMetrics(inTokens, outTokens){
+  document.getElementById("uIn").textContent    = fmtTokens(inTokens) + " tokens";
+  document.getElementById("uOut").textContent   = fmtTokens(outTokens) + " tokens";
+  document.getElementById("uTotal").textContent = fmtTokens(inTokens + outTokens) + " tokens";
+  document.getElementById("mIn").textContent    = "¥" + fmtNum(inTokens  / 1000 * currentModel.inPrice);
+  document.getElementById("mOut").textContent   = "¥" + fmtNum(outTokens / 1000 * currentModel.outPrice);
+  document.getElementById("mTotal").textContent = "¥" + fmtNum(inTokens  / 1000 * currentModel.inPrice
+                                                            + outTokens / 1000 * currentModel.outPrice);
+}
 '''
 
 PB_RUN_HEAD_NEW = r'''/* ================= 调试 ================= */
@@ -497,31 +611,44 @@ function pdFillMetrics(inTokens, outTokens){
 }
 '''
 
-PB_RUN_OLD = r'''  var inTokens = estTokens(sys) + estTokens(userAll);
-  var outText =
-    "（模拟输出 · " + currentModel.name + "）\n\n" +
-    "已按服务器 " + currentServer.name + "（" + currentServer.base + "）发起一次调试请求。\n" +
-    "会话轮次：" + (1 + rounds) + " 轮    " +
-    "系统提示词 " + sys.length + " 字符 ｜ 用户提示词 " + user.length + " 字符\n\n" +
-    "这里是模型的示例回复内容，用于演示调试结果的展示效果。接入真实服务后，此区域将显示模型的实际返回文本。";
-  var outTokens = estTokens(outText);
+PB_RUN_OLD = r'''  /* 本次调试的轮次数：第 1 轮 + 多轮会话时追加的每一轮 */
+  var roundCount = 1;
+  if ($multi.checked) roundCount += tas.length;
 
-  var inCost  = inTokens  / 1000 * currentModel.inPrice;
-  var outCost = outTokens / 1000 * currentModel.outPrice;
+  /* 链接守卫：同一次调试未返回前拦住重复点击（按钮外观与文案均不改） */
+  if (pbLinking){ toast("正在调用模型，请稍候…", "warn"); return; }
 
-  $modelOut.value = outText;
-  document.getElementById("uIn").textContent    = fmtTokens(inTokens) + " tokens";
-  document.getElementById("uOut").textContent   = fmtTokens(outTokens) + " tokens";
-  document.getElementById("uTotal").textContent = fmtTokens(inTokens + outTokens) + " tokens";
-  document.getElementById("mIn").textContent    = "¥" + fmtNum(inCost);
-  document.getElementById("mOut").textContent   = "¥" + fmtNum(outCost);
-  document.getElementById("mTotal").textContent = "¥" + fmtNum(inCost + outCost);
+  var myRun = ++pbRunSeq;
+  pbLinking = true;
+  $modelOut.classList.remove("is-error");
+  $modelOut.value = "正在链接模型";            /* 链接中的占位文案 */
 
-  toast("调试完成", "ok");
+  /* 原型无真实后端：用一次定时器模拟「链接 -> 返回」的往返 */
+  setTimeout(function(){
+    if (myRun !== pbRunSeq) return;            /* 已被新的一次调试取代，丢弃这次回填 */
+    pbLinking = false;
+
+    var reason = pbFailReason();
+    if (reason){                               /* 链接失败：红字 + 原因 + 指标清零 */
+      $modelOut.value = pbFailText(reason, null);
+      $modelOut.classList.add("is-error");
+      pbFillMetrics(0, 0);
+      toast("模型调用失败", "warn");
+      return;
+    }
+
+    var answers = [];
+    for (var k = 0; k < roundCount; k++) answers.push(pbAnswer(k + 1));
+    $modelOut.value = pbRenderRounds(answers);
+    pbFillMetrics(estTokens(sys) + estTokens(userAll), estTokens($modelOut.value));
+
+    toast("调试完成", "ok");
+  }, 900);
 '''
 
 PB_RUN_NEW = r'''  /* 数据层接线：发起一次真实调用（后端转发给模型），输出区显示模型的实际返回文本。
-     点击后先把输出区置为「正在链接模型」占位，避免上一轮答案一直挂到新返回到达 */
+     点击后先把输出区置为「正在链接模型」占位，避免上一轮答案一直挂到新返回到达；
+     链接失败时输出框整体转红字（.is-error）并写明失败原因，三项费用指标清零。 */
   if (pdRunning){ toast("正在调用模型，请稍候…", "warn"); return; }
 
   var roundTexts = [user];
@@ -531,6 +658,7 @@ PB_RUN_NEW = r'''  /* 数据层接线：发起一次真实调用（后端转发�
   }
 
   pdRunning = true;
+  $modelOut.classList.remove("is-error");
   $modelOut.value = "正在链接模型";
   toast("正在调用模型…", "ok");
 
@@ -547,22 +675,762 @@ PB_RUN_NEW = r'''  /* 数据层接线：发起一次真实调用（后端转发�
   }).then(function(r){ return r.json(); }).then(function(res){
     pdRunning = false;
     if (!res || !res.ok){
-      var failMsg = "（第 " + ((res && res.round) || 1) + " 轮调用失败）" + ((res && res.error) || "未知错误");
+      /* 已拿到的轮次照常展示，失败信息接在后面（与原型 pbFailText 同口径） */
+      var failMsg = "链接模型失败\n\n原因：（第 " + ((res && res.round) || 1) + " 轮调用失败）"
+                  + ((res && res.error) || "未知错误");
       $modelOut.value = pdRenderAnswers(res && res.answers, failMsg);
+      $modelOut.classList.add("is-error");
       pdFillMetrics(0, 0);
       toast("模型调用失败", "warn");
       return;
     }
     $modelOut.value = pdRenderAnswers(res.answers, "");
+    $modelOut.classList.remove("is-error");
     pdFillMetrics(res.prompt_tokens || 0, res.completion_tokens || 0);
     toast("调试完成", "ok");
   }).catch(function(err){
     pdRunning = false;
-    $modelOut.value = "（调用失败）" + err;
+    $modelOut.value = "链接模型失败\n\n原因：" + err;
+    $modelOut.classList.add("is-error");
     pdFillMetrics(0, 0);
     toast("模型调用失败", "warn");
   });
 '''
+
+
+# =====================================================================
+# 「保存」按钮：由「只写本地存储」改成「落服务端 tp 表 + 跳提示词方案列表页」
+# ---------------------------------------------------------------------
+# 原型口径一行不动：先弹「保存提示词方案」弹窗（系统提示词必填、方案命名必填
+# 都由前端拦），确认后按「编辑流 id 覆盖 → 同名覆盖 → 新增」定位目标。
+# 本次只把落点从 localStorage 换成 tp 表，成功后跳回 prompt_scheme.html。
+# =====================================================================
+PB_SAVE_OLD = r'''  if (!pdWriteSchemes(list)){
+    toast("保存失败：当前环境无法写入本地存储", "warn");
+    return;
+  }
+  closeSaveModal();
+  if (targetId && hit > -1){
+    toast("已覆盖提示词方案「" + name + "」，相关测试结果已同步", "ok");
+  } else {
+    toast(hit > -1 ? "已覆盖同名方案「" + name + "」"
+                   : "已保存提示词方案「" + name + "」，可到「提示词测试」页选用", "ok");
+  }
+  pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+});
+'''
+
+PB_SAVE_NEW = r'''  /* 本地存储镜像：真源是服务端 tp 表，这里仍写一份到本地，让「提示词测试」页
+     左栏下拉继续可用（下一轮把它也接上就可以删掉这一段）。 */
+  pdWriteSchemes(list);
+  closeSaveModal();
+  toast("正在保存提示词方案「" + name + "」…", "ok");
+
+  /* ★ 第二次迭代：把这一份方案 POST 到服务端 tp 表，成功后再跳「提示词方案」列表页。
+     覆盖口径（编辑流按 id 覆盖 / 其余同名覆盖）由服务端复用原型逻辑判定，因此
+     非编辑流刻意不带 id —— 本地算出来的 mx+1 只是本地镜像的下标，不是库里的主键。 */
+  var postBody = {};
+  for (var pk in item){ postBody[pk] = item[pk]; }
+  if (!targetId){ delete postBody.id; }
+
+  fetch("/api/tp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(postBody)
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok) throw new Error((res && res.error) || "服务端未返回 ok");
+
+    /* 用服务端返回的主键回写本地镜像，避免两处 id 对不上 */
+    if (res.id){
+      var arr = pdReadSchemes();
+      for (var z = 0; z < arr.length; z++){
+        if (arr[z] && String(arr[z].name) === name) arr[z].id = res.id;
+      }
+      pdWriteSchemes(arr);
+    }
+    pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+
+    var okMsg = (res.result === "updated")
+      ? "已覆盖提示词方案「" + name + "」，相关测试结果已同步"
+      : (res.result === "overwritten"
+          ? "已覆盖同名方案「" + name + "」"
+          : "已保存提示词方案「" + name + "」，可到「提示词测试」页选用");
+    toast(okMsg, "ok");
+    setTimeout(function(){ window.location.href = "prompt_scheme.html"; }, 600);
+  }).catch(function(err){
+    toast("保存失败：" + err, "warn");
+  });
+});
+'''
+
+
+# =====================================================================
+# 提示词方案列表 prompt_scheme.html
+# ---------------------------------------------------------------------
+# 第二次迭代（Django 版）口径变化：方案库的真源从浏览器本地存储挪到服务端 tp 表
+#   · 列表  GET    /api/tp
+#   · 删除  DELETE /api/tp
+#   · 保存  POST   /api/tp（在 prompt.html 点「保存」时发起）
+# 本地存储降级成「镜像」，只为让本轮尚未接后端的页面（提示词测试页的左栏下拉）
+# 还能读到同一批方案 —— 下一轮把它也接上即可删掉镜像那几行。
+# 页面 HTML 与 CSS 一个字不动，脚本只改「数据从哪儿来、删完往哪儿存」。
+# =====================================================================
+SCH_SCHEMES_OLD = r'''var schemes = (function(){
+  var raw = null;
+  try{ raw = window.localStorage.getItem(PD_SCHEME_KEY); }catch (e){ raw = null; }
+  if (raw === null){
+    try{ window.localStorage.setItem(PD_SCHEME_KEY, JSON.stringify(SEED_SCHEMES)); }catch (e){}
+  }
+  pdUpgradeSchemeApiKeys();   /* 旧数据补 apiKey（键已存在时不播种，这里兜住） */
+  var stored = pdReadSchemes();
+  var src = (stored !== null) ? stored : SEED_SCHEMES;
+  var out = [];
+  for (var i = 0; i < src.length; i++){
+    var s = pdNormScheme(src[i]);
+    if (!s.id) s.id = i + 1;
+    out.push(s);
+  }
+  return out;
+})();
+'''
+
+SCH_SCHEMES_NEW = r'''/* 数据源：方案库的真源在服务端三张表（tst_plan / tst_plan_prompt / tst_api_key），
+   列表由 pdBoot() 拉取后填入。库里没有方案时，页面按原型渲染那 1 行空态占位。 */
+var schemes = [];
+'''
+
+# 注：原型里「/* 启动 */ + render();」出现两次（1388 与 1519 行各一处，
+# 原型自带的重复，不属本次改动范围），所以锚点往前多带两行把它定位到第一处。
+SCH_BOOT_OLD = r'''  if (d){ pdGotoEdit(Number(d.getAttribute("data-edit"))); return; }
+});
+
+/* ================= 启动 ================= */
+render();
+'''
+
+SCH_BOOT_NEW = r'''  if (d){ pdGotoEdit(Number(d.getAttribute("data-edit"))); return; }
+});
+
+/* ================= 启动：数据来自后端 /api/tp（第二次迭代） =================
+   页面 HTML 与 CSS 一个字不动，只换数据来源。本地存储再写一份镜像，
+   供本轮尚未接入后端的页面（提示词测试页的左栏下拉）读取。 */
+function apiTpList(){
+  return fetch("/api/tp").then(function(r){ return r.json(); });
+}
+function apiTpDelete(ids){
+  return fetch("/api/tp", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: ids })
+  });
+}
+
+function pdBoot(){
+  apiTpList().then(function(list){
+    list = (list && typeof list.length === "number") ? list : [];
+    var out = [];
+    for (var i = 0; i < list.length; i++){
+      var s = pdNormScheme(list[i]);
+      if (!s.id) s.id = i + 1;
+      out.push(s);
+    }
+    schemes = out;
+    selected = {};
+    view = schemes.slice();
+    pdWriteSchemes(schemes);        /* 本地存储镜像（下一轮接入后即可删掉） */
+    refreshTypeOptions();
+    applyFilter();
+  }).catch(function(){
+    render();
+    toast("加载提示词方案失败，请确认服务已启动", "warn");
+  });
+}
+pdBoot();
+'''
+
+SCH_DEL_OLD = r'''  closeModal();
+  pdPersist();
+  refreshTypeOptions();
+  applyFilter();
+  toast("已删除 " + ids.length + " 个提示词方案", "ok");
+});
+'''
+
+SCH_DEL_NEW = r'''  closeModal();
+  pdPersist();
+  refreshTypeOptions();
+  applyFilter();
+  toast("已删除 " + ids.length + " 个提示词方案", "ok");
+  /* 数据层接线：同步删掉服务端 tp 表里的这几条，删完回读一次（以库为准） */
+  apiTpDelete(ids).then(function(){ pdBoot(); })
+                  .catch(function(){ toast("删除未同步到服务端，请确认服务已启动", "warn"); });
+});
+'''
+
+
+# =====================================================================
+# 提示词测试 prompt_test.html（第二次迭代起接线）
+# ---------------------------------------------------------------------
+# 本页 HTML 与 CSS 一个字不动，只换三处「数据从哪儿来、改完往哪儿存」：
+#   1. 左栏方案下拉：本地存储 → GET /api/tp（方案库的真源在服务端三张表）
+#   2. 「开始调试」：原型态的 pdMockAnswer / pdAutoJudge 模拟 →
+#      逐题调 /api/chat（用选定方案的 模型 + API_key + 系统提示词，题目当用户提示词）
+#      → 模型回答写「测试反馈答案」列 → 再调 /api/judge 得到「判断」列的 AI 结论
+#   3. 「保存结果」：原本只写本地存储 → 同时 POST /api/rec（tst_rec + tst_rec_dtl）
+# 原型里那套模拟函数（pdMockAnswer / pdAutoJudge / pdHash…）**保留不删** ——
+# 原型页没有后端，打开原型本身仍按原样演示；这与 prompt.html 的 pbAnswer 同款处理。
+# =====================================================================
+PT_SCHEMES_OLD = r'''/* 重载方案列表（打开页面 / 另一个标签页保存过 / 存储变化时） */
+function loadSchemes(){
+  var keep = currentScheme ? String(currentScheme.name) : "";
+  schemes = pdReadSchemes();
+  currentScheme = null;
+  for (var i = 0; i < schemes.length; i++){
+    if (String(schemes[i].name) === keep){ currentScheme = schemes[i]; break; }
+  }
+  buildSchemeMenu();
+  fillSchemeView();
+}
+'''
+
+PT_SCHEMES_NEW = r'''/* 重载方案列表（打开页面 / 另一个标签页保存过 / 存储变化时）。
+   第二次迭代：方案库的真源在服务端三张表（tst_plan / tst_plan_prompt / tst_api_key），
+   这里改成 GET /api/tp 拉取。字段名与原型的方案对象一字不差，所以下游
+   buildSchemeMenu / fillSchemeView / pickScheme 全部零改动。
+   返回 Promise —— 启动段据此等方案到位，再跑「重新测试」与 render()。 */
+function pdNormScheme(s){
+  return {
+    id:        s.id,
+    name:      String(s.name      || ""),
+    server:    String(s.server    || ""),
+    base:      String(s.base      || ""),
+    model:     String(s.model     || ""),
+    modelType: String(s.modelType || ""),
+    sys:       String(s.sys       || ""),
+    user:      (s.user && typeof s.user.length === "number") ? s.user : [],
+    multi:     !!s.multi,
+    apiKey:    String(s.apiKey || "")
+  };
+}
+
+function loadSchemes(){
+  var keep = currentScheme ? String(currentScheme.name) : "";
+  return fetch("/api/tp").then(function(r){ return r.json(); }).then(function(list){
+    list = (list && typeof list.length === "number") ? list : [];
+    var out = [];
+    for (var i = 0; i < list.length; i++){
+      var s = pdNormScheme(list[i]);
+      if (!s.name) continue;
+      if (!s.id) s.id = i + 1;
+      out.push(s);
+    }
+    schemes = out;
+    currentScheme = null;
+    for (var j = 0; j < schemes.length; j++){
+      if (String(schemes[j].name) === keep){ currentScheme = schemes[j]; break; }
+    }
+    buildSchemeMenu();
+    fillSchemeView();
+  }).catch(function(){
+    toast("加载提示词方案失败，请确认服务已启动", "warn");
+  });
+}
+'''
+
+PT_BOOT_OLD = r'''/* ================= 启动 ================= */
+loadSchemes();
+'''
+
+PT_BOOT_NEW = r'''/* ================= 启动：方案列表来自后端 /api/tp =================
+   方案是异步拉回来的，所以原型的启动收尾（「重新测试」入口 + render）挪进 then 里。 */
+loadSchemes().then(function(){
+'''
+
+PT_TAIL_OLD = r'''render();
+if (!pdStoreOK){
+  toast("当前环境无法持久化（localStorage 不可用），刷新后新增内容会丢失", "warn");
+}
+'''
+
+PT_TAIL_NEW = r'''  render();
+  if (!pdStoreOK){
+    toast("当前环境无法持久化（localStorage 不可用），刷新后新增内容会丢失", "warn");
+  }
+});
+'''
+
+PT_RUN_OLD = r'''$btnDebug.addEventListener("click", function(){
+  if (debugging) return;
+  if (!currentScheme){ toast("请先在左侧选择提示词方案", "warn"); return; }
+  if (!tests.length){ toast("请先导入或添加测试问题", "warn"); return; }
+
+  debugging = true;
+  debugged  = true;                 /* 跑过一次后统计栏才开始出「准确率」 */
+  $prog.hidden = false;
+  pdResetProgress();
+  refreshView();
+
+  var total = tests.length, i = 0, seed = pdHash(currentScheme.name);
+  var hitRight = 0, hitWrong = 0;
+
+  function step(){
+    if (i >= total){
+      debugging = false;
+      pdSetProgress(total, total);
+      pdSave(tests);
+      refreshView();
+      toast("调试完成：共 " + total + " 题，AI 判对 " + hitRight + " 题、判错 " + hitWrong
+            + " 题，可在列表里人工改判", "ok");
+      return;
+    }
+    var t   = tests[i];
+    var fb  = pdMockAnswer(t.q, t.ans, seed + i);
+    var ai  = pdAutoJudge(t.ans, fb);
+    var old = t.ai;
+    /* 人工改判过的行（判定与上一轮 AI 结论不同）保留人工结论，其余跟随本轮 AI 判定 */
+    var manual = !!(old && t.judge && t.judge !== old);
+    t.fb   = fb;
+    t.ai   = ai;
+    if (!manual) t.judge = ai;
+    if (ai === "right") hitRight++;
+    else if (ai === "wrong") hitWrong++;
+
+    i++;
+    pdSetProgress(i, total);
+    pdSave(tests);
+    pdPatchRow(t);
+    setTimeout(step, 160);
+  }
+  step();
+});
+'''
+
+PT_RUN_NEW = r'''/* 数据层接线（第二次迭代）：一道题 = 两次调用
+     ① /api/chat —— 用选定方案的「模型 + API_key + 系统提示词」把题目当用户提示词发出去，
+        返回的文本就是「测试反馈答案」列（= 模型答案列）要显示的内容；
+     ② /api/judge —— 拿「标准答案 ↔ 模型答案」走固定判定模型（DeepSeek）做语义一致性判定，
+        结论写进「判断」列。判定模型调不动时该题只显示模型答案、判定留空（未判定）。 */
+function pdJudgeQuestion(t, out){
+  return fetch("/api/judge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ans: String(t.ans == null ? "" : t.ans), out: out })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    return { fb: out, ai: (res && res.ok && res.ai) ? res.ai : "", failed: false };
+  }).catch(function(){
+    return { fb: out, ai: "", failed: false };
+  });
+}
+
+function pdRunQuestion(t){
+  return fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      base_url: currentScheme.base,
+      api_key:  currentScheme.apiKey,
+      model:    currentScheme.model,
+      system:   currentScheme.sys,
+      rounds:   [String(t.q == null ? "" : t.q)]
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      return { fb: "（调用失败）" + ((res && res.error) || "未知错误"), ai: "", failed: true };
+    }
+    var out = (res.answers && res.answers.length) ? res.answers[0] : (res.text || "");
+    return pdJudgeQuestion(t, out);
+  }).catch(function(err){
+    return { fb: "（调用失败）" + err, ai: "", failed: true };
+  });
+}
+
+$btnDebug.addEventListener("click", function(){
+  if (debugging) return;
+  if (!currentScheme){ toast("请先在左侧选择提示词方案", "warn"); return; }
+  if (!tests.length){ toast("请先导入或添加测试问题", "warn"); return; }
+
+  debugging = true;
+  debugged  = true;                 /* 跑过一次后统计栏才开始出「准确率」 */
+  $prog.hidden = false;
+  pdResetProgress();
+  refreshView();
+
+  var total = tests.length, i = 0;
+  var hitRight = 0, hitWrong = 0, hitFail = 0;
+
+  function step(){
+    if (i >= total){
+      debugging = false;
+      pdSetProgress(total, total);
+      pdSave(tests);
+      refreshView();
+      toast("调试完成：共 " + total + " 题，AI 判对 " + hitRight + " 题、判错 " + hitWrong
+            + " 题" + (hitFail ? "，" + hitFail + " 题调用失败" : "") + "，可在列表里人工改判", "ok");
+      return;
+    }
+    var t = tests[i];
+    pdRunQuestion(t).then(function(r){
+      var old = t.ai;
+      /* 人工改判过的行（判定与上一轮 AI 结论不同）保留人工结论，其余跟随本轮 AI 判定 */
+      var manual = !!(old && t.judge && t.judge !== old);
+      t.fb = r.fb;
+      t.ai = r.ai;
+      if (!manual) t.judge = r.ai;
+      if (r.ai === "right") hitRight++;
+      else if (r.ai === "wrong") hitWrong++;
+      if (r.failed) hitFail++;
+
+      i++;
+      pdSetProgress(i, total);
+      pdSave(tests);
+      pdPatchRow(t);
+      step();
+    });
+  }
+  step();
+});
+'''
+
+PT_SAVE_OLD = r'''  var ok = false;
+  try{ window.localStorage.setItem(PD_RESULT_KEY, JSON.stringify(list)); ok = true; }catch (e){}
+  if (!ok){ toast("保存失败：当前环境无法写入本地存储", "warn"); return; }
+
+  toast((hit >= 0 ? "已更新" : "已保存")
+        + "到「测试结果列表」：" + name + "（共 " + problems.length + " 题）", "ok");
+}
+'''
+
+PT_SAVE_NEW = r'''  var ok = false;
+  try{ window.localStorage.setItem(PD_RESULT_KEY, JSON.stringify(list)); ok = true; }catch (e){}
+  if (!ok){ toast("保存失败：当前环境无法写入本地存储", "warn"); return; }
+
+  toast((hit >= 0 ? "已更新" : "已保存")
+        + "到「测试结果列表」：" + name + "（共 " + problems.length + " 题）", "ok");
+
+  /* 数据层接线（第二次迭代）：同一次保存再落一份到数据库 ——
+     tst_rec 一条汇总（针对哪个方案 / 用哪把 key / 题数 / 准确率 / 错题数 / 矫正数）
+     + tst_rec_dtl 逐题明细（问题 / 标准答案 / 模型输出 / AI 判定 / 是否人工改判）。
+     本地那份仍然写，「测试结果列表」页继续可用；落库结果由服务端按明细现算。
+     失败只补一条提示，成功不额外打扰（页面原有的成功提示已经给过了）。 */
+  fetch("/api/rec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      planId:  currentScheme.id,
+      details: problems.map(function(p){
+        return { q: p.q, ans: p.ans, out: p.out, ai: p.ai, judge: p.judge };
+      })
+    })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      toast("保存到数据库失败：" + ((res && res.error) || "未知错误"), "warn");
+    }
+  }).catch(function(){
+    toast("保存到数据库失败，请确认服务已启动", "warn");
+  });
+}
+'''
+
+
+# =====================================================================
+# 数据库表结构提取 Table_Structure_Extraction.html（第二次迭代接线）
+# ---------------------------------------------------------------------
+# 页面本体（字段 / 风格 / 排版 / CSS / 控件外观 / 必填校验）一字未动，只换数据来源：
+#   · SCHEMA / RELATIONS 两份演示数据下线，改由 /api/schema（应用库）/ POST /api/schema
+#     （上传 .sqlite）/ POST /api/schema/connect（真连 MySQL·PG·SQL Server·Oracle·Db2）灌入；
+#   · 「提取表结构 / 重新生成」前先向 /api/schema/desc 要「库里没有注释」的表 /
+#     字段说明（服务端调 DeepSeek 生成），补完再按原型原有口径渲染；
+#   · 结构**按库**挂（db.map / db.rels），一次连多个库时同名表不会串；
+#   · 服务端不做二次校验：连不上就把驱动的真实报错原样提示，不伪造表树。
+# =====================================================================
+TS_SCHEMA_OLD = re.compile(
+    r"/\* 原型演示用的表结构：字段名 / 逻辑类型 / 字段描述 \*/\n"
+    r"var SCHEMA = \[.*?\n\];", re.S)
+
+TS_SCHEMA_NEW = '''/* 二次迭代：原型的演示表结构已下线，改由后端 /api/schema 灌入真实库结构。
+   字段说明分两路（见 core/schema.py）：库里写了注释的直接用，没有的调 DeepSeek 补。 */
+var SCHEMA = [];'''
+
+TS_REL_OLD = re.compile(
+    r"/\* 表间关系：\[从表, 从字段, 主表, 主字段, 关系说明\] \*/\n"
+    r"var RELATIONS = \[.*?\n\];", re.S)
+
+TS_REL_NEW = '''/* 表间关系：[从表, 从字段, 主表, 主字段, 关系说明]
+   二次迭代：改由后端提供（取自真实外键），原型演示数据已下线。
+   第二批：外键按「每个已连接的库」分别保存（见 pdFillDb / collectRels），
+   这里的全局 RELATIONS 只作兜底。 */
+var RELATIONS = [];
+
+/* ============ 真实库结构（二次迭代 · 第二批新增的数据层） ============
+   后端返回的统一形状（/api/schema、POST /api/schema、/api/schema/connect 都一样）：
+     { ok, name, kind,
+       tables:    [{ name, rows, desc, descFrom, cols:[[字段名, 类型关键字, 字段说明, 真实类型]] }],
+       relations: [[从表, 从字段, 主表, 主字段, 关系说明]] }
+   · cols[j][1] === "pk" 表示主键 —— 原型据此标「主键」，并用 TYPE_MAP 把它映射成
+     该方言下的真实类型（MySQL→BIGINT / Oracle→NUMBER …）；
+   · 其余列给库里声明的真实类型原文，原型 colType() 查不到就原样返回
+     （所以 VARCHAR(255) / DECIMAL(10,2) 这类会透传，不会被改写）。
+   结构**按库**挂在 db.map / db.rels 上（支持一次连多个库，两个库有同名表也不会串），
+   于是原型的 schemaOf / collectRels / buildSchemaHtml / buildText 照常工作。 */
+function pdFillDb(db, sch){
+  db.schema = sch || { tables: [], relations: [] };
+  db.map = {};
+  db.rels = db.schema.relations || [];
+  var i;
+  for (i = 0; i < (db.schema.tables || []).length; i++){
+    db.map[db.schema.tables[i].name] = db.schema.tables[i];
+  }
+  db.tables = mockTables(db.kind, db.name, db.schema.tables || []);
+}
+
+/* 「提取表结构」前，把本次勾选到的表里「库里没有注释」的部分交给服务端补说明
+   （服务端调 DeepSeek）。哪张表 / 哪个字段进 payload，由 needDesc / need 决定，
+   所以库里本来就有注释的一律不重发、不覆盖。 */
+function pdFetchDesc(sel){
+  var payload = [], names = [], i, j, k;
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, sch = schemaOf(sel[i].t.name, db);
+    var need = [], cols = [], missing = false;
+    for (j = 0; j < sch.cols.length; j++){
+      cols.push([sch.cols[j][0], colType(db.kind, sch.cols[j][1])]);
+      if (!String(sch.cols[j][2] || "").length){ need.push(sch.cols[j][0]); missing = true; }
+    }
+    var noTableDesc = !String(sch.desc || "").length;
+    if (noTableDesc) missing = true;
+    if (missing){
+      payload.push({ name: sch.name, needDesc: noTableDesc, need: need, cols: cols });
+    }
+    for (k = 0; k < names.length; k++){ if (names[k] === db.name) break; }
+    if (k === names.length) names.push(db.name);
+  }
+  if (!payload.length) return Promise.resolve({ ok: true, tables: [], skipped: true });
+  return fetch("/api/schema/desc", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ db: names.join(" + "), tables: payload })
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok) return null;
+    pdMergeDesc(d.tables || [], sel);
+    return d;
+  }, function(){ return null; });
+}
+
+/* 把服务端生成的说明并回**对应那个库**的结构 —— **只填空的**，库里已有的注释一律不覆盖。 */
+function pdMergeDesc(list, sel){
+  var by = {}, i, j;
+  for (i = 0; i < list.length; i++){ by[list[i].name] = list[i]; }
+  for (i = 0; i < sel.length; i++){
+    var db = sel[i].db, nm = sel[i].t.name;
+    var tgt = (db.map && db.map[nm]) || null, src = by[nm];
+    if (!tgt || !src) continue;
+    if (!String(tgt.desc || "").length && src.desc) tgt.desc = src.desc;
+    var cm = {};
+    for (j = 0; j < (src.cols || []).length; j++){ cm[src.cols[j].name] = src.cols[j].desc; }
+    for (j = 0; j < tgt.cols.length; j++){
+      var one = cm[tgt.cols[j][0]];
+      if (one && !String(tgt.cols[j][2] || "").length) tgt.cols[j][2] = one;
+    }
+  }
+}
+
+/* 真连一个数据库（二次迭代 · 第二批）：把连接弹窗里的信息交给后端，
+   由后端用真实驱动连上去读结构（MySQL / PostgreSQL / SQL Server / Oracle / Db2）。
+   服务端**不做二次校验** —— 连不上就把驱动的真实报错原样提示出来，不伪造表树。 */
+function pdConnectDb(kind, cfg, name){
+  toast("正在连接 " + kind + " 数据库…", "");
+  return fetch("/api/schema/connect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(cfg)
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok){ toast((d && d.error) || ("连接 " + kind + " 失败"), "warn"); return null; }
+    var db = addDb(name, kind, true, d);
+    toast("已连接数据库：" + name + "（" + ((d.tables || []).length) + " 张表）", "ok");
+    return db;
+  }, function(){
+    toast("连接失败，请确认服务已启动", "warn");
+    return null;
+  });
+}'''
+
+TS_MOCK_OLD = '''function mockTables(kind, name){
+  var s = kind + "|" + name, seed = 0, i;
+  for (i = 0; i < s.length; i++){ seed = (seed * 31 + s.charCodeAt(i)) % 99991; }
+  var out = [];
+  for (i = 0; i < SCHEMA.length; i++){
+    out.push({ name: SCHEMA[i].name, rows: ((seed * (i + 7) + i * 613) % 9800) + 96, checked: false });
+  }
+  return out;
+}'''
+
+TS_MOCK_NEW = '''/* 二次迭代（第二批）：表清单来自后端灌进来的「本库结构」，行数用库里真实行数 */
+function mockTables(kind, name, sch){
+  var out = [], i;
+  for (i = 0; i < (sch || []).length; i++){
+    out.push({ name: sch[i].name, rows: sch[i].rows || 0, checked: false });
+  }
+  return out;
+}'''
+
+# ⚠️ addDb 必须**原地替换**（不能像别处那样在别处新增一个同名函数）：
+#    原型里 addDb 在 mockTables 之后，函数声明是「后写的赢」，
+#    新增的那个会被原版直接盖掉 —— 实测表现为左栏 0 张表（踩过一次）。
+TS_ADDB_OLD = '''function addDb(name, kind, silent){
+  dbs.push({ id: nextDbId++, name: name, kind: kind, collapsed: false, tables: mockTables(kind, name) });
+  renderTree();
+  if (!silent) toast("已连接数据库：" + name, "ok");
+}'''
+
+TS_ADDB_NEW = '''/* 二次迭代（第二批）：按库保存结构（db.map / db.rels）——
+   支持一次连多个库；两个库有同名表也不会互相串数据。 */
+function addDb(name, kind, silent, sch){
+  var db = { id: nextDbId++, name: name, kind: kind, collapsed: false,
+             tables: [], map: {}, rels: [] };
+  dbs.push(db);
+  pdFillDb(db, sch);
+  renderTree();
+  if (!silent) toast("已连接数据库：" + name, "ok");
+  return db;
+}'''
+
+TS_BOOT_OLD = '''/* ================= 启动 ================= */
+initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
+
+/* 演示用种子：默认已连接一个 SQLite 数据库，页面开箱即可体验「勾选 → 提取」
+   （不需要的话删掉这一行即可，页面回到「先连接数据库」的初始态） */
+addDb("demo_shop.sqlite", "SQLite", true);
+
+resetSchema();'''
+
+TS_BOOT_NEW = '''/* ================= 启动 ================= */
+initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
+
+/* 二次迭代（第二批）：打开页面先连上后端自己的应用库（SQLite，真实结构），
+   其余 5 种类型由用户从「连接数据库」弹窗**真连**（见 pdConnectDb）。
+   「演示种子」换成「真实结构」，字段 / 排版 / CSS 一字未动。
+   说明文字不在这一步生成 —— 点「提取表结构」时才调 DeepSeek 补，且只补勾选到的表。 */
+function pdBoot(){
+  fetch("/api/schema").then(function(r){ return r.json(); }).then(function(d){
+    if (!d || !d.ok){ toast((d && d.error) || "读取库结构失败", "warn"); resetSchema(); return; }
+    addDb(d.name, d.kind, true, d);
+    resetSchema();
+  }, function(){
+    toast("读取库结构失败，请确认服务已启动", "warn");
+    resetSchema();
+  });
+}
+pdBoot();'''
+
+TS_EXTRACT_OLD = '''$btnExtract.addEventListener("click", function(){
+  var sel = selection();
+  if (!sel.length){ toast("请先勾选要提取的表", "warn"); return; }
+  renderSchema();
+  toast("已提取 " + sel.length + " 张表的表结构", "ok");
+});
+
+/* 重新生成：按当前勾选重跑一次（勾选没变时「提取表结构」按钮是灰的，这里可以强制重出） */
+$btnRegen.addEventListener("click", function(){
+  var sel = selection();
+  if (!sel.length){ toast("请先勾选要提取的表", "warn"); return; }
+  renderSchema();
+  toast("已重新生成 " + sel.length + " 张表的表结构", "ok");
+});'''
+
+TS_EXTRACT_NEW = '''/* 二次迭代：提取前先让服务端把「库里没有注释」的表 / 字段说明补上（调 DeepSeek），
+   补完再按原型原有口径渲染 —— 字段 / 排版 / CSS 一字未动。
+   模型不可用时只是说明为空，提取本身照常出结果。 */
+function pdRunExtract(word){
+  var sel = selection();
+  if (!sel.length){ toast("请先勾选要提取的表", "warn"); return; }
+  $btnExtract.disabled = true;
+  $btnRegen.disabled   = true;
+  toast("正在生成表结构说明…", "");
+  pdFetchDesc(sel).then(function(d){
+    renderSchema();
+    syncSchBtns();
+    toast(d ? (word + " " + sel.length + " 张表的表结构")
+            : (word + " " + sel.length + " 张表（说明未生成，模型不可用）"),
+          d ? "ok" : "warn");
+  });
+}
+
+$btnExtract.addEventListener("click", function(){ pdRunExtract("已提取"); });
+
+/* 重新生成：按当前勾选重跑一次（勾选没变时「提取表结构」按钮是灰的，这里可以强制重出） */
+$btnRegen.addEventListener("click", function(){ pdRunExtract("已重新生成"); });'''
+
+TS_FILE_OLD = '''$fileConfirm.addEventListener("click", function(){
+  if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
+  hideMask($fileMask);
+  addDb(pickedFile, "SQLite");
+});'''
+
+TS_FILE_NEW = '''$fileConfirm.addEventListener("click", function(){
+  if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
+  var f = $fileInput.files && $fileInput.files[0];
+  if (!f){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
+  /* 二次迭代：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端临时打开、
+     读出真实表结构（含外键）后回传；说明仍在「提取表结构」时由 DeepSeek 补。 */
+  var fd = new FormData();
+  fd.append("file", f);
+  hideMask($fileMask);
+  toast("正在读取数据库结构…", "");
+  fetch("/api/schema", { method: "POST", body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d || !d.ok){ toast((d && d.error) || "读取数据库结构失败", "warn"); return; }
+      addDb(d.name || f.name, d.kind || "SQLite", false, d);
+    }, function(){ toast("读取数据库结构失败，请确认服务已启动", "warn"); });
+});'''
+
+TS_CONN_OLD = '''  var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
+  hideMask($connMask);
+  addDb(name, kind);
+});'''
+
+TS_CONN_NEW = '''  var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
+  hideMask($connMask);
+  /* 二次迭代（第二批）：**真接驱动** —— 把弹窗里的连接信息交给后端，由后端用真实驱动
+     （MySQL = pymysql / PostgreSQL = psycopg2 / SQL Server = pymssql /
+       Oracle = oracledb / Db2 for LUW = ibm_db）连上去读真实表结构。
+     服务端**不做二次校验**：不查必填、不查端口格式，连不上就把驱动的真实报错原样提示。
+     URL 模式下端口 / 用户名 / 密码 / 库名都在连接串里，所以把 url 一起送过去。 */
+  pdConnectDb(kind, {
+    kind: kind, mode: connMode,
+    host: $inpAddr.value, port: $inpPort.value,
+    user: $inpUser.value, pwd: $inpPwd.value, dbname: $inpDbName.value,
+    url: $inpAddr.value
+  }, name);
+});'''
+
+
+TS_SCHEMAOF_OLD = '''function schemaOf(name){
+  for (var i = 0; i < SCHEMA.length; i++){ if (SCHEMA[i].name === name) return SCHEMA[i]; }
+  return { name:name, desc:"", cols:[] };
+}'''
+
+TS_SCHEMAOF_NEW = '''/* 二次迭代（第二批）：结构按库取（db.map）—— 一次连多个库时，同名表不会串；
+   没给 db（或该库里没有这张表）时回落到全局 SCHEMA。 */
+function schemaOf(name, db){
+  if (db && db.map && db.map[name]) return db.map[name];
+  for (var i = 0; i < SCHEMA.length; i++){ if (SCHEMA[i].name === name) return SCHEMA[i]; }
+  return { name:name, desc:"", cols:[] };
+}'''
+
+TS_RELS_OLD = '''    for (k = 0; k < RELATIONS.length; k++){
+      var r = RELATIONS[k];
+      if (g.names[r[0]] && g.names[r[2]]) out.push({ db: g.db, r: r });
+    }'''
+
+TS_RELS_NEW = '''    var rels = (g.db && g.db.rels) || RELATIONS;   /* 二次迭代（第二批）：外键按库取 */
+    for (k = 0; k < rels.length; k++){
+      var r = rels[k];
+      if (g.names[r[0]] && g.names[r[2]]) out.push({ db: g.db, r: r });
+    }'''
+
+# buildSchemaHtml / buildText 里同一行取结构的地方（两处，want=2）
+TS_SITEOF_OLD = "    var db = sel[i].db, tbl = sel[i].t, sch = schemaOf(tbl.name);"
+TS_SITEOF_NEW = "    var db = sel[i].db, tbl = sel[i].t, sch = schemaOf(tbl.name, db);"
 
 
 PATCHES = {
@@ -576,6 +1444,7 @@ PATCHES = {
     ],
     "model_add.html": [
         ("str", A_SAVE_OLD, A_SAVE_NEW, "add-1 保存落库"),
+        ("str", A_COMBO_OLD, A_COMBO_NEW, "add-2 平台下拉选项改由服务器列表提供"),
     ],
     "list_server.html": [
         ("re", re.compile(r"var servers = \[.*?\n\];", re.S), "var servers = [];", "srv-list-1 mock数组"),
@@ -595,21 +1464,59 @@ PATCHES = {
         ("str", PB_BOOT_OLD, PB_BOOT_NEW, "prompt-5 启动加载（数据来自 /api/*）"),
         ("str", PB_RUN_HEAD_OLD, PB_RUN_HEAD_NEW, "prompt-6 调试指标回填 + 并发守卫"),
         ("str", PB_RUN_OLD, PB_RUN_NEW, "prompt-7 调试改为调用真实模型"),
+        ("str", PB_SAVE_OLD, PB_SAVE_NEW, "prompt-8 保存落 tp 表 + 跳提示词方案列表页"),
+    ],
+    "prompt_scheme.html": [
+        ("str", SCH_SCHEMES_OLD, SCH_SCHEMES_NEW, "scheme-1 方案列表改由后端提供"),
+        ("str", SCH_BOOT_OLD, SCH_BOOT_NEW, "scheme-2 启动从 /api/tp 拉列表"),
+        ("str", SCH_DEL_OLD, SCH_DEL_NEW, "scheme-3 删除同步到 tp 表"),
+    ],
+    # 提示词测试：第二次迭代起接线（HTML / CSS 一字未动，只换数据层）
+    "prompt_test.html": [
+        ("str", PT_SCHEMES_OLD, PT_SCHEMES_NEW, "ptest-1 方案下拉改由 /api/tp 提供"),
+        ("str", PT_BOOT_OLD, PT_BOOT_NEW, "ptest-2 启动等方案到位"),
+        ("str", PT_TAIL_OLD, PT_TAIL_NEW, "ptest-3 启动收尾收进 then"),
+        ("str", PT_RUN_OLD, PT_RUN_NEW, "ptest-4 开始调试改调真实模型 + AI 判定"),
+        ("str", PT_SAVE_OLD, PT_SAVE_NEW, "ptest-5 保存结果落 tst_rec / tst_rec_dtl"),
+    ],
+    # 数据库表结构提取：第二次迭代起接线（HTML / CSS 一字未动，只换数据层）
+    "Table_Structure_Extraction.html": [
+        ("re", TS_SCHEMA_OLD, TS_SCHEMA_NEW, "ts-1 演示表结构下线，改由 /api/schema 灌入"),
+        ("re", TS_REL_OLD, TS_REL_NEW, "ts-2 演示关系下线 + 真实结构数据层（按库）"),
+        ("str", TS_MOCK_OLD, TS_MOCK_NEW, "ts-3 表清单按本库结构生成"),
+        ("str", TS_ADDB_OLD, TS_ADDB_NEW, "ts-3b addDb 原地改：按库保存结构"),
+        ("str", TS_BOOT_OLD, TS_BOOT_NEW, "ts-4 启动改连真实库"),
+        ("str", TS_EXTRACT_OLD, TS_EXTRACT_NEW, "ts-5 提取/重新生成先补说明再渲染"),
+        ("str", TS_FILE_OLD, TS_FILE_NEW, "ts-6 选文件改成真上传读结构"),
+        ("str", TS_CONN_OLD, TS_CONN_NEW, "ts-7 主机 / URL 连接改真接驱动"),
+        ("str", TS_SCHEMAOF_OLD, TS_SCHEMAOF_NEW, "ts-8 schemaOf 按库取结构"),
+        ("str", TS_RELS_OLD, TS_RELS_NEW, "ts-9 collectRels 外键按库取"),
+        ("str", TS_SITEOF_OLD, TS_SITEOF_NEW, "ts-10 两处取结构处传上 db", 2),
     ],
 }
 
-# 本期无「原样托管」页（prompt.html 已接入数据层）
-VERBATIM = []
+# 「原样托管」页：本轮不接后端，原样复制到 static/（侧栏跳转能正常打开）
+VERBATIM = [
+    "prompt_test_results_list.html",
+]
 
 
 def build(name, edits):
+    """按 edits 顺序给一页原型接线。
+
+    edit 是 4 元组 `(kind, old, new, label)`，或 5 元组多给一个 `want`（期望命中次数，
+    默认 1）。同一段字面在原型里出现多次、且**都要改**时用 5 元组（例如
+    `buildSchemaHtml` 与 `buildText` 里取结构的那一行完全一样）。
+    """
     with open(os.path.join(SRC_DIR, name), "r", encoding="utf-8") as fp:
         text = fp.read()
-    for kind, old, new, label in edits:
+    for edit in edits:
+        kind, old, new, label = edit[0], edit[1], edit[2], edit[3]
+        want = edit[4] if len(edit) > 4 else 1
         if kind == "re":
-            text = apply_re(text, old, new, label)
+            text = apply_re(text, old, new, label, want=want)
         else:
-            text = apply(text, old, new, label)
+            text = apply(text, old, new, label, want=want)
     return text
 
 
