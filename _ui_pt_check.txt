@@ -6,13 +6,13 @@ PromptDeck · 「提示词测试」页端到端校验（真实 Edge + CDP）
   [PASS] 自起的应用实例已就绪  http://127.0.0.1:8503
 
 ■ [1] 方案下拉的真源 = 后端 /api/tp
-  [PASS] POST /api/tp 造出临时方案  {'ok': True, 'id': 75, 'result': 'created'}
-  [PASS] 方案已落 tst_plan（带外键 srv_id）  srv_id=86
+  [PASS] POST /api/tp 造出临时方案  {'ok': True, 'id': 167, 'result': 'created'}
+  [PASS] 方案已落 tst_plan（带外键 srv_id）  srv_id=203
   [PASS] Edge devtools 已就绪  port=9351
     页面：http://127.0.0.1:8503/prompt_test.html
-  [PASS] 左栏方案下拉已由 /api/tp 渲染出选项  选项数=1 空态=''
-  [PASS] 能在下拉里选中刚建的方案  UI校验调试方案-786305
-  [PASS] 左栏回显模型 = 方案里的模型  ui-check-model-786305（文本生成）
+  [PASS] 左栏方案下拉已由 /api/tp 渲染出选项  选项数=2 空态=''
+  [PASS] 能在下拉里选中刚建的方案  UI校验调试方案-535479
+  [PASS] 左栏回显模型 = 方案里的模型  ui-check-model-535479（文本生成）
   [PASS] 左栏回显提示词含系统提示词  【系统提示词】 你是 UI 校验用的助手，只回答被问到的问题。  【用户提示词】 占位用户提示词
   [PASS] 选好方案后右栏解锁（不再置灰）  is-locked=False
 
@@ -23,8 +23,8 @@ PromptDeck · 「提示词测试」页端到端校验（真实 Edge + CDP）
   [PASS] 列表 3 行都在  行数=3
   [PASS] 每道题都真发了一次模型调用（3 次 /api/chat）  实测 3 次：['/v1/chat/completions', '/v1/chat/completions', '/v1/chat/completions']
   [PASS] 模型调用打到 {base_url}/chat/completions  ['/v1/chat/completions']
-  [PASS] 模型调用带的是方案的 API_key  ['Bearer sk-ui-check-786305']
-  [PASS] 模型调用带的是方案的模型名  ['ui-check-model-786305']
+  [PASS] 模型调用带的是方案的 API_key  ['Bearer sk-ui-check-535479']
+  [PASS] 模型调用带的是方案的模型名  ['ui-check-model-535479']
   [PASS] 模型调用是 stream=false 的同步请求
   [PASS] 模型调用带上了方案的系统提示词 + 题目当用户提示词  system='你是 UI 校验用的助手，只回答被问到的问题。'
   [PASS] 每道题一条消息（system + user），没有多带上下文  [2]
@@ -48,31 +48,31 @@ PromptDeck · 「提示词测试」页端到端校验（真实 Edge + CDP）
 
 ■ [6] 保存结果 -> tst_rec + tst_rec_dtl
   [PASS] tst_rec 写入 1 条记录  实测 1 条
-  [PASS] tst_rec.plan_id 指向本次调试的方案  plan_id=75
+  [PASS] tst_rec.plan_id 指向本次调试的方案  plan_id=167
   [PASS] tst_rec.q_cnt = 3  q_cnt=3
   [PASS] tst_rec.err_cnt = 1（AI 判错 1 道）  err_cnt=1
   [PASS] tst_rec.fix_cnt = 1（人工矫正 1 道）  fix_cnt=1
   [PASS] tst_rec.acc_rate = 66.67（与页面 67% 同口径）  acc_rate=66.67
-  [PASS] tst_rec.api_key_id 指向该方案自己的那把密钥  api_key_id=51
-  [PASS] tst_rec.test_time 已写入  2026-10-01 00:38:39
+  [PASS] tst_rec.api_key_id 指向该方案自己的那把密钥  api_key_id=166
+  [PASS] tst_rec.test_time 已写入  2026-10-09 16:44:54
   [PASS] tst_rec_dtl 写入 3 条逐题明细  实测 3 条
   [PASS] 明细 1：问题 / 标准答案 / 模型输出 逐项对上  问题一：一句话说明用途 | 模型回答：问题一：一句话说明用途 | 模型回答：问题一：一句话说明用途
   [PASS] 明细 1：AI 判定 right / 未人工改判  right / 0
   [PASS] 明细 2：AI 判定 wrong 且被人工改判（is_man_fix=1）  wrong / 1
   [PASS] 明细 3：没有标准答案 -> 判定为空、未改判  std='' ai=None fix=0
   [PASS] 明细 3：模型输出仍然落了库  模型回答：问题三：还没有标准答案
-  [PASS] GET /api/rec 能读回这条记录  条数=1
+  [PASS] GET /api/rec 能读回这条记录  条数=2
 
 ■ [7] JS 异常
     页面 error：[]；CDP 捕获异常：0 条
   [PASS] 无页面 JS 异常
 
 ■ [8] 收尾：库回到基线
-  [PASS] srv 回到基线  17 -> 17
-  [PASS] mdl 回到基线  16 -> 16
-  [PASS] tst_plan 回到基线  0 -> 0
-  [PASS] tst_rec 回到基线  0 -> 0
-  [PASS] tst_rec_dtl 回到基线  0 -> 0
+  [PASS] srv 回到基线  2 -> 2
+  [PASS] mdl 回到基线  31 -> 31
+  [PASS] tst_plan 回到基线  1 -> 1
+  [PASS] tst_rec 回到基线  1 -> 1
+  [PASS] tst_rec_dtl 回到基线  30 -> 30
   [PASS] 判定密钥仍在库里（本轮没动它）
 
 ==============================================================================

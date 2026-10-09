@@ -903,6 +903,65 @@ $baseUrl.addEventListener("blur", function(){ checkUrl($baseUrl); });
 $homeUrl.addEventListener("blur", function(){ checkUrl($homeUrl); });
 $homeUrl.addEventListener("input", function(){ $homeUrl.classList.remove("is-invalid"); });
 
+/* ================= API 网址（base_url）查重（10-09 新增，用户点名） =================
+   口径（逐条选定）：
+     · 「重复」= 归一化后相同 —— **忽略大小写 + 忽略末尾斜杠**：域名本来就不区分大小写，
+       末尾多一条斜杠是常见手误，不该各留一份；
+     · 保存时比对：命中就停在「新增服务器」页并提示「已存在服务器API网址」，不落库、不跳列表页；
+     · 前端先拦一道，后端在 POST /api/srv 里还有一道兜底（换个入口也绕不过去）。
+   原型态用下面这份演示清单兜底（单开这一页也能看到提示）；应用侧由 build_static 把
+   pdUrlTaken 换成读 /api/srv 的真实清单，调用方一个字都不用改。 */
+/* 应用侧：演示清单下线（查重改读 /api/srv，见下面的 pdUrlTaken） */
+var PD_SRV_URLS = [];
+
+/* 归一化：去首尾空白 → 转小写 → 去掉末尾斜杠 */
+function pdNormUrl(u){
+  return String(u == null ? "" : u).trim().toLowerCase().replace(/\/+$/, "");
+}
+
+/* 查这个 base_url 是否已被占用：cb 收到「命中的那条原文」，没命中给 null。
+   ⚠️ 用回调而不是同步返回 —— 应用侧要先 fetch /api/srv 取真实清单，那是异步的。 */
+function pdUrlTaken(url, cb){
+  /* 数据层接线：演示清单下线，改读真实库（与「服务器列表」页同源）。
+     取不到列表就**不拦** —— 宁可放过去，也不让接口抖动把「保存」卡死；
+     真撞上了后端 POST /api/srv 那道兜底还拦得住。 */
+  fetch("/api/srv").then(function(r){ return r.json(); }).then(function(rows){
+    var norm = pdNormUrl(url), i, hit = null;
+    rows = rows || [];
+    for (i = 0; i < rows.length; i++){
+      if (pdNormUrl(rows[i] && rows[i].api) === norm){ hit = String(rows[i].api); break; }
+    }
+    cb(hit);
+  }).catch(function(){ cb(null); });
+}
+
+/* 保存动作（原型态：只提示 + 跳列表页）；应用侧由数据层接管成 POST /api/srv */
+function pdSaveServer(){
+  /* 数据层接线：先落库，再返回列表。
+     ⚠️ 后端在 POST /api/srv 里还兜了一道 base_url 查重（命中已有网址回 409）。
+        前端 pdUrlTaken 已经先拦过；这里再判一次是为了「别的入口 / 手调接口」也拦得住，
+        提示文案与前端保持同一个口径。 */
+  fetch("/api/srv", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      plat_name: $platform.value.trim(),
+      comp_name: document.getElementById("company").value.trim(),
+      base_url:  $baseUrl.value.trim(),
+      home_url:  $homeUrl.value.trim()
+    })
+  }).then(function(r){
+    if (r.status === 409){                       /* 撞网址：停在本页，不落库也不跳列表 */
+      $baseUrl.classList.add("is-invalid");
+      toast("已存在服务器API网址，请更换后再保存", "warn");
+      $baseUrl.focus();
+      return;
+    }
+    toast("服务器已保存，正在返回列表…", "ok");
+    setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
+  });
+}
+
 /* ================= 必填校验（平台 / 官方名、API 网址） ================= */
 function checkRequired(el){
   var ok = !!el.value.trim();
@@ -936,19 +995,15 @@ document.getElementById("serverForm").addEventListener("submit", function(e){
     $homeUrl.focus();
     return;
   }
-  /* 数据层接线：先落库，再返回列表 */
-  fetch("/api/srv", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      plat_name: $platform.value.trim(),
-      comp_name: document.getElementById("company").value.trim(),
-      base_url:  $baseUrl.value.trim(),
-      home_url:  $homeUrl.value.trim()
-    })
-  }).then(function(){
-    toast("服务器已保存，正在返回列表…", "ok");
-    setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
+  /* API 网址查重：命中就停在本页（不落库、不跳列表页） */
+  pdUrlTaken($baseUrl.value, function(taken){
+    if (taken){
+      $baseUrl.classList.add("is-invalid");
+      toast("已存在服务器API网址，请更换后再保存", "warn");
+      $baseUrl.focus();
+      return;
+    }
+    pdSaveServer();
   });
 });
 

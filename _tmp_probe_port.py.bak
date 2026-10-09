@@ -1,0 +1,25 @@
+# -*- coding: utf-8 -*-
+"""临时诊断：8502 到底有没有在跑、路由认不认新接口。"""
+import socket
+import urllib.error
+import urllib.request
+
+s = socket.socket()
+try:
+    s.connect(("127.0.0.1", 8502))
+    print("8502 可连")
+except Exception as e:
+    print("8502 连不上:", e)
+finally:
+    s.close()
+
+for path in ("/api/health", "/api/database/execute-sql"):
+    try:
+        with urllib.request.urlopen("http://127.0.0.1:8502" + path, timeout=5) as f:
+            body = f.read().decode("utf-8", "replace")
+            print("GET %-32s -> %s | %s" % (path, f.status, body[:120]))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        print("GET %-32s -> %s | %s" % (path, e.code, body[:300]))
+    except Exception as e:
+        print("GET %-32s -> 异常 %s" % (path, e))

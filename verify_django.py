@@ -11,7 +11,9 @@
     · 落库核对：断言以「库里的行」为准，不看页面（本项目踩过的坑）；
       **本次换库后核对的是新库的 tst_plan + tst_plan_prompt + tst_api_key 三张表**；
     · 新库表结构的 4 条拍板口径（加列 / CASCADE / 单价 TEXT / 旧 tp 表已废）；
-    · 上一版已有的 /api/srv、/api/mdl、/api/chat 换库后仍可用。
+    · 上一版已有的 /api/srv、/api/mdl、/api/chat 换库后仍可用；
+    · base_url 查重（10-09 用户点名）—— POST 撞已有网址回 409（归一化：忽略大小写 / 末尾斜杠），
+      PUT 排除自己那条（否则改名称也会被自己判重）；用例自清理，收尾 srv 回基线。
 
 第二次迭代补的两块（「提示词测试」页）：
     · /api/judge —— 判定密钥必须落 tst_api_key（plan_id 为 NULL）、且不写死在源码里；
@@ -32,11 +34,13 @@
 变的只有「落库核对」那一段读的表，外加 3.5 / 4 / 5 三块新接口。
 """
 import argparse
+import importlib
 import json
 import os
 import sqlite3
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.request
 
@@ -127,6 +131,13 @@ def db_has_table(name):
                             (name,)).fetchone()[0] > 0
 
 
+def db_count_like(table, column, pattern):
+    """按 LIKE 计数（表名 / 列名由调用方写死，pattern 走参数绑定）。"""
+    with sqlite3.connect(DB_PATH) as conn:
+        return conn.execute("SELECT COUNT(*) FROM %s WHERE %s LIKE ?" % (table, column),
+                            (pattern,)).fetchone()[0]
+
+
 def db_plan(plan_id):
     """把一个方案的完整落库形态从新库三张表拼出来。
 
@@ -206,10 +217,11 @@ def db_rec(rec_id):
 
 
 def cleanup():
-    """清掉本次校验写进去的 E2E 供应商（连带它的模型）。按名字精确删，幂等。"""
+    """清掉本次校验写进去的 E2E 供应商（连带它的模型）+ base_url 查重用例。按名字精确删，幂等。"""
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("DELETE FROM srv WHERE plat_name = ?", (E2E_SRV,))
+        conn.execute("DELETE FROM srv WHERE plat_name LIKE 'E2E 查重%'")
         conn.commit()
 
 
@@ -439,6 +451,53 @@ def main():
             any(str(r.get("inPrice", "")).endswith(".00") for r in mdl),
             "样例 %s" % [(r.get("model"), r.get("inPrice")) for r in mdl[:2]])
 
+    # ---------------------------------------------------------- 2.1 base_url 查重
+    # 10-09 用户点名：「服务器 API 网址（base_url）不可重复」，前端提示 + 后端兜底。
+    # 这里只打后端那一层；前端那一层在 verify_ui.py [19] 里验。
+    print("\n■ 2.1 /api/srv 的 base_url 查重（10-09 用户点名）")
+    dup_stamp = str(int(time.time()))[-6:]
+    dup_a = "https://e2e-dup-%s.example.com/v1" % dup_stamp
+    dup_b = "https://e2e-dup-%s-b.example.com/v1" % dup_stamp
+    n_srv = db_count("srv")
+
+    code, ra = jreq("POST", "%s/api/srv" % base,
+                    {"plat_name": "E2E 查重A-%s" % dup_stamp, "base_url": dup_a})
+    id_a = ra.get("id") if isinstance(ra, dict) else None
+    chk("POST 新增（网址没被占用）-> 201", code == 201 and ra.get("ok"), "HTTP %s / %s" % (code, ra))
+    code, rb = jreq("POST", "%s/api/srv" % base,
+                    {"plat_name": "E2E 查重B-%s" % dup_stamp, "base_url": dup_b})
+    id_b = rb.get("id") if isinstance(rb, dict) else None
+    chk("POST 新增第二条（另一个网址）-> 201", code == 201 and rb.get("ok"), "HTTP %s / %s" % (code, rb))
+
+    # 撞网址：只差**大小写 + 末尾斜杠**，归一化后是同一条 —— 这正是选定的判定口径
+    code, dup = jreq("POST", "%s/api/srv" % base,
+                     {"plat_name": "E2E 查重C-%s" % dup_stamp, "base_url": dup_a.upper() + "/"})
+    chk("POST 撞已有网址（仅大小写 / 末尾斜杠不同）-> 409",
+        code == 409 and isinstance(dup, dict) and dup.get("error") == "已存在服务器API网址",
+        "HTTP %s / %s" % (code, dup))
+    chk("409 里带回了撞上的那条（dupId / dupUrl）",
+        isinstance(dup, dict) and dup.get("dupId") == id_a and dup.get("dupUrl") == dup_a, dup)
+    chk("被拦下的那次没有落库（srv 恰好 +2）", db_count("srv") == n_srv + 2, "库 %d" % db_count("srv"))
+    chk("被拦下的那条也进了库才算漏 —— 确认没写进去",
+        not db_count_like("srv", "plat_name", "E2E 查重C-" + dup_stamp + "%"),
+        "E2E 查重C 不应存在")
+
+    # 修改：不排除自己那条的话，改别的字段也会被自己判成重复
+    code, r = jreq("PUT", "%s/api/srv" % base,
+                   {"id": id_a, "plat_name": "E2E 查重A改-%s" % dup_stamp,
+                    "base_url": dup_a.upper() + "/", "comp_name": "", "home_url": ""})
+    chk("PUT 保留自己的网址（只是大小写 / 末尾斜杠不同）-> 200（排除自己那条）",
+        code == 200 and r.get("ok"), "HTTP %s / %s" % (code, r))
+    code, r = jreq("PUT", "%s/api/srv" % base,
+                   {"id": id_a, "plat_name": "E2E 查重A改-%s" % dup_stamp,
+                    "base_url": dup_b, "comp_name": "", "home_url": ""})
+    chk("PUT 改成别人占着的网址 -> 409",
+        code == 409 and r.get("error") == "已存在服务器API网址", "HTTP %s / %s" % (code, r))
+
+    jreq("DELETE", "%s/api/srv" % base, {"ids": [id_a, id_b]})
+    chk("清掉本次查重用例 -> srv 回到跑之前（自清理）",
+        db_count("srv") == n_srv, "库 %d" % db_count("srv"))
+
     # ---------------------------------------------------------- 3. /api/tp CRUD
     print("\n■ 3. /api/tp（提示词方案 · 落 tst_plan 三张表）")
     code, lst = jreq("GET", "%s/api/tp" % base)
@@ -456,9 +515,16 @@ def main():
             bool(lst[0].get("name")) and bool(lst[0].get("server")),
             "%s / %s" % (lst[0].get("name"), lst[0].get("server")))
         multi_rows = [r for r in lst if r.get("multi")]
-        chk("多轮方案（user 多于 1 条）能从提示词表还原成 multi=true",
-            all(len(r["user"]) > 1 for r in multi_rows) and bool(multi_rows),
-            "多轮方案 %d 条：%s" % (len(multi_rows), [r["name"] for r in multi_rows]))
+        # ⚠️ 开发库是用户自己在用的，多轮方案**可能一条都没有**（基线一律现场取，不写死）。
+        #    有就逐条验「user 确实多于 1 条」；一条都没有就只提示现场情况，不判失败。
+        #    （本用例自己新建的多轮方案另有 3.1 那条「多轮由 user 条数还原」在钉。）
+        if multi_rows:
+            chk("多轮方案（user 多于 1 条）能从提示词表还原成 multi=true",
+                all(len(r["user"]) > 1 for r in multi_rows),
+                "多轮方案 %d 条：%s" % (len(multi_rows), [r["name"] for r in multi_rows]))
+        else:
+            chk("库里当前没有多轮方案（跳过该项，非失败）", True,
+                "tst_plan 共 %d 条，均为单轮" % len(lst))
 
     # 3.1 新增（不带 id，库里没有同名）
     payload = {
@@ -961,6 +1027,454 @@ CREATE TABLE prompt (               -- 提示词调试表
         code == 200 and isinstance(res3, dict) and res3.get("ok") is False, res3)
     code, _ = jreq("PUT", "%s/api/schema/connect" % base, {})
     chk("PUT /api/schema/connect -> 405", code == 405, "HTTP %s" % code)
+
+    # ---------------------------------------------------------- 5.95 链接数据库调试
+    # 前端按钮（prompt.html 模型输出区）→ POST /api/dbeaver/link → core/dbeaver.py 唤起 DBeaver。
+    # 本节**不真启DBeaver**（会弹真窗口），而是把「拼参数」这一层单独拎出来验 ——
+    # 那才是最容易出错、也最该被钉住的部分（管道分隔、驱动映射、密码不外传）。
+    print("\n■ 5.95 链接数据库调试（/api/dbeaver/link · 参数拼装与安全口径）")
+
+    code, res = jreq("POST", "%s/api/dbeaver/link" % base, {})
+    chk("POST 空体 -> 200 + ok=false（不抛 500）",
+        code == 200 and isinstance(res, dict) and res.get("ok") is False, "HTTP %s %s" % (code, res))
+    chk("空体时报的是「没有数据库类型」",
+        "没有数据库类型" in str(res.get("error") or ""), res.get("error"))
+
+    # 直接验 core/dbeaver 的参数拼装（不经过 HTTP，免得真去启动 GUI）
+    db_mod = importlib.import_module("core.dbeaver")
+    db_mod = importlib.reload(db_mod)
+
+    con, why = db_mod.build_con({"kind": "MySQL", "name": "shop",
+                                 "mode": "host", "host": "127.0.0.1", "port": "3306",
+                                 "dbname": "shop_db", "user": "root"})
+    chk("MySQL -con 拼出驱动 / 主机 / 端口 / 库名 / 用户 / 控制台",
+        con.startswith("driver=mysql") and "host=127.0.0.1" in con and "port=3306" in con
+        and "database=shop_db" in con and "user=root" in con and "openConsole=true" in con,
+        con)
+    chk("-con 里没有 password", "password" not in con.lower(), con)
+
+    con2, why2 = db_mod.build_con({"kind": "SQL Server", "name": "srv1", "mode": "host",
+                                   "host": "10.0.0.9", "port": "1433", "dbname": "sales",
+                                   "user": "sa", "pwd": "SHOULD-NEVER-APPEAR"})
+    chk("SQL Server -> driver=sqlserver", con2.startswith("driver=sqlserver"), con2)
+    chk("即便请求体里塞了 pwd 也不进 -con（安全口径）",
+        "SHOULD-NEVER-APPEAR" not in con2 and "password" not in con2.lower(), con2)
+
+    con3, why3 = db_mod.build_con({"kind": "SQLite", "name": "本地库", "file": DB_PATH})
+    chk("SQLite -> driver=sqlite 且带文件绝对路径",
+        con3.startswith("driver=sqlite") and ("database=" + os.path.abspath(DB_PATH)) in con3, con3)
+
+    code4, why4 = db_mod.build_con({"kind": "SQLite", "name": "x", "file": "/no/such/file.db"})
+    chk("SQLite 文件不存在 -> 给出「路径无效」而不是崩",
+        code4 == "" and "路径无效" in why4, why4)
+
+    code5, why5 = db_mod.build_con({"kind": "Sybase", "name": "x"})
+    chk("不认识的类型 -> 明确说不支持",
+        code5 == "" and "暂不支持" in why5, why5)
+
+    code6, why6 = db_mod.build_con({"kind": "PostgreSQL", "name": "pg",
+                                    "mode": "host", "host": "127.0.0.1", "port": "5432",
+                                    "dbname": ""})
+    chk("服务器型缺库名 -> 明确说缺库名", code6 == "" and "数据库名" in why6, why6)
+
+    con7, why7 = db_mod.build_con({"kind": "PostgreSQL", "name": "pg", "mode": "url",
+                                   "url": "postgresql://u:p@h:5432/app"})
+    chk("URL 模式原样交给 DBeaver（不拆主机端口）",
+        "url=postgresql://u:p@h:5432/app" in con7, con7)
+
+    # 值里的 '|' 会破坏 DBeaver 的参数分隔 ⇒ 必须被清掉（a|b → a b）
+    con8, _ = db_mod.build_con({"kind": "MySQL", "name": "a|b", "mode": "host",
+                                "host": "h", "port": "3306", "dbname": "d"})
+    segs = con8.split("|")
+    chk("值里的 '|' 被替换成空格，参数段数不因此变多",
+        con8.count("|") == 5 and "name=a b" in segs, con8)
+
+    # 脚本文件：SQL 写进去 + 表名进注释 + **文件名带表名**（标签页直接写明给哪张表）
+    f = db_mod.write_sql_file("SELECT * FROM srv LIMIT 1;", ["srv", "mdl"], "SQLite · twe.db")
+    body = open(f, "r", encoding="utf-8").read()
+    chk("临时 .sql 里有 SQL 正文与目标表注释",
+        "SELECT * FROM srv LIMIT 1;" in body and "srv, mdl" in body, body[:80])
+    chk("目标库也写进注释", "SQLite · twe.db" in body, body[:120])
+    # ⚠️ 这条是「定位到表」的关键：文件名带表名 ⇒ DBeaver 的编辑器标签直接写明是哪张表
+    # ⚠️ 局部变量别叫 `base` —— 外层 `base` 是服务地址（args.base），覆盖掉会让后面所有
+    # 接口请求拼成 "xxx.sql/api/..." 而抛 ValueError（踩过一次）。
+    fname = os.path.basename(f)
+    chk("★ 脚本文件名带目标表（编辑器标签直接标明）",
+        fname.startswith("srv") and "2" in fname and fname.endswith(".sql"), fname)
+    os.remove(f)
+
+    # 表名里的路径分隔符 / 非法字符必须被洗掉，否则 mkstemp 会直接抛错
+    try:
+        f2 = db_mod.write_sql_file("SELECT 1;", ["a/b:c*d?", "x"], "")
+        ok2 = os.path.isfile(f2)
+        os.remove(f2)
+    except Exception as exc:
+        ok2 = False
+        fname = repr(exc)
+    chk("表名含 / : * ? 等非法字符也能安全落文件（不抛异常）", ok2 is True, fname if not ok2 else "")
+
+    # 「什么时候不该起 DBeaver」：SQL 为空时压根不找可执行文件
+    r = db_mod.launch({"kind": "MySQL", "name": "x", "mode": "host",
+                       "host": "h", "port": "3306", "dbname": "d"}, "   ")
+    chk("SQL 为空 -> 直接回「请先生成 SQL」，不去启动任何进程",
+        r.get("ok") is False and "请先生成 SQL" in str(r.get("error") or ""), r)
+
+    # 找得到 / 找不到可执行文件都要有明确说法（找不到时提示去配置）
+    exe, why = db_mod.find_exe()
+    chk("find_exe 要么给出路径、要么明确让用户去配置",
+        bool(exe) or "DBEAVER_PATH" in why, "exe=%r why=%r" % (exe, why))
+
+    # ⚠️ 便携版探测（本机装在 D:\DB\，注册表无记录、也不在 Program Files）：
+    #    只扫标准位置会一直报「未检测到」⇒ 必须浅层扫盘，且判据是「有 dbeaver.ini + 启动器」。
+    chk("★ _scan_portable 存在（别退回只扫 Program Files / 注册表）",
+        hasattr(db_mod, "_scan_portable") and hasattr(db_mod, "_PORTABLE_HINTS"))
+    if exe:
+        chk("★ 找到的路径确实带 dbeaver.ini（便携版判据成立）",
+            db_mod._is_dbeaver_dir(os.path.dirname(exe)) is True, exe)
+    chk("_is_dbeaver_dir 对普通目录返回 False（不会把无关目录当 DBeaver）",
+        db_mod._is_dbeaver_dir(BASE_DIR) is False, BASE_DIR)
+
+    # ⚠️ rc=0 秒退是 Eclipse 单实例交接的**正常**行为，不能当成失败
+    #（静态断言：确保判据写的是 returncode 真值，而不是「进程还活着吗」）
+    src = open(os.path.join(BASE_DIR, "core", "dbeaver.py"), "r", encoding="utf-8").read()
+    chk("★ 判「是否失败」用的是退出码而非进程存活（单实例会秒退）",
+        "if proc.returncode:" in src and "not in (0, None)" not in src)
+
+    code, _ = jreq("PUT", "%s/api/dbeaver/link" % base, {})
+    chk("PUT /api/dbeaver/link -> 405", code == 405, "HTTP %s" % code)
+
+    class _FakeReq(object):
+        """直接调视图用（不经过 HTTP）——用来验参数归一的**行为**，
+        比在源码里搜字符串可靠。"""
+        method = "POST"
+        content_type = "application/json"
+
+        def __init__(self, body):
+            self._b = body
+
+        @property
+        def body(self):
+            return self._b
+
+    # ---- 5.94b tables 传「对象数组」时，DBeaver 脚本注释只该写表名 ----
+    # 10-09 起因：前端交接的 tables 从「纯表名数组」升级成结构化表清单
+    #（页面内调试弹窗要字段），若后端直接 to_str(x) 会把一整串 Python dict
+    # 原文写进 .sql 脚本头部注释里。
+    code, res_t = jreq("POST", "%s/api/dbeaver/link" % base, {
+        "meta": {"kind": "SQLite", "name": "x", "mode": "file",
+                 "file": "/no/such/file.db",
+                 "tables": [{"name": "tst_plan", "rows": 1, "desc": "方案表",
+                             "cols": [["plan_name", "TEXT", "方案名称", "TEXT"]]},
+                            {"name": "tst_rec", "rows": 2, "desc": "记录表",
+                             "cols": [["rec_id", "pk", "", "INTEGER"]]}]},
+        "sql": "SELECT 1;",
+    })
+    chk("tables 传对象数组时接口不崩（仍按缺文件路径回错）",
+        isinstance(res_t, dict) and res_t.get("ok") is False, res_t)
+    # 直接验归一源码：只能是表名，不该出现 dict 原文
+    _src = open(os.path.join(BASE_DIR, "core", "views.py"), "r", encoding="utf-8").read()
+    chk("★ tables 归一那段显式处理了 dict（不会把 dict 原文写进脚本注释）",
+        "isinstance(x, dict)" in _src and 'x.get("name")' in _src)
+    #行为验（打桩 launch，**不启动任何进程**）：归一结果必须是纯表名
+    _got = {}
+    _dbeaver_saved = dbeaver_mod_backup = None
+    try:
+        import core.views as _v
+        _dbeaver_saved = _v.dbeaver
+        _v.dbeaver = type("M", (), {"launch": staticmethod(
+            lambda clean, sql: _got.update(clean=clean) or {"ok": False, "error": "stub"})})
+        import json as _json
+        _v.dbeaver_link_api(_FakeReq(_json.dumps({
+            "meta": {"kind": "SQLite", "name": "x", "mode": "file",
+                     "file": "/no/such/x.db",
+                     "tables": [{"name": "tst_plan", "rows": 1, "desc": "方案表",
+                                 "cols": [["plan_name", "TEXT", "方案名称", "TEXT"]]},
+                                {"name": "tst_rec", "rows": 2, "desc": "",
+                                 "cols": [["rec_id", "pk", "", "INTEGER"]]}]},
+            "sql": "SELECT 1;"}).encode("utf-8")))
+        chk("★ 对象数组归一出的 tables 是**纯表名**（脚本注释里不会出现 dict 原文）",
+            _got.get("clean", {}).get("tables") == ["tst_plan", "tst_rec"],
+            _got.get("clean", {}).get("tables"))
+        _got.clear()
+        _v.dbeaver_link_api(_FakeReq(_json.dumps({
+            "meta": {"kind": "SQLite", "name": "x", "mode": "file",
+                     "file": "/no/such/x.db", "tables": ["a", "b"]},
+            "sql": "SELECT 1;"}).encode("utf-8")))
+        chk("★ 老结构（纯表名数组）照常工作（向后兼容）",
+            _got.get("clean", {}).get("tables") == ["a", "b"],
+            _got.get("clean", {}).get("tables"))
+    finally:
+        if _dbeaver_saved is not None:
+            _v.dbeaver = _dbeaver_saved
+
+    # ------------------------------------------------- 5.96 页面内调试 execute-sql
+    # 与 5.95 的 DBeaver 路线**并存**：同一个按钮旁边多一个「页面内调试」，
+    # 由服务端真连库执行**只读** SQL，把结果集回页面。
+    print("\n■ 5.96 页面内调试（/api/database/execute-sql · 只读白名单与行数上限）")
+    sqlrun = importlib.import_module("core.sqlrun")
+
+    # —— 安全口径：写 / 管理语句必须一律拒（这是本模块存在的全部意义）——
+    deny = [
+        "DROP TABLE t", "delete from t", "UPDATE t SET a=1", "INSERT INTO t VALUES(1)",
+        "ALTER TABLE t ADD c INT", "CREATE TABLE t(a int)", "TRUNCATE TABLE t",
+        "GRANT ALL ON t TO u", "REVOKE ALL ON t FROM u",
+        "CALL sp_who()", "EXEC sp_executesql N'select 1'", "EXECUTE sp_who",
+        "SET GLOBAL x=1", "USE otherdb", "COMMIT", "ROLLBACK",
+        "SELECT 1; DROP TABLE t",              # 多语句注入
+        "SELECT * INTO backup FROM t",          # T-SQL 建表
+        "SELECT pg_sleep(5)",                    # 阻塞型函数
+        "SELECT load_extension('x')",
+        "SELECT * FROM t1, t2 WHERE 1=1 UNION SELECT * FROM t3",
+    ]
+    bad = [(s, sqlrun.check_readonly(s)) for s in deny]
+    # UNION 本身是读，放行；只把真正该拒的挑出来断言
+    union = [x for x in bad if "UNION" in x[0]]
+    real_deny = [x for x in bad if "UNION" not in x[0]]
+    chk("★ 写 / 管理 / 注入类语句一律被拒（%d 条）" % len(real_deny),
+        all(ok is False and why for ok, why in (v for _, v in real_deny)),
+        [s for s, (ok, why) in real_deny if ok is not False])
+    chk("UNION ALL 属只读，放行",
+        sqlrun.check_readonly(union[0][1] if False else
+                              "SELECT a FROM t1 UNION SELECT b FROM t2")[0] is True)
+
+    allow = [
+        "SELECT * FROM member_group", "select 1",
+        "WITH t AS (SELECT 1 AS a) SELECT * FROM t",
+        "SELECT COUNT(*) FROM information_schema.TABLES",
+        "SELECT a FROM t WHERE b IN (1,2,3) ORDER BY a LIMIT 10",
+        "  SELECT 1  ",                            # 前后空白
+    ]
+    chk("★ 常规只读语句全部放行（%d 条）" % len(allow),
+        all(sqlrun.check_readonly(s)[0] is True for s in allow),
+        [s for s in allow if sqlrun.check_readonly(s)[0] is not True])
+    chk("空 SQL 被拒", sqlrun.check_readonly("")[0] is False)
+    chk("注释里藏写语句也拦得住（先剥注释再判）",
+        sqlrun.check_readonly("SELECT 1 /* ; DROP TABLE t */")[0] is True
+        and sqlrun.check_readonly("-- DROP TABLE t")[0] is False)
+
+    # —— 行数上限：套 LIMIT 时故意多放 1 行当截断探针 ——
+    w1, _t1 = sqlrun._wrap_limit("SELECT a FROM t", "SQLite", 501)
+    w2, _t2 = sqlrun._wrap_limit("SELECT a FROM t LIMIT 10", "SQLite", 501)
+    w3, _t3 = sqlrun._wrap_limit("SELECT a FROM t", "SQL Server", 501)
+    chk("★ 无 LIMIT 时补上（cap+1 当截断探针）", w1.endswith("LIMIT 501"), w1)
+    chk("用户自带 LIMIT 时不改写语义", w2 == "SELECT a FROM t LIMIT 10", w2)
+    chk("SQL Server 走 TOP 写法", "TOP 501" in w3, w3)
+
+    # —— 真跑一个 SQLite：只读、行数截断、报错透出、数据零损伤 ——
+    import sqlite3 as _sq
+    tmp_db = os.path.join(tempfile.gettempdir(), "pd_verify_sqlrun.db")
+    if os.path.exists(tmp_db):
+        os.remove(tmp_db)
+    _cn = _sq.connect(tmp_db)
+    _cn.execute("CREATE TABLE v_probe (id INTEGER PRIMARY KEY, nm TEXT)")
+    _cn.executemany("INSERT INTO v_probe VALUES (?,?)", [(i, "r%d" % i) for i in range(1, 61)])
+    _cn.commit(); _cn.close()
+
+    r = sqlrun.run_sql("SQLite", {"file": tmp_db}, "SELECT id, nm FROM v_probe ORDER BY id", cap=10)
+    chk("★ 真执行 SELECT 返回结果集",
+        r.get("ok") is True and r.get("rowCount") == 10
+        and [c["title"] for c in r["columns"]] == ["id", "nm"], r)
+    chk("★ 超过上限时截断且标记 truncated=True", r.get("truncated") is True, r.get("truncated"))
+    chk("耗时字段是毫秒整数",
+        isinstance(r.get("elapsed"), int) and r["elapsed"] >= 0, r.get("elapsed"))
+    r2 = sqlrun.run_sql("SQLite", {"file": tmp_db}, "SELECT COUNT(*) AS n FROM v_probe")
+    chk("未超上限时 truncated=False",
+        r2.get("truncated") is False and r2["rows"][0].get("c0") == 60, r2)
+
+    r3 = sqlrun.run_sql("SQLite", {"file": tmp_db}, "DELETE FROM v_probe")
+    chk("★ 写语句到执行层仍被拒", r3.get("ok") is False, r3)
+    r4 = sqlrun.run_sql("SQLite", {"file": tmp_db}, "SELECT * FROM v_nope")
+    chk("驱动报错原样透出（用户看得懂、能自己改）",
+        r4.get("ok") is False and "v_nope" in (r4.get("error") or ""), r4)
+    #⚠️ with sqlite3.connect(...) 只管事务、**不关连接**，句柄还开着时 os.remove
+    #   在 Windows 上会 PermissionError ⇒ 这里显式 close() 再删。
+    _cc = _sq.connect(tmp_db)
+    try:
+        left = _cc.execute("SELECT COUNT(*) FROM v_probe").fetchone()[0]
+        still = _cc.execute("SELECT name FROM sqlite_master WHERE name='v_probe'").fetchone()
+    finally:
+        _cc.close()
+    chk("★ 只读执行后数据零损伤（行数不变、表还在）", left == 60 and still is not None,
+        "rows=%s tbl=%s" % (left, still))
+    r5 = sqlrun.run_sql("SQLite", {"file": tmp_db + ".missing"}, "SELECT 1")
+    chk("文件不存在给明确提示（不是 500）", r5.get("ok") is False, r5)
+
+    # —— 连接阶段异常必须变成友好错误，不能 500 白屏 ——
+    _pwl = "Sup3rSecret!2026"
+    r6 = sqlrun.run_sql("MySQL", {"host": "localhost", "port": 3306, "user": "root",
+                                   "pwd": _pwl, "dbname": "nope"}, "SELECT 1")
+    chk("★ 连不上库返回友好错误而非抛异常",
+        r6.get("ok") is False and (r6.get("error") or "").startswith("连接 MySQL 失败"), r6)
+    chk("★ 报错里不含明文密码",
+        _pwl not in str(r6), str(r6.get("error"))[:120])
+    r7 = sqlrun.run_sql("MongoDB", {}, "SELECT 1")
+    chk("未支持的类型给明确提示", r7.get("ok") is False, r7)
+    if os.path.exists(tmp_db):
+        os.remove(tmp_db)
+
+    # —— HTTP 层：方法守卫 + 真发一次请求 ——
+    code, _ = jreq("GET", "%s/api/database/execute-sql" % base)
+    chk("GET /api/database/execute-sql -> 405", code == 405, "HTTP %s" % code)
+    code, res = jreq("POST", "%s/api/database/execute-sql" % base,
+                     {"kind": "SQLite", "meta": {"file": "C:/nope/x.db"},
+                      "sql": "SELECT 1"})
+    chk("POST execute-sql 缺文件时返回 200 + ok=false（不是 500）",
+        code == 200 and isinstance(res, dict) and res.get("ok") is False, (code, res))
+    code, res = jreq("POST", "%s/api/database/execute-sql" % base,
+                     {"kind": "SQLite", "meta": {"file": "C:/nope/x.db"},
+                      "sql": "DELETE FROM t"})
+    chk("POST execute-sql 对写语句返回 ok=false",
+        code == 200 and res.get("ok") is False, (code, res))
+
+    # —— 密码零留存：全库 + 静态扫描都不得出现 ——
+    _pw_probe = "PdPwProbe_9x8y7z"
+    code, res = jreq("POST", "%s/api/database/execute-sql" % base,
+                     {"kind": "MySQL", "meta": {"host": "127.0.0.1", "port": 59999,
+                                                "user": "u", "dbname": "d"},
+                      "pwd": _pw_probe, "sql": "SELECT 1"})
+    chk("带密码的请求正常返回（不 500）", code == 200, "HTTP %s" % code)
+    chk("★ 响应里不含明文密码", _pw_probe not in json.dumps(res, ensure_ascii=False))
+    _srcdump = ""
+    for _f in ("core/views.py", "core/sqlrun.py", "core/urls.py", "config/urls.py"):
+        _p = os.path.join(BASE_DIR, _f)
+        if os.path.exists(_p):
+            _srcdump += open(_p, "r", encoding="utf-8").read()
+    chk("★ 源码里搜不到这次用的探针密码（说明密码没被写死进任何地方）",
+        _pw_probe not in _srcdump)
+    chk("★ execute-sql 不碰 tst_api_key（不落库）",
+        "tst_api_key" not in open(os.path.join(BASE_DIR, "core", "sqlrun.py"),
+                                  "r", encoding="utf-8").read())
+
+    # ------------------------------------------------ 5.97 已连接数据库存档 /api/db-conn
+    # 10-09 用户点名：「表结构提取」页把已连接好的库存下来，下次进来左栏还在。
+    # 本节钉四件事：
+    #   ① 新表在建（setup_db_conn 幂等），列里**没有密码位**；
+    #   ② 三个动词都对（GET 列表 / POST 保存并覆盖 / DELETE 删除）；
+    #   ③ **密码类字段一律不落库**（这是本功能唯一有安全含义的一条）；
+    #   ④ 老库缺表时不 500（页面拿到空列表，不影响别的功能）。
+    print("\n■ 5.97 已连接数据库存档（/api/db-conn · 连接信息落库、密码不落库）")
+
+    with sqlite3.connect(DB_PATH) as _c0:
+        _has_tbl = _c0.execute("SELECT COUNT(*) FROM sqlite_master"
+                               " WHERE type='table' AND name='tst_db_conn'").fetchone()[0] > 0
+    chk("★ tst_db_conn 表已就位（setup_db_conn.py 幂等建表）", _has_tbl)
+
+    _conn_ids_before = set()
+    if _has_tbl:
+        with sqlite3.connect(DB_PATH) as _c1:
+            _conn_ids_before = {r[0] for r in _c1.execute("SELECT id FROM tst_db_conn")}
+
+    try:
+        code, res = jreq("GET", "%s/api/db-conn" % base)
+        chk("GET /api/db-conn 返回列表", code == 200 and isinstance(res.get("list"), list),
+            (code, str(res)[:80]))
+
+        if _has_tbl:
+            _cols = []
+            with sqlite3.connect(DB_PATH) as _c2:
+                _cols = [r[1] for r in _c2.execute("PRAGMA table_info(tst_db_conn)")]
+            chk("★ 表里**没有密码列**（pwd / password / api_key / secret / token 都不该有）",
+                not [c for c in _cols if any(
+                    k in c.lower() for k in ("pwd", "passw", "api_key", "apikey", "secret", "token"))],
+                _cols)
+
+        # 保存一条（**故意夹带三种密码字段**，看它们进不进库）
+        _PW = "DbConnPwProbe_9x8y7z"
+        _entry = {
+            "kind": "MySQL", "name": "E2E-conn-probe", "mode": "host",
+            "host": "10.1.2.3", "port": "3306", "dbname": "demo", "user": "root",
+            "pwd": _PW, "password": _PW, "apiKey": _PW,
+            "checked": ["t1", "t2"],
+            "schema": {"tables": [{"name": "t1", "rows": 5, "desc": "表一",
+                                   "cols": [["id", "pk", "主键", "INTEGER"]]}],
+                       "relations": [{"fromTable": "t1", "column": "pid",
+                                      "refTable": "t2", "refColumn": "id"}]},
+        }
+        code, res = jreq("POST", "%s/api/db-conn" % base, _entry)
+        chk("★ POST /api/db-conn 保存成功", code == 200 and res.get("ok") is True
+            and res.get("action") in ("created", "updated"), (code, res))
+
+        code, res = jreq("GET", "%s/api/db-conn" % base)
+        _mine = [x for x in res.get("list", []) if x.get("name") == "E2E-conn-probe"]
+        chk("★ 存进去的连接能被读回来（含表结构快照）",
+            len(_mine) == 1 and len(_mine[0]["schema"]["tables"]) == 1
+            and _mine[0]["checked"] == ["t1", "t2"], _mine)
+        chk("★ 连接信息字段齐（host / port / dbname / user）",
+            _mine and _mine[0]["host"] == "10.1.2.3" and _mine[0]["port"] == "3306"
+            and _mine[0]["dbname"] == "demo" and _mine[0]["user"] == "root", _mine)
+
+        # ⚠️ 本功能唯一有安全含义的断言：密码绝不落库
+        with sqlite3.connect(DB_PATH) as _c3:
+            _row = _c3.execute("SELECT conn_name, host, port, dbname, user_name,"
+                               " COALESCE(schema_json,''), COALESCE(checked_json,'')"
+                               " FROM tst_db_conn WHERE conn_name='E2E-conn-probe'").fetchall()
+        chk("★ **明文密码没有落库**（整行扫一遍）", _PW not in str(_row),
+            [r[:5] for r in _row])
+        chk("★ 落库内容里没有 pwd / password 字样（连键名都不该有）",
+            "pwd" not in str(_row).lower() and "password" not in str(_row).lower())
+        chk("响应里也不回显密码", _PW not in json.dumps(res, ensure_ascii=False))
+
+        # 覆盖：同一个「库名 + 类型」再存一次 → 更新而非新增
+        code, res = jreq("POST", "%s/api/db-conn" % base,
+                         {"kind": "MySQL", "name": "E2E-conn-probe", "mode": "host",
+                          "host": "10.1.2.9", "port": "3307", "dbname": "demo2",
+                          "user": "root", "schema": {"tables": [], "relations": []}})
+        code, res = jreq("GET", "%s/api/db-conn" % base)
+        _mine2 = [x for x in res.get("list", []) if x.get("name") == "E2E-conn-probe"]
+        chk("★ 同一个库重复保存是**覆盖**（不新增行），且字段已更新",
+            len(_mine2) == 1 and _mine2[0]["port"] == "3307"
+            and _mine2[0]["dbname"] == "demo2", _mine2)
+
+        # 缺库名 / 类型：回 ok=false，但不 500
+        code, res = jreq("POST", "%s/api/db-conn" % base, {"name": "", "kind": ""})
+        chk("缺库名/类型时回 ok=false（不 500）", code == 200 and res.get("ok") is False,
+            (code, res))
+
+        # DELETE 按「库名 + 类型」
+        code, res = jreq("DELETE", "%s/api/db-conn" % base,
+                         {"name": "E2E-conn-probe", "kind": "MySQL"})
+        chk("★ DELETE /api/db-conn 按 name+kind 删除成功",
+            code == 200 and res.get("deleted") == 1, (code, res))
+        code, res = jreq("GET", "%s/api/db-conn" % base)
+        chk("删除后列表里不再有它",
+            not [x for x in res.get("list", []) if x.get("name") == "E2E-conn-probe"])
+
+        code, _ = jreq("PUT", "%s/api/db-conn" % base, {})
+        chk("PUT /api/db-conn -> 405", code == 405, "HTTP %s" % code)
+
+        # 缺表时要**优雅**（模拟线上老容器）：把表藏起来，看接口是否还活
+        _bak = "tst_db_conn__hidden_for_probe"
+        with sqlite3.connect(DB_PATH) as _c4:
+            _c4.execute("ALTER TABLE tst_db_conn RENAME TO %s" % _bak)
+            _c4.commit()
+        try:
+            code, res = jreq("GET", "%s/api/db-conn" % base)
+            chk("★ 表缺失时 GET 不 500，回空列表 + needSetup（线上老库容错）",
+                code == 200 and isinstance(res.get("list"), list)
+                and res.get("list") == [] and res.get("needSetup") is True, (code, res))
+            code, res = jreq("POST", "%s/api/db-conn" % base,
+                             {"kind": "MySQL", "name": "x"})
+            chk("表缺失时 POST 也不 500（回 ok=false / needSetup）",
+                code == 200 and res.get("ok") is False, (code, res))
+        finally:
+            with sqlite3.connect(DB_PATH) as _c5:
+                _c5.execute("ALTER TABLE %s RENAME TO tst_db_conn" % _bak)
+                _c5.commit()
+        code, res = jreq("GET", "%s/api/db-conn" % base)
+        chk("表已还原（后续检查不受影响）", code == 200)
+    finally:
+        # ⚠️ 硬约束：写库的用例必须自清理，跑完回到基线
+        if _has_tbl:
+            with sqlite3.connect(DB_PATH) as _c6:
+                _c6.execute("DELETE FROM tst_db_conn WHERE conn_name LIKE 'E2E-conn-%'")
+                _c6.commit()
+
+    if _has_tbl:
+        with sqlite3.connect(DB_PATH) as _c7:
+            _conn_ids_after = {r[0] for r in _c7.execute("SELECT id FROM tst_db_conn")}
+        chk("★ tst_db_conn 回到跑前的基线（本用例没留下残留行）",
+            _conn_ids_after == _conn_ids_before,
+            "before=%s after=%s" % (sorted(_conn_ids_before), sorted(_conn_ids_after)))
 
     # ---------------------------------------------------------- 6. 收尾
     print("\n■ 6. 收尾")

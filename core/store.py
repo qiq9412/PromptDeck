@@ -27,16 +27,22 @@ prompt_scheme.html 零改动），变的只是它们背后读写的表：
 校验口径（按用户约束，一个字都没变）：
     必填 / 网址格式校验只保留在原型前端，服务端**不做二次校验**；
     这里只做「空串 -> NULL」的类型归一。
-    唯一的例外是 save_tp 里那条「按 id / 同名覆盖」的判定 —— 它是原型自带的
-    保存逻辑（同名即覆盖），不是新增校验。
+    例外只有两条，都是**用户点名**要的：
+      · save_tp 里那条「按 id / 同名覆盖」的判定 —— 原型自带的保存逻辑（同名即覆盖）；
+      · find_srv_by_url 的 base_url 查重（10-09 新增）—— 用户在需求里点名
+        「服务器 API 网址（base_url）不可重复」，并要求前端提示 + 后端兜底。
+        它不拦「必填 / 格式」，只拦「这条网址已经存在」。
 
 计费单价 in_price / out_price 在新库里是 TEXT，按用户输入的原文存，不做四舍五入。
 """
+import json
+import re
 from datetime import datetime
 
 from django.db import transaction
 
-from .models import Mdl, Srv, TstApiKey, TstPlan, TstPlanPrompt, TstRec, TstRecDtl
+from .models import (Mdl, Srv, TstApiKey, TstDbConn, TstPlan, TstPlanPrompt,
+                     TstRec, TstRecDtl)
 
 # tst_plan_prompt.prompt_role 的取值（与 OpenAI messages 口径一致，小写）
 ROLE_SYSTEM = "system"
@@ -84,6 +90,37 @@ def list_srv(platform="", company=""):
     if company:
         qs = qs.filter(comp_name__icontains=company)
     return list(qs.order_by("id"))
+
+
+def norm_base_url(u):
+    """base_url 的归一化口径：去首尾空白 → 转小写 → 去掉末尾斜杠。
+
+    与前端 new_server.html 的 pdNormUrl() **同一口径**（10-09 用户逐条选定）：
+    域名本来就不区分大小写，末尾多一条斜杠是常见手误，不该各留一份。
+    """
+    return re.sub(r"/+$", "", to_str(u).lower())
+
+
+def find_srv_by_url(base_url, exclude_id=None):
+    """按归一化后的 base_url 找已有服务器；没命中返回 None。
+
+    exclude_id 给「修改」用 —— 不排除自己的话，改别的字段（平台名 / 公司名）
+    也会被自己那条判成重复。
+    归一化放在 Python 里做（不写 SQL 函数）：服务器表就十几行，够用且各库方言一致。
+    """
+    norm = norm_base_url(base_url)
+    if not norm:
+        return None
+    qs = Srv.objects.all()
+    if exclude_id not in (None, ""):
+        try:
+            qs = qs.exclude(id=int(exclude_id))
+        except (TypeError, ValueError):
+            pass
+    for row in qs.order_by("id"):
+        if norm_base_url(row.base_url) == norm:
+            return row
+    return None
 
 
 def create_srv(plat_name, base_url="", comp_name="", home_url=""):
@@ -525,3 +562,148 @@ def delete_rec(ids):
     with transaction.atomic():
         TstRecDtl.objects.filter(rec_id__in=ids).delete()
         return TstRec.objects.filter(id__in=ids).delete()[0]
+
+
+# ------------------------------------------------------------------ tst_db_conn（已连接数据库存档）
+# 第四次迭代新增：把「数据库表结构提取」页上连好的库存下来，下次进来还在。
+#
+# ⚠️⚠️ 安全地基（三条，动这张表之前先读一遍）
+#   1. **不存密码**。前端 pdRememberConn 从设计上就不登记密码，本表连密码列都没有；
+#      save_db_conn 还会把入参里的 pwd / password / apiKey 显式删掉再落库（双保险）。
+#      要是哪天有人想「顺手把密码也存上省得每次重填」—— 那不是优化，是破了这条地基。
+#   2. **不存服务端自己的库凭据**。用户连自己的业务库，认证由用户那次导入 / 重连完成；
+#      存档只描述「连得上哪儿」，重开后要重连才拿得到最新结构（快照是只读参考）。
+#   3. **表可能不存在**：开发库由 setup_db_conn.py 建；
+#      线上老容器的持久化库里可能还没有这张表 ⇒ 这里全部包一层保护，
+#      缺表时返回空列表 / 明确错误，**绝不让整页 500**。
+#
+# 键 = (conn_name, conn_kind)，与前端 pdFindConn 的 "name|kind" 同一口径 ⇒
+# 同一个库重复连接只更新那一条，不会在左栏堆出两行。
+
+def _db_conn_table_ready():
+    """本表是否已就位（直接问库里的表清单，不用异常做控制流）。
+
+    没就位时调用方给「需要初始化」而不是抛异常 —— 线上老容器的持久化库里
+    可能还没有这张表，绝不能让整页 500。
+    """
+    from django.db import connection
+    try:
+        return "tst_db_conn" in connection.introspection.table_names()
+    except Exception:
+        return False
+
+
+# 落库前必须从入参里剔除的键（密码 / 密钥一律不进这张表）
+_DB_CONN_FORBIDDEN = ("pwd", "password", "passwd", "apiKey", "api_key", "secret", "token")
+
+
+def _db_conn_load_json(raw, fallback):
+    if raw in (None, ""):
+        return fallback
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        return fallback
+
+
+def list_db_conn():
+    """已保存的连接列表（按 id 升序），形状与前端 sessionStorage 的 pd_db_link_meta 对齐。
+
+    返回 {"ok": True, "list": [...]}；
+    表还没就位时返回 {"ok": True, "list": [], "needSetup": True}（页面据此当空列表用，
+    不弹错、不 500）。
+    """
+    if not _db_conn_table_ready():
+        return {"ok": True, "list": [], "needSetup": True}
+
+    out = []
+    for r in TstDbConn.objects.order_by("id"):
+        out.append({
+            "id": r.id,
+            "name": r.conn_name or "",
+            "kind": r.conn_kind or "",
+            "mode": r.conn_mode or "host",
+            "host": r.host or "",
+            "port": r.port or "",
+            "dbname": r.dbname or "",
+            "user": r.user_name or "",
+            "file": r.file_path or "",
+            # schema 里就是 {tables:[…], relations:[…]}，前端拿去直接喂 pdFillDb
+            "schema": _db_conn_load_json(r.schema_json, {"tables": [], "relations": []}),
+            "checked": _db_conn_load_json(r.checked_json, []),
+            "savedAt": r.saved_at or "",
+        })
+    return {"ok": True, "list": out}
+
+
+def save_db_conn(d):
+    """保存（或覆盖）一个已连接的数据库，返回 (id, 结果类型 / 错误说明)。
+
+    覆盖键 = (conn_name, conn_kind)，与前端 pdFindConn 同口径：
+    重复导入 / 重连同一个库时更新原记录，不新增行。
+
+    ⚠️ **pwd / password / apiKey 等一律被剔除**：本函数拿到的 dict 可能来自
+       原始请求体（里面有弹窗填的临时密码），落库前必须清干净。
+       剔除是**列白名单式**的 —— 只有下面 fields 里显式列出的字段才落库，
+       不存在「忘了删某个密码字段」的可能。
+    """
+    if not _db_conn_table_ready():
+        return None, "needSetup"
+
+    d = d or {}
+    name = to_str(d.get("name"))
+    kind = to_str(d.get("kind"))
+    if not name or not kind:
+        return None, "缺少库名或数据库类型"
+
+    schema = d.get("schema")
+    if not isinstance(schema, dict):
+        schema = {"tables": [], "relations": []}
+    checked = d.get("checked")
+    if not isinstance(checked, (list, tuple)):
+        checked = []
+
+    # 白名单式落库：只有这些键会被写进去，密码类字段结构上就没有落点
+    fields = {
+        "conn_name": name,
+        "conn_kind": kind,
+        "conn_mode": to_str(d.get("mode")) or "host",
+        "host": to_str(d.get("host")) or None,
+        "port": to_str(d.get("port")) or None,
+        "dbname": to_str(d.get("dbname")) or None,
+        "user_name": to_str(d.get("user")) or None,
+        "file_path": to_str(d.get("file")) or None,
+        "schema_json": json.dumps(schema, ensure_ascii=False),
+        "checked_json": json.dumps([to_str(x) for x in checked if to_str(x)],
+                                   ensure_ascii=False),
+        "saved_at": now_str(),
+    }
+    # 双保险：即便将来有人往 fields 里加了键，这里也再扫一遍黑名单
+    for k in list(fields.keys()):
+        if k.lower() in [x.lower() for x in _DB_CONN_FORBIDDEN]:
+            fields.pop(k, None)
+
+    with transaction.atomic():
+        hit = (TstDbConn.objects
+               .filter(conn_name=name, conn_kind=kind).order_by("id").first())
+        if hit:
+            TstDbConn.objects.filter(id=hit.id).update(**fields)
+            return hit.id, "updated"
+        return TstDbConn.objects.create(**fields).id, "created"
+
+
+def delete_db_conn(ids):
+    """批量删除已保存的连接，返回删掉的条数。"""
+    ids = [int(i) for i in ids]
+    if not ids or not _db_conn_table_ready():
+        return 0
+    return TstDbConn.objects.filter(id__in=ids).delete()[0]
+
+
+def delete_db_conn_by_key(name, kind):
+    """按 (库名, 类型) 删除 —— 页面「移除该库」时只知道名字与类型，不知道库里的 id。"""
+    name = to_str(name)
+    kind = to_str(kind)
+    if not name or not kind or not _db_conn_table_ready():
+        return 0
+    return TstDbConn.objects.filter(conn_name=name, conn_kind=kind).delete()[0]

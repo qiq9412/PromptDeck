@@ -290,6 +290,11 @@ def main():
     seed = os.path.join(PKG, "data", "seed.sqlite")
     seed_ver_file = os.path.join(PKG, "data", "seed.version")
     seed_ver = open(seed_ver_file, encoding="utf-8").read().strip()
+    # ⚠️ 期望行数一律从**这份种子的真身**现场取，绝不写死 17 / 45。
+    #    踩过：清洗规则一个字没改，但开发库里多了一行「同平台不重名」的模型，
+    #    种子从 45 变成 46，[2] / [5] / /api/srv / /api/mdl / /api/schema 五处断言集体假失败 ——
+    #    这就是「基线一律现场取、禁止硬编码」那条硬约束的现场。
+    EXP = db_counts(seed)
 
     work = tempfile.mkdtemp(prefix="pd_ms_rehearsal_")
     db = os.path.join(work, "prompt_test_DB.db")
@@ -329,8 +334,8 @@ def main():
         cnt = db_counts(db)
         chk("建出的库表结构完整（7 张业务表都在）", all(t in cnt for t in SEED_TABLES),
             "实际 %s" % cnt)
-        chk("库里就是种子数据：srv=17 / mdl=45 / 密钥 0 行",
-            cnt["srv"] == 17 and cnt["mdl"] == 45 and cnt["tst_api_key"] == 0,
+        chk("库里就是种子数据：srv=%d / mdl=%d / 密钥 0 行" % (EXP["srv"], EXP["mdl"]),
+            cnt["srv"] == EXP["srv"] and cnt["mdl"] == EXP["mdl"] and cnt["tst_api_key"] == 0,
             "实际 %s" % cnt)
         got_mark = open(mark, encoding="utf-8").read().strip() if os.path.exists(mark) else ""
         chk("库旁写下了种子版本标记 = %s" % seed_ver, got_mark == seed_ver,
@@ -372,14 +377,14 @@ def main():
         chk("/api/health = ok", st == 200 and body.strip() == "ok", "%s %r" % (st, body[:40]))
 
         st, srv = jget("/api/srv")
-        chk("/api/srv 返回 17 条且字段齐全",
-            st == 200 and isinstance(srv, list) and len(srv) == 17
+        chk("/api/srv 返回 %d 条且字段齐全" % EXP["srv"],
+            st == 200 and isinstance(srv, list) and len(srv) == EXP["srv"]
             and set(("id", "platform", "company", "api", "cUrl")) <= set(srv[0]),
             "status=%s len=%s" % (st, len(srv) if isinstance(srv, list) else srv))
 
         st, mdl = jget("/api/mdl")
-        chk("/api/mdl 返回 45 条且字段齐全",
-            st == 200 and isinstance(mdl, list) and len(mdl) == 45
+        chk("/api/mdl 返回 %d 条且字段齐全" % EXP["mdl"],
+            st == 200 and isinstance(mdl, list) and len(mdl) == EXP["mdl"]
             and set(("id", "srvId", "platform", "model", "type", "inPrice",
                      "outPrice", "unit", "url")) <= set(mdl[0]),
             "status=%s len=%s" % (st, len(mdl) if isinstance(mdl, list) else mdl))
@@ -400,8 +405,9 @@ def main():
             "status=%s names=%s" % (st, names))
         if isinstance(sch, dict) and sch.get("tables"):
             by = {t["name"]: t for t in sch["tables"]}
-            chk("/api/schema 报的行数与库内一致（srv=17 / mdl=45）",
-                by.get("srv", {}).get("rows") == 17 and by.get("mdl", {}).get("rows") == 45,
+            chk("/api/schema 报的行数与库内一致（srv=%d / mdl=%d）" % (EXP["srv"], EXP["mdl"]),
+                by.get("srv", {}).get("rows") == EXP["srv"]
+                and by.get("mdl", {}).get("rows") == EXP["mdl"],
                 "srv=%s mdl=%s" % (by.get("srv", {}).get("rows"),
                                    by.get("mdl", {}).get("rows")))
 
@@ -425,8 +431,8 @@ def main():
         chk("带前缀能打开页面（/studio/app/prompt.html）", st == 200 and "提示词" in body,
             "status=%s" % st)
         st, arr = jget("/api/srv", base=pbase)
-        chk("带前缀能调接口（/studio/app/api/srv 返回 17 条）",
-            st == 200 and isinstance(arr, list) and len(arr) == 17,
+        chk("带前缀能调接口（/studio/app/api/srv 返回 %d 条）" % EXP["srv"],
+            st == 200 and isinstance(arr, list) and len(arr) == EXP["srv"],
             "status=%s len=%s" % (st, len(arr) if isinstance(arr, list) else arr))
         code, _b, hdrs = http("/", raw=True, base=pbase)
         loc = hdrs.get("Location")
@@ -452,10 +458,12 @@ def main():
             scalar(db, "select count(*) from srv") == 1)
 
         proc, log = start_sh(work, db, seed, seed_ver_file)
-        ok = wait_db(lambda: db_counts(db)["srv"] == 17 and db_counts(db)["mdl"] == 45)
+        ok = wait_db(lambda: db_counts(db)["srv"] == EXP["srv"]
+                     and db_counts(db)["mdl"] == EXP["mdl"])
         logtxt = stop(proc, log)
         proc = None
-        chk("旧版库被判不可用并换成种子数据（srv 1->17 / mdl 1->45）", ok,
+        chk("旧版库被判不可用并换成种子数据（srv 1->%d / mdl 1->%d）"
+            % (EXP["srv"], EXP["mdl"]), ok,
             "日志尾部：%s" % logtxt[-300:])
         chk("start.sh 日志里说明了重建原因",
             ("旧版" in logtxt) or ("不可用" in logtxt), logtxt[-200:])

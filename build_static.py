@@ -357,7 +357,10 @@ N_SAVE_OLD = r'''  toast("服务器已保存，正在返回列表…", "ok");
   setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
 '''
 
-N_SAVE_NEW = r'''  /* 数据层接线：先落库，再返回列表 */
+N_SAVE_NEW = r'''  /* 数据层接线：先落库，再返回列表。
+     ⚠️ 后端在 POST /api/srv 里还兜了一道 base_url 查重（命中已有网址回 409）。
+        前端 pdUrlTaken 已经先拦过；这里再判一次是为了「别的入口 / 手调接口」也拦得住，
+        提示文案与前端保持同一个口径。 */
   fetch("/api/srv", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -367,11 +370,50 @@ N_SAVE_NEW = r'''  /* 数据层接线：先落库，再返回列表 */
       base_url:  $baseUrl.value.trim(),
       home_url:  $homeUrl.value.trim()
     })
-  }).then(function(){
+  }).then(function(r){
+    if (r.status === 409){                       /* 撞网址：停在本页，不落库也不跳列表 */
+      $baseUrl.classList.add("is-invalid");
+      toast("已存在服务器API网址，请更换后再保存", "warn");
+      $baseUrl.focus();
+      return;
+    }
     toast("服务器已保存，正在返回列表…", "ok");
     setTimeout(function(){ window.location.href = "list_server.html"; }, 700);
   });
 '''
+
+# base_url 查重（10-09 用户点名）：原型读演示清单，应用侧换成真实库。
+# 调用方（submit 处理里的 pdUrlTaken(...) 回调）一个字都不用改 —— 两边都是回调式。
+N_URL_OLD = r'''function pdUrlTaken(url, cb){
+  var norm = pdNormUrl(url), i;
+  for (i = 0; i < PD_SRV_URLS.length; i++){
+    if (pdNormUrl(PD_SRV_URLS[i]) === norm){ cb(String(PD_SRV_URLS[i])); return; }
+  }
+  cb(null);
+}'''
+
+N_URL_NEW = r'''function pdUrlTaken(url, cb){
+  /* 数据层接线：演示清单下线，改读真实库（与「服务器列表」页同源）。
+     取不到列表就**不拦** —— 宁可放过去，也不让接口抖动把「保存」卡死；
+     真撞上了后端 POST /api/srv 那道兜底还拦得住。 */
+  fetch("/api/srv").then(function(r){ return r.json(); }).then(function(rows){
+    var norm = pdNormUrl(url), i, hit = null;
+    rows = rows || [];
+    for (i = 0; i < rows.length; i++){
+      if (pdNormUrl(rows[i] && rows[i].api) === norm){ hit = String(rows[i].api); break; }
+    }
+    cb(hit);
+  }).catch(function(){ cb(null); });
+}'''
+
+N_MOCK_OLD = r'''var PD_SRV_URLS = [
+  "https://api.openai.com/v1",
+  "https://api.anthropic.com",
+  "https://api.deepseek.com"
+];'''
+
+N_MOCK_NEW = r'''/* 应用侧：演示清单下线（查重改读 /api/srv，见下面的 pdUrlTaken） */
+var PD_SRV_URLS = [];'''
 
 
 # =====================================================================
@@ -408,9 +450,19 @@ PB_COMBO_NEW_3 = r'''/* 模型：选中后显示对应的输入 / 输出 token �
 comboModel = initCombo("comboModel", function(it){'''
 
 PB_COMBO_OLD_4 = r'''}, modelKeep);
+
+pdCombosReadyNow();          /* 原型：三个下拉已同步初始化完成，回填可以跑了 */
 '''
 
+# ⚠️ 两件事必须一起做，缺一个「编辑跳进来」就还是全空（10-09 实测踩了两遍）：
+#   ① pdCombosReadyNow() 要落在 initCombos() **里面**（} 之前）—— 放函数外面照样是
+#      解析期执行，那时下拉还没初始化，等于登记了个寂寞；
+#   ② 必须把**原型那句顶层的** pdCombosReadyNow() 一并吃掉（它就写在上面的 OLD 里）——
+#      否则它在应用里仍是解析期点亮标记，pdWhenCombosReady 一看「已就绪」就立刻回填，
+#      又撞回 comboServer === undefined。
 PB_COMBO_NEW_4 = r'''}, modelKeep);
+
+pdCombosReadyNow();          /* 下拉就绪：三个 initCombo 都跑完了，回填可以执行 */
 
 }
 '''
@@ -698,6 +750,87 @@ PB_RUN_NEW = r'''  /* 数据层接线：发起一次真实调用（后端转发�
 '''
 
 
+PB_DBG_OLD = r'''/* 原型态：单开这一页时没有后端，只把「要做什么」讲清楚，不发任何请求。
+   应用侧由 build_static 把这个函数原地换成真调后端 /api/dbeaver/link。 */
+function PD_DBG_API(meta, sql){
+  toast("原型演示：将唤起 DBeaver 打开 " + meta.kind + " · " + (meta.name || "")
+      + "，并粘贴这条 SQL（" + sql.length + " 字）", "ok");
+}
+
+pdDbgLastSql = pdDbgSql();
+pdDbgSync();
+pdDbgPoll();'''
+
+PB_DBG_NEW = r'''/* ================= 数据层接线：链接数据库调试 =================
+   原型态那句「原型演示」提示到此为止；这里换成真调后端 /api/dbeaver/link，
+   由服务端去唤起本机 DBeaver（找可执行文件 → 拼 -con → 写临时 .sql → Popen）。
+   ⚠️ meta 里**没有密码**：表结构页交接时就没登记，认证走 DBeaver 自己的凭据。
+   ⚠️ 必须原地替换同名函数：按钮的点击回调只认 PD_DBG_API 这一个名字。 */
+function PD_DBG_API(meta, sql){
+  var b = document.getElementById("btnDbgLink");
+  b.setAttribute("aria-disabled", "true");
+  toast("正在唤起 DBeaver…", "ok");
+
+  fetch("/api/dbeaver/link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ meta: meta, sql: sql })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      toast((res && res.error) || "唤起 DBeaver 失败", "warn");
+      return;
+    }
+    /* 目标表写在标签名与脚本首行注释里 —— DBeaver 命令行没法在导航树里高亮某张表 */
+    var tb = (res.tables || []).length ? ("（目标表：" + res.tables.join(", ") + "）") : "";
+    toast("已打开 " + (res.target || "DBeaver") + tb + "，SQL 已放进新的编辑器标签", "ok");
+  }).catch(function(err){
+    toast("唤起 DBeaver 失败：" + err, "warn");
+  }).then(function(){
+    /* 无论成败都把按钮状态还回去（请求期间不允许重复点） */
+    b.setAttribute("aria-disabled", pdDbgMissing() ? "true" : "false");
+  });
+}
+
+pdDbgLastSql = pdDbgSql();
+pdDbgSync();
+pdDbgPoll();'''
+
+
+# ---- 页面内调试弹窗（10-09 用户点名）：原型态的假数据 → 真调后端 -----------
+PDX_RUN_OLD = r'''/* 原型态：没有后端，只讲清「要做什么」，不发请求。
+   应用侧由 build_static 把这个函数原地换成真调 /api/database/execute-sql。 */
+function PDX_RUN_API(req, onOk, onErr, onDone){
+  onOk({ ok:true, columns:[{key:"c0",title:"gid"},{key:"c1",title:"gname"},{key:"c2",title:"glevel"}],
+         rows:[{c0:1,c1:"member",c2:"A"},{c0:2,c1:"vip",c2:"B"},{c0:3,c1:"staff",c2:"A"}],
+         elapsed:24, rowCount:3, truncated:false });
+  if (onDone) onDone();
+}'''
+
+PDX_RUN_NEW = r'''/* ================= 数据层接线：页面内调试 =================
+   原型态那份假数据到此为止；这里真调后端 /api/database/execute-sql，
+   由服务端连库执行**只读** SQL（写语句在服务端就被拒了）并回结果集。
+   ⚠️ pwd 是弹窗里现填的密码，只随这一次请求发出去 ——
+      不写库、不写文件、不进 sessionStorage，请求结束（onDone）即清空输入框。
+   ⚠️ 必须原地替换同名函数：弹窗只认 PDX_RUN_API 这一个名字。 */
+function PDX_RUN_API(req, onOk, onErr, onDone){
+  fetch("/api/database/execute-sql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: req.kind, meta: req.meta, pwd: req.pwd, sql: req.sql })
+  }).then(function(r){
+    return r.json().catch(function(){
+      throw new Error("服务返回了非 JSON 内容（HTTP " + r.status + "）");
+    });
+  }).then(function(res){
+    onOk(res);
+  }).catch(function(err){
+    onErr(String((err && err.message) || err));
+  }).then(function(){
+    if (onDone) onDone();
+  });
+}'''
+
+
 # =====================================================================
 # 「保存」按钮：由「只写本地存储」改成「落服务端 tp 表 + 跳提示词方案列表页」
 # ---------------------------------------------------------------------
@@ -717,6 +850,7 @@ PB_SAVE_OLD = r'''  if (!pdWriteSchemes(list)){
                    : "已保存提示词方案「" + name + "」，可到「提示词测试」页选用", "ok");
   }
   pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+  pdDraftDrop();           /* 内容已落库 ⇒ 草稿作废（不动表单：保存后照旧停在本页 / 由数据层跳列表页） */
 });
 '''
 
@@ -749,6 +883,7 @@ PB_SAVE_NEW = r'''  /* 本地存储镜像：真源是服务端 tp 表，这里�
       pdWriteSchemes(arr);
     }
     pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+    pdDraftDrop();           /* 内容已落库 ⇒ 草稿作废（本页 600ms 后跳列表页，表单不必清） */
 
     var okMsg = (res.result === "updated")
       ? "已覆盖提示词方案「" + name + "」，相关测试结果已同步"
@@ -1246,6 +1381,8 @@ function pdConnectDb(kind, cfg, name){
     if (!d || !d.ok){ toast((d && d.error) || ("连接 " + kind + " 失败"), "warn"); return null; }
     var db = addDb(name, kind, true, d);
     toast("已连接数据库：" + name + "（" + ((d.tables || []).length) + " 张表）", "ok");
+    /* 10-09：连上就存档 —— 下次进页面左栏还是这些库（pdLibSave 只送「连得上哪儿」+ 结构快照，不含密码） */
+    pdLibSave(db);
     return db;
   }, function(){
     toast("连接失败，请确认服务已启动", "warn");
@@ -1276,9 +1413,11 @@ function mockTables(kind, name, sch){
 #    原型里 addDb 在 mockTables 之后，函数声明是「后写的赢」，
 #    新增的那个会被原版直接盖掉 —— 实测表现为左栏 0 张表（踩过一次）。
 TS_ADDB_OLD = '''function addDb(name, kind, silent){
-  dbs.push({ id: nextDbId++, name: name, kind: kind, collapsed: false, tables: mockTables(kind, name) });
+  var db = { id: nextDbId++, name: name, kind: kind, collapsed: false, tables: mockTables(kind, name) };
+  dbs.push(db);
   renderTree();
   if (!silent) toast("已连接数据库：" + name, "ok");
+  return db;          /* 返回新建的库：调用方拿它去存档（pdLibSave） */
 }'''
 
 TS_ADDB_NEW = '''/* 二次迭代（第二批）：按库保存结构（db.map / db.rels）——
@@ -1290,6 +1429,7 @@ function addDb(name, kind, silent, sch){
   pdFillDb(db, sch);
   renderTree();
   if (!silent) toast("已连接数据库：" + name, "ok");
+  return db;          /* 返回新建的库：调用方拿它去存档（pdLibSave） */
   return db;
 }'''
 
@@ -1300,26 +1440,81 @@ initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
    （不需要的话删掉这一行即可，页面回到「先连接数据库」的初始态） */
 addDb("demo_shop.sqlite", "SQLite", true);
 
+/* 恢复上次保存的已连接数据库（原型态 PD_LIB_LOAD 回空列表 ⇒ 什么都不做） */
+pdLibRestore();
+
 resetSchema();'''
 
 TS_BOOT_NEW = '''/* ================= 启动 ================= */
 initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
 
-/* 二次迭代（第二批）：打开页面先连上后端自己的应用库（SQLite，真实结构），
-   其余 5 种类型由用户从「连接数据库」弹窗**真连**（见 pdConnectDb）。
-   「演示种子」换成「真实结构」，字段 / 排版 / CSS 一字未动。
-   说明文字不在这一步生成 —— 点「提取表结构」时才调 DeepSeek 补，且只补勾选到的表。 */
-function pdBoot(){
-  fetch("/api/schema").then(function(r){ return r.json(); }).then(function(d){
-    if (!d || !d.ok){ toast((d && d.error) || "读取库结构失败", "warn"); resetSchema(); return; }
-    addDb(d.name, d.kind, true, d);
-    resetSchema();
-  }, function(){
-    toast("读取库结构失败，请确认服务已启动", "warn");
-    resetSchema();
-  });
+/* 14-18 用户点名：**不再自动挂应用自带库**。
+   之前这里调了一次 GET /api/schema，把后端自己的 SQLite（srv / mdl / tst_* / django_migrations
+   等模板表）自动连上，用户一开页面左栏就挂着这十几张与「调提示词」无关的表。
+   现在改成：**左栏起始为空**，一切由用户自己导入 / 连接驱动 ——
+     · SQLite  → 选本机 .sqlite 文件（POST /api/schema 上传，服务端落 data/uploads/ 并回绝对路径）
+     · 其余 5 种 → 连接弹窗真连驱动（POST /api/schema/connect）
+   后续「提取表结构 / 复制 → 送提示词 / 链接数据库调试」全部只认用户导入的库。
+   ⚠️ 服务端的 GET /api/schema 仍然保留（外部调试 / 手工调用要用），只是页面不再自动调它。
+   ⚠️ 自动挂库那条链路里的 pdRememberConn 也随之不需要了 —— 连接登记只发生在用户
+   真正导入 / 连接的那一刻（ts-6 上传成功、ts-7 连接确认）。
+   ⚠️ 本注释里刻意不写那条 fetch 的完整字面量：`pack_modelscope.EXPECT_FETCH`
+   是在 static/*.html 里逐次数那串前缀的，注释里出现一次就会把打包脚本的计数带偏（踩过一次）。 */
+
+/* ⚠️ `renderTree()` 这句不能少：#dbTree 在 HTML 里是**空的**，那句「还没有连接数据库」的
+   提示是由 renderTree() 在 dbs 为空时渲染出来的（原来靠自动挂库间接触发）。
+   现在启动不挂库了，不显式调一次的话左栏就是一片空白、用户不知道该去连接 / 导入。 */
+renderTree();
+
+/* 10-09 用户点名：恢复上次**保存下来**的已连接数据库。
+   顺序很重要 —— 先 renderTree() 出「还没有连接数据库」的引导态，
+   等 /api/db-conn 回来再把存过的库逐个恢复进左栏（异步，网络慢也不挡页面）。
+   ⚠️ 恢复出来的库与「手动连接」走的是同一条路（addDb + pdFillDb），
+      所以照样能直接勾选 / 提取 / 复制，不用重连。 */
+pdLibRestore();
+
+resetSchema();'''
+
+# ---- 已连接数据库存档（10-09 用户点名）：原型态的空实现 → 真调后端 -----------
+PD_LIB_OLD = '''/* ---- 原型态的空实现：没有后端，什么都不做、不发请求 ----
+   应用侧由 build_static 把这三个函数原地替换成真调后端。 */
+function PD_LIB_SAVE(entry){ return; }
+function PD_LIB_DEL(name, kind){ return; }
+function PD_LIB_LOAD(onOk){ if (onOk) onOk([]); }'''
+
+PD_LIB_NEW = '''/* ================= 数据层接线：已连接数据库存档 =================
+   原型态那三个空实现到此为止；这里真调后端 /api/db-conn 三个动词。
+
+   ⚠️ 送出去的 entry **不含密码**（pdLibEntry 只挑「连得上哪儿」+ 结构快照）——
+      服务端那张表也没有密码列，这条地基两端都锁着。
+   ⚠️ **存档失败绝不打扰用户**：连接本身已经成功了，存档只是锦上添花。
+      只有服务端**明确回错**（且不是「表还没就位」）才提示一句，网络抖动一律静默。 */
+function PD_LIB_SAVE(entry){
+  fetch("/api/db-conn", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry)
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (res && res.ok === false && res.error && res.error !== "needSetup"){
+      toast("数据库已连接，但存档失败：" + res.error, "warn");
+    }
+  }).catch(function(){ /* 静默：存档失败不影响本次连接 */ });
 }
-pdBoot();'''
+
+function PD_LIB_DEL(name, kind){
+  fetch("/api/db-conn", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name, kind: kind })
+  }).catch(function(){ /* 静默：删除失败不挡「已从页面移除」这件事 */ });
+}
+
+function PD_LIB_LOAD(onOk){
+  fetch("/api/db-conn", { method: "GET" })
+    .then(function(r){ return r.json(); })
+    .then(function(res){ if (onOk) onOk((res && res.list) || []); })
+    .catch(function(){ if (onOk) onOk([]); });   /* 取不到就当没有存档 */
+}'''
 
 TS_EXTRACT_OLD = '''$btnExtract.addEventListener("click", function(){
   var sel = selection();
@@ -1362,15 +1557,19 @@ $btnRegen.addEventListener("click", function(){ pdRunExtract("已重新生成");
 TS_FILE_OLD = '''$fileConfirm.addEventListener("click", function(){
   if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
   hideMask($fileMask);
-  addDb(pickedFile, "SQLite");
+  /* 登记连接元数据：浏览器拿不到本机绝对路径，file 先留空（应用侧由后端回填） */
+  pdRememberConn(pickedFile, "SQLite", { mode: "file", file: "", host: "", port: "", dbname: "", user: "" });
+  pdLibSave(addDb(pickedFile, "SQLite"));
 });'''
 
-TS_FILE_NEW = '''$fileConfirm.addEventListener("click", function(){
+TS_FILE_NEW = '''/* 10-09：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端落一份到
+   data/uploads/ 并读出真实表结构（含外键）后回传。
+   ⚠️ 这一份**要留着**（原来读完即删）——「链接数据库调试」要在 DBeaver 里打开它，
+   删了就没有可指的路径了；服务端把绝对路径放在 res.path 里回传。 */
+$fileConfirm.addEventListener("click", function(){
   if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
   var f = $fileInput.files && $fileInput.files[0];
   if (!f){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
-  /* 二次迭代：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端临时打开、
-     读出真实表结构（含外键）后回传；说明仍在「提取表结构」时由 DeepSeek 补。 */
   var fd = new FormData();
   fd.append("file", f);
   hideMask($fileMask);
@@ -1379,17 +1578,32 @@ TS_FILE_NEW = '''$fileConfirm.addEventListener("click", function(){
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d || !d.ok){ toast((d && d.error) || "读取数据库结构失败", "warn"); return; }
-      addDb(d.name || f.name, d.kind || "SQLite", false, d);
+      /* 连接登记：文件绝对路径由服务端回传（浏览器侧拿不到，本机路径只有服务端知道） */
+      pdRememberConn(d.name || f.name, d.kind || "SQLite",
+        { mode: "file", file: d.path || "", host: "", port: "", dbname: "", user: "" });
+      /* 10-09：导入成功就存档（含表结构快照）—— 下次进来左栏还在，且能直接提取 */
+      pdLibSave(addDb(d.name || f.name, d.kind || "SQLite", false, d));
     }, function(){ toast("读取数据库结构失败，请确认服务已启动", "warn"); });
 });'''
 
 TS_CONN_OLD = '''  var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
   hideMask($connMask);
-  addDb(name, kind);
+  /* 登记连接元数据（供「提示词构造」页的「链接数据库调试」用）。
+     ⚠️ 密码**不登记**：DBeaver 侧用自己的已保存凭据，敏感信息不过我们的手。 */
+  pdRememberConn(name, kind, {
+    mode: connMode, host: $inpAddr.value, port: $inpPort.value,
+    dbname: $inpDbName.value, user: $inpUser.value, file: ""
+  });
+  pdLibSave(addDb(name, kind));
 });'''
 
 TS_CONN_NEW = '''  var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
   hideMask($connMask);
+  /* 连接登记（供「链接数据库调试」）：⚠️ 密码不登记，认证走 DBeaver 自己的凭据 */
+  pdRememberConn(name, kind, {
+    mode: connMode, host: $inpAddr.value, port: $inpPort.value,
+    dbname: $inpDbName.value, user: $inpUser.value, file: ""
+  });
   /* 二次迭代（第二批）：**真接驱动** —— 把弹窗里的连接信息交给后端，由后端用真实驱动
      （MySQL = pymysql / PostgreSQL = psycopg2 / SQL Server = pymssql /
        Oracle = oracledb / Db2 for LUW = ibm_db）连上去读真实表结构。
@@ -1454,7 +1668,9 @@ PATCHES = {
         ("str", L_BOOT_OLD, L_BOOT_NEW, "srv-list-5 启动加载"),
     ],
     "new_server.html": [
-        ("str", N_SAVE_OLD, N_SAVE_NEW, "srv-new-1 保存落库"),
+        ("str", N_SAVE_OLD, N_SAVE_NEW, "srv-new-1 保存落库（含后端查重 409 兜底）"),
+        ("str", N_URL_OLD, N_URL_NEW, "srv-new-2 base_url 查重改读真实库"),
+        ("str", N_MOCK_OLD, N_MOCK_NEW, "srv-new-3 演示网址清单下线"),
     ],
     "prompt.html": [
         ("str", PB_COMBO_OLD_1, PB_COMBO_NEW_1, "prompt-1 下拉初始化延迟 + initCombos 包裹"),
@@ -1464,6 +1680,8 @@ PATCHES = {
         ("str", PB_BOOT_OLD, PB_BOOT_NEW, "prompt-5 启动加载（数据来自 /api/*）"),
         ("str", PB_RUN_HEAD_OLD, PB_RUN_HEAD_NEW, "prompt-6 调试指标回填 + 并发守卫"),
         ("str", PB_RUN_OLD, PB_RUN_NEW, "prompt-7 调试改为调用真实模型"),
+        ("str", PB_DBG_OLD, PB_DBG_NEW, "prompt-8b 链接数据库调试改调后端唤起 DBeaver"),
+        ("str", PDX_RUN_OLD, PDX_RUN_NEW, "prompt-8c 页面内调试改调后端 execute-sql"),
         ("str", PB_SAVE_OLD, PB_SAVE_NEW, "prompt-8 保存落 tp 表 + 跳提示词方案列表页"),
     ],
     "prompt_scheme.html": [
@@ -1485,7 +1703,8 @@ PATCHES = {
         ("re", TS_REL_OLD, TS_REL_NEW, "ts-2 演示关系下线 + 真实结构数据层（按库）"),
         ("str", TS_MOCK_OLD, TS_MOCK_NEW, "ts-3 表清单按本库结构生成"),
         ("str", TS_ADDB_OLD, TS_ADDB_NEW, "ts-3b addDb 原地改：按库保存结构"),
-        ("str", TS_BOOT_OLD, TS_BOOT_NEW, "ts-4 启动改连真实库"),
+        ("str", TS_BOOT_OLD, TS_BOOT_NEW, "ts-4 启动不再自动挂应用自带库（左栏起始为空）"),
+        ("str", PD_LIB_OLD, PD_LIB_NEW, "ts-11 已连接数据库存档改调后端 /api/db-conn"),
         ("str", TS_EXTRACT_OLD, TS_EXTRACT_NEW, "ts-5 提取/重新生成先补说明再渲染"),
         ("str", TS_FILE_OLD, TS_FILE_NEW, "ts-6 选文件改成真上传读结构"),
         ("str", TS_CONN_OLD, TS_CONN_NEW, "ts-7 主机 / URL 连接改真接驱动"),

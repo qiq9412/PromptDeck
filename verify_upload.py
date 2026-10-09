@@ -64,7 +64,7 @@ DEV_LEAK = [
 ]
 # 包里必须存在的业务表（少了说明种子库不是这一版的）
 SEED_TABLES = ["srv", "mdl", "tst_plan", "tst_plan_prompt",
-               "tst_api_key", "tst_rec", "tst_rec_dtl"]
+               "tst_api_key", "tst_rec", "tst_rec_dtl", "tst_db_conn"]
 # 明文密钥形态：settings.py 里那把是 sk- + 32 位十六进制
 KEY_RE = re.compile(r"sk-[A-Za-z0-9]{20,}")
 # 真正的「根绝对路径 URL 引用」。**不能**用简单的 `="/` 判断 ——
@@ -183,13 +183,30 @@ def check_local(dst):
     if os.path.isfile(seed_p):
         try:
             c = sqlite3.connect(seed_p)
+            # 逐张点名缺哪张：整个 try 一次性抛错的话，报出来只会是
+            # 「表结构不对」，看不出是「包旧了」还是「库坏了」。
+            _missing = []
             for t in SEED_TABLES:
-                c.execute("select count(*) from %s" % t)
+                try:
+                    c.execute("select count(*) from %s" % t)
+                except sqlite3.Error:
+                    _missing.append(t)
+            if _missing:
+                errs.append("data/seed.sqlite 缺表：%s —— 包是旧的，"
+                            "请用当前代码重新打包（pack_modelscope.py）" % "、".join(_missing))
+                raise sqlite3.Error("缺表: %s" % "、".join(_missing))
             n_s = c.execute("select count(*) from srv").fetchone()[0]
             n_m = c.execute("select count(*) from mdl").fetchone()[0]
             n_k = c.execute("select count(*) from tst_api_key").fetchone()[0]
             if n_k:
                 errs.append("data/seed.sqlite 的 tst_api_key 还有 %d 行密钥 —— 密钥不能带上线" % n_k)
+            # 已连接数据库存档同样一条都不该带上线：里面是开发机连过的库
+            # （主机 / 库名 / 用户名 / 落盘路径），对使用者没意义还等于公开内网拓扑。
+            # ⚠️ 本表本来就没有密码列；这条闸门拦的是「连接信息」本身。
+            n_c = c.execute("select count(*) from tst_db_conn").fetchone()[0]
+            if n_c:
+                errs.append("data/seed.sqlite 的 tst_db_conn 还有 %d 行已保存连接 —— "
+                            "连接信息不能带上线（prepare_seed 的 clean_seed 没生效？）" % n_c)
             # 计费单位只允许原型下拉里的四个值
             bad_unit = c.execute(
                 "select count(*) from mdl where unit is not null and unit not in "
@@ -205,7 +222,8 @@ def check_local(dst):
             if n_s <= 0:
                 errs.append("data/seed.sqlite 里没有任何服务器记录（部署后页面会是空的）")
             else:
-                notes.append("种子库：%d 服务器 / %d 模型 / 密钥 %d 行" % (n_s, n_m, n_k))
+                notes.append("种子库：%d 服务器 / %d 模型 / 密钥 %d 行 / 连接存档 %d 行"
+                             % (n_s, n_m, n_k, n_c))
         except Exception as exc:                                 # noqa: BLE001
             errs.append("data/seed.sqlite 打不开或表结构不对（不是可用库 / 还是个 LFS 指针）：%s" % exc)
     ver_p = os.path.join(dst, "data", "seed.version")

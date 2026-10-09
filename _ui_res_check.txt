@@ -66,13 +66,13 @@ PromptDeck · 「测试结果列表」页端到端校验（真实 Edge + CDP）
   [PASS] 无页面 JS 异常  []
 
 ■ [11] 收尾：库表计数回到基线（本页不写库）
-  [PASS] srv 回到基线  17 -> 17
-  [PASS] mdl 回到基线  16 -> 16
-  [PASS] tst_plan 回到基线  0 -> 0
-  [PASS] tst_plan_prompt 回到基线  0 -> 0
-  [PASS] tst_api_key 回到基线  1 -> 1
-  [PASS] tst_rec 回到基线  0 -> 0
-  [PASS] tst_rec_dtl 回到基线  0 -> 0
+  [PASS] srv 回到基线  2 -> 2
+  [PASS] mdl 回到基线  31 -> 31
+  [PASS] tst_plan 回到基线  1 -> 1
+  [PASS] tst_plan_prompt 回到基线  2 -> 2
+  [PASS] tst_api_key 回到基线  2 -> 2
+  [PASS] tst_rec 回到基线  1 -> 1
+  [PASS] tst_rec_dtl 回到基线  30 -> 30
 
 ==============================================================================
 结果：全部通过

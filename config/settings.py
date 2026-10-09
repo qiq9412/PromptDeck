@@ -72,6 +72,14 @@ DEEPSEEK_API_KEY = os.environ.get("PD_DEEPSEEK_API_KEY") or "sk-19746978411e4ed9
 # 表结构提取默认读哪个 SQLite 库；留空 = 就用上面的 DB_PATH（应用库本身）
 SCHEMA_DB_PATH = os.environ.get("PD_SCHEMA_DB") or ""
 
+# 「链接数据库调试」用的 DBeaver 可执行文件：留空 = 自动探测
+#   探测顺序 = 环境变量 PROMPTDECK_DBEAVER → 标准安装位置 → **便携版浅层扫盘** → 注册表。
+#   ⚠️ 便携版 / 绿色版不在注册表、也不在 Program Files，用户装哪儿全凭自己
+#     （本机实测就装在 D:\DB\），所以必须扫盘才能自动找到。
+#   扫盘仍找不到时才需要在这里手填（指向 dbeaver.exe 本身或它所在的目录都行）。
+#   设 PD_DBEAVER_SCAN=0 可关掉扫盘（扫盘约 0.1~2 秒，按盘符数量浮动）。
+DBEAVER_PATH = os.environ.get("PROMPTDECK_DBEAVER") or ""
+
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 LANGUAGE_CODE = "zh-hans"

@@ -385,10 +385,25 @@ JS_PB_VISIBLE = """(function(menu){
   return JSON.stringify(vis);
 })"""
 
+# ⚠️ 点下拉项必须挑「当前**可见**」的那一条，不能用 querySelector 取「DOM 里第一个匹配」。
+#    下拉是「把不匹配的项 display:none 留在 DOM 里」，不是把项删掉；而模型名在**不同平台下会重名**
+#    （库里两条 claude-3-5-sonnet：一条挂在 Anthropic 下有 21.60/108.00，一条挂在 OpenAI 下是
+#    只补了名字的空价行）。点了服务器之后再按名字 querySelector，会点到被隐藏的那条 ——
+#    标签显示的是**另一行**的计费，于是拿 tgt 去比对必然假失败（10-09 踩过 3 项）。
+#    ⚠️ 比较值用**裸字符串字面量**（%s 处填 json.dumps 的结果，本身就是合法 JS 字符串字面量）；
+#      若沿用属性选择器那套 JSON.stringify(...)，拿到的是**带引号**的 "多模态"，=== 永远不等。
+JS_PICK_VISIBLE = (
+    "  var cand = document.querySelectorAll('#%s .combo-item'), it = null;\n"
+    "  for (var i=0;i<cand.length;i++){\n"
+    "    if (cand[i].style.display !== 'none'\n"
+    "        && cand[i].getAttribute('data-value') === %s){ it = cand[i]; break; }\n"
+    "  }\n"
+)
+
 JS_PB_PICK_TYPE = (
     "(function(){\n"
-    "  var it = document.querySelector('#menuModelType .combo-item[data-value=' + JSON.stringify(%s) + ']');\n"
-    "  if (!it) return '__NOITEM__';\n"
+    + (JS_PICK_VISIBLE % ("menuModelType", "%s"))
+    + "  if (!it) return '__NOITEM__';\n"
     "  it.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true}));\n"
     "  var all = document.querySelectorAll('#menuModel .combo-item'), vis = [];\n"
     "  for (var i=0;i<all.length;i++){\n"
@@ -398,9 +413,8 @@ JS_PB_PICK_TYPE = (
     "})()"
 )
 
-JS_PB_PICK_MODEL = """(function(){
-  var it = document.querySelector('#menuModel .combo-item[data-value=' + JSON.stringify(%s) + ']');
-  if (!it) return JSON.stringify({err: '__NOITEM__'});
+JS_PB_PICK_MODEL = ("""(function(){
+""" + (JS_PICK_VISIBLE % ("menuModel", "%s")) + """  if (!it) return JSON.stringify({err: '__NOITEM__'});
   it.dispatchEvent(new MouseEvent('mousedown', {bubbles:true, cancelable:true}));
   return JSON.stringify({
     inTag:    document.getElementById('tagIn').textContent,
@@ -410,7 +424,7 @@ JS_PB_PICK_MODEL = """(function(){
     hidden:   document.getElementById('costTags').hidden,
     modelVal: document.getElementById('model').value
   });
-})()"""
+})()""")
 
 # 必填校验原样：先两个都空、再只填系统提示词，各点一次「调试」
 JS_PB_RUN_GUARD = """(function(){
@@ -986,7 +1000,12 @@ def main():
             chk("输出计费标签 == out_price 原文（不四舍五入）",
                 tags.get("outTag") == "¥" + fmt_price(appdb.price_text(tgt["out_price"])),
                 tags.get("outTag"))
-            chk("单位标签 == unit", tags.get("unitIn") == "/ " + (tgt["unit"] or ""), tags.get("unitIn"))
+            # ⚠️ 原型口径是 `currentModel.unit ? "/ " + unit : ""`（prompt.html:1427）——
+            #    模型没配单位时该标签就留空，不是 "/ "。原先写死 "/ " + unit，是靠「点到隐藏的
+            #    同名行（unit='K'）」蒙过去的假通过。
+            chk("单位标签 == unit（模型未配单位时留空）",
+                tags.get("unitIn") == ("/ " + (tgt["unit"] or "") if tgt["unit"] else ""),
+                tags.get("unitIn"))
 
         w("")
         w("[12] 必填校验原样（未填系统提示词 / API_key 时应被拦下）")
@@ -1272,6 +1291,40 @@ def main():
         if nrows:
             chk("落库的 base_url 是补全后的网址",
                 nrows[0]["base_url"] == "https://example.com/v1", nrows[0]["base_url"])
+
+        w("")
+        w("[19b] 新增服务器：base_url 查重（10-09 用户点名 · 忽略大小写与末尾斜杠）")
+        # 拿 [19] 刚落库的那条网址，**改大小写 + 加末尾斜杠** —— 归一化后是同一条，必须被拦下。
+        # 「不同的网址照常存进去」由上面 [19] 已经证过（库里本来就有别的服务器，没被误拦）。
+        dup_src  = nrows[0]["base_url"] if nrows else "https://example.com/v1"
+        dup_var  = dup_src.upper() + "/"
+        dup_plat = "UI复现查重-" + stamp
+        srv_before = len(appdb.list_srv())
+        c.go(APP + "new_server.html", wait=5)
+        c.ev("""(function(){
+          document.getElementById('platform').value = %s;
+          document.getElementById('baseUrl').value  = %s;
+          document.getElementById('btnSave').click();
+          return 'ok';
+        })()""" % (json.dumps(dup_plat), json.dumps(dup_var)))
+        dup_txt = ""
+        for _ in range(7):                       # 前端要先 fetch /api/srv 再提示 → 轮询等它出来
+            c.pump(0.4)
+            dup_txt = str(c.ev("String((document.getElementById('toastWrap')||{}).textContent||'')"))
+            if "已存在服务器API网址" in dup_txt:
+                break
+        dup_cls = str(c.ev("String(document.getElementById('baseUrl').className||'')"))
+        c.pump(1.6)
+        w("    撞网址提示：%r    输入框类名：%s" % (dup_txt, dup_cls))
+        chk("提示「已存在服务器API网址」", "已存在服务器API网址" in dup_txt, dup_txt)
+        chk("base_url 进告警态", "is-invalid" in dup_cls, dup_cls)
+        chk("被拦下：仍停留在新增服务器页（没有跳回列表）",
+            "new_server.html" in str(c.ev("location.pathname")), c.ev("location.pathname"))
+        chk("被拦下：库内没有多出这条服务器",
+            len(appdb.list_srv()) == srv_before,
+            "%s -> %s" % (srv_before, len(appdb.list_srv())))
+        chk("被拦下：库内也没有这条平台名",
+            not [r for r in appdb.list_srv() if r["plat_name"] == dup_plat], dup_plat)
 
         w("")
         w("[20] 提示词构造：多轮会话按轮次依次调用，逐轮各产出一条回答")

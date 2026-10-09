@@ -1,0 +1,51 @@
+# -*- coding: utf-8 -*-
+"""临时：验 dbeaver_link_api 收到对象数组时，归一出的表名干净（不启动任何进程）。"""
+import os
+import sys
+
+sys.path.insert(0, os.getcwd())
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django
+django.setup()
+
+from core import views
+
+class FakeReq:
+    method = "POST"
+    content_type = "application/json"
+    def __init__(self, body):
+        self._b = body
+    @property
+    def body(self):
+        return self._b
+
+# 打桩 dbeaver.launch，只看传进去的 clean 里tables 长什么样
+import core.views as V
+got = {}
+V.dbeaver = type("M", (), {"launch": staticmethod(
+    lambda clean, sql: got.update(clean=clean, sql=sql) or {"ok": False, "error": "stub"})})
+
+import json
+payload = {
+    "meta": {"kind": "SQLite", "name": "x", "mode": "file", "file": "/no/such/x.db",
+             "tables": [
+                 {"name": "tst_plan", "rows": 1, "desc": "方案表",
+                  "cols": [["plan_name", "TEXT", "方案名称", "TEXT"]]},
+                 {"name": "tst_rec", "rows": 2, "desc": "记录表",
+                  "cols": [["rec_id", "pk", "", "INTEGER"]]}]},
+    "sql": "SELECT 1;",
+}
+views.sql_execute_api  # 触发 import 已有
+views.dbeaver_link_api(FakeReq(json.dumps(payload).encode("utf-8")))
+
+print("归一后的 tables =", got.get("clean", {}).get("tables"))
+t = got.get("clean", {}).get("tables") or []
+print("是纯表名列表吗:", t == ["tst_plan", "tst_rec"])
+print("没有 dict 原文泄漏:", not any(isinstance(x, (dict,)) for x in t))
+print("没有 [object:", not any("{" in str(x) for x in t))
+
+# 对照：老结构（纯表名数组）也要照常
+got.clear()
+payload["meta"]["tables"] = ["a", "b"]
+views.dbeaver_link_api(FakeReq(json.dumps(payload).encode("utf-8")))
+print("老结构仍正常:", got.get("clean", {}).get("tables") == ["a", "b"])

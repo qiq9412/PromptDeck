@@ -1,0 +1,52 @@
+# -*- coding: utf-8 -*-
+"""临时诊断：带 pwd 的 execute-sql 为何 500。"""
+import json
+import traceback
+import urllib.request
+
+import os
+import sys
+
+sys.path.insert(0, os.getcwd())
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+import django
+django.setup()
+
+from core import views, sqlrun
+
+print("=== 直接调 views.sql_execute_api 会不会抛 ===")
+payload = {"kind": "MySQL",
+           "meta": {"host": "127.0.0.1", "port": 59999, "user": "u", "dbname": "d"},
+           "pwd": "PdPwProbe_9x8y7z", "sql": "SELECT 1"}
+
+class FakeReq:
+    method = "POST"
+    content_type = "application/json"
+    def __init__(self, body):
+        self._b = body
+    @property
+    def body(self):
+        return self._b
+
+try:
+    resp = views.sql_execute_api(FakeReq(json.dumps(payload).encode("utf-8")))
+    print("OK:", resp.status_code, resp.content[:200])
+except Exception:
+    print("抛异常了：")
+    traceback.print_exc()
+
+print()
+print("=== sqlrun.run_sql 直调 ===")
+try:
+    print(sqlrun.run_sql("MySQL", dict(payload["meta"], pwd=payload["pwd"]), "SELECT 1"))
+except Exception:
+    traceback.print_exc()
+
+print()
+print("=== 单独试 cfg['pwd'] = '' 这行（finally 里的）===")
+cfg = {"host": "h", "pwd": "abc"}
+try:
+    cfg["pwd"] = "" if isinstance(cfg, dict) else cfg
+    print("这行没问题:", cfg)
+except Exception:
+    traceback.print_exc()

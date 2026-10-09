@@ -275,9 +275,12 @@ JS_TREE = """(function(){
   var empty = document.querySelector('#dbTree .ts-empty');
   return JSON.stringify({
     n: items.length,
+    dbs: document.querySelectorAll('#dbTree .db-node').length,
     db: dbn ? dbn.textContent : '',
     kind: dbk ? dbk.textContent : '',
     empty: !!empty,
+    /* 空态的**文案**（14-18 用来断言「提示用户去连接/导入」而不是挂着模板表） */
+    emptyText: empty ? (empty.textContent || '') : '',
     items: out,
     treeCount: (document.getElementById('treeCount') || {}).textContent || '',
     extractDisabled: document.getElementById('btnExtract').disabled,
@@ -464,6 +467,107 @@ JS_SELECTION = """(function(){
 
 JS_PICKED_FILE = "String(window.pickedFile || '')"
 
+# ---------------------------------------------------------------- 单库全选框
+# 14-18 用户点名：库头前加一个全选框，可全选**单个库**里的所有表。
+# 这里把它的行为整条钉住 —— 尤其那两条容易回归的：
+#   ① 点它**不能顺手把库折叠掉**（它就在 .db-node-head 里，不拦住就会误触）；
+#   ② 三态（全选 / 半选 / 空）必须跟着**表行勾选**实时变，且半选时再点是「补成全选」而不是「取消」。
+JS_DB_ALL_STATE = """(function(){
+  var nodes = document.querySelectorAll('#dbTree .db-node');
+  var out = [];
+  for (var i = 0; i < nodes.length; i++){
+    var n = nodes[i], box = n.querySelector('[data-db-all]');
+    var items = n.querySelectorAll('.tbl-item'), on = 0;
+    for (var j = 0; j < items.length; j++){
+      if (items[j].querySelector('.tbl-check').checked) on++;
+    }
+    out.push({ name: (n.querySelector('.db-name')||{}).textContent,
+               collapsed: n.classList.contains('is-collapsed'),
+               box: !!box, checked: box ? box.checked : null,
+               half: box ? box.indeterminate : null,
+               tables: items.length, on: on });
+  }
+  var tb = document.getElementById('checkAllTables');
+  return JSON.stringify({ nodes: out, total: tb ? { checked: tb.checked, half: tb.indeterminate } : null });
+})()"""
+
+JS_DB_ALL_CLICK = """(function(ix){
+  var nodes = document.querySelectorAll('#dbTree .db-node');
+  var box = nodes[ix] && nodes[ix].querySelector('[data-db-all]');
+  if (!box) return 'no-box';
+  box.click();
+  return 'clicked';
+})(%s)"""
+
+JS_DB_ALL_RESET = """(function(){
+  for (var i = 0; i < dbs.length; i++){
+    for (var j = 0; j < dbs[i].tables.length; j++){ dbs[i].tables[j].checked = false; }
+  }
+  renderTree();
+  return 'reset';
+})()"""
+
+JS_ERR_ONLY = "JSON.stringify({ errors: (window.__pdErrors || []).slice() })"
+
+# 把一个 .sqlite 文件当成「用户导入的库」挂到页面上（14-18 之后页面不再自动挂自带库了，
+# 所以每段需要表可用的用例都得自己先导入一次）。
+# 走的是页面自己的路径：选「SQLite」→ 选文件 → 确定 ⇒ POST /api/schema 上传 → addDb。
+# ⚠️ 本片段只负责「打开选文件弹窗」；真正挂文件靠 DOM.setFileInputFiles（浏览器不给本机路径）。
+JS_OPEN_SQLITE_FLOW = """(function(){
+  var it = document.querySelector('#comboDbType .combo-item[data-value="SQLite"]');
+  if (!it) return 'no-type-item';
+  it.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+  var f = document.getElementById('fileMask');
+  return (f && f.classList.contains('show')) ? 'opened' : 'no-mask';
+})()"""
+
+# 第 ix 个库里的表名清单（拿第 0 个 / 第 1 个来点，避免写死表名 —— 库结构会漂）
+JS_DB_TABLES = """(function(ix){
+  var n = document.querySelectorAll('#dbTree .db-node')[ix];
+  if (!n) return JSON.stringify({ tables: [] });
+  var out = [];
+  n.querySelectorAll('.tbl-item').forEach(function(li){ out.push(li.getAttribute('data-table')); });
+  return JSON.stringify({ tables: out });
+})(%s)"""
+
+# 「链接数据库调试」那份元数据（导入时就该登记好；没有它按钮会一直灰着）
+JS_DBLINK_META = """(function(){
+  var out = null;
+  for (var i = 0; i < dbs.length; i++){
+    if (dbs[i].kind === 'SQLite'){ out = dbs[i]; break; }
+  }
+  var m = null;
+  try{ m = JSON.parse(sessionStorage.getItem('pd_db_link_meta') || 'null'); }catch(e){}
+    return JSON.stringify({ dbs: dbs.length,
+    conn: (typeof PD_CONN !== 'undefined') ? Object.keys(PD_CONN).length : -1,
+    meta: m ? { kind: m.kind, hasFile: !!m.file, tables: (m.tables||[]).length } : null });
+})()"""
+
+# 存档恢复后的左栏状态（10-09：连接后自动存档 → 刷新后应自动恢复）
+JS_LIB_STATE = """(function(){
+  var nodes = document.querySelectorAll('#dbTree .db-node'), out = [];
+  for (var i = 0; i < nodes.length; i++){
+    var nm = nodes[i].querySelector('.db-name');
+    out.push({ name: nm ? nm.textContent.trim() : '',
+               tables: nodes[i].querySelectorAll('.tbl-item').length });
+  }
+  return JSON.stringify({
+    dbs: dbs.length,
+    nodes: out,
+    connCount: (typeof PD_CONN !== 'undefined') ? Object.keys(PD_CONN).length : -1,
+    emptyText: (function(){
+      var e = document.querySelector('#dbTree .ts-empty');
+      return e ? e.textContent.replace(/\\s+/g, ' ').trim() : '';
+    })()
+  });
+})()"""
+
+# 恢复出来的「连接登记」——「链接数据库调试 / 页面内调试」全靠它拿元数据
+JS_LIB_CONN = """(function(){
+  var r = (typeof pdFindConn === 'function') ? pdFindConn({ name: %s, kind: 'SQLite' }) : null;
+  return JSON.stringify(r ? { mode: r.mode, hasFile: !!r.file } : null);
+})()"""
+
 
 def db_snapshot():
     """库里真实结构（表名 → (行数, {字段名}))，用作基线，不写死。"""
@@ -482,6 +586,67 @@ def db_snapshot():
 def db_count(table):
     with sqlite3.connect(DB_PATH) as conn:
         return conn.execute("SELECT COUNT(*) FROM %s" % table).fetchone()[0]
+
+
+def lib_ids():
+    """tst_db_conn 里现有行的 id 集合。
+
+    本页现在**会写库**（连接成功后自动存档），所以收尾要自清理，
+    不能整表清空（用户自己攒的连接记录必须留着）。
+    表还没就位时返回空集 —— 页面本身也容错，不必让校验挂掉。
+    """
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            return {r[0] for r in conn.execute("SELECT id FROM tst_db_conn")}
+    except sqlite3.Error:
+        return set()
+
+
+# ---------------------------------------------------------------- 存档隔离
+# ⚠️ 10-09 起本页会把连上的库**存档**并在下次打开时自动恢复。
+#    本脚本 [1] 要断言「左栏起始为空」，后续又按位置挑表 ⇒
+#    库里若有别人的存档，恢复出来的库会插到左栏前面，把断言全带偏。
+#    ⇒ 跑前把存档快照 + 清空，跑完**只补缺地**放回去（不冲掉期间新写的连接）。
+def lib_snapshot():
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            cols = [r[1] for r in conn.execute("PRAGMA table_info(tst_db_conn)")]
+            rows = [tuple(r) for r in conn.execute("SELECT * FROM tst_db_conn")]
+        return (cols, rows) if cols else None
+    except sqlite3.Error:
+        return None
+
+
+def lib_clear():
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.execute("DELETE FROM tst_db_conn")
+            conn.commit()
+    except sqlite3.Error:
+        pass
+
+
+def lib_restore(snap):
+    """只补缺地放回跑前那份存档（测试期间用户新存的连接不能被冲掉）。"""
+    if not snap:
+        return 0
+    cols, rows = snap
+    n = 0
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            have = {(r[0], r[1]) for r in
+                    conn.execute("SELECT conn_name, conn_kind FROM tst_db_conn")}
+            ph = ",".join("?" * len(cols))
+            for row in rows:
+                d = dict(zip(cols, row))
+                if (d.get("conn_name"), d.get("conn_kind")) not in have:
+                    conn.execute("INSERT INTO tst_db_conn (%s) VALUES (%s)"
+                                 % (",".join(cols), ph), row)
+                    n += 1
+            conn.commit()
+    except sqlite3.Error:
+        pass
+    return n
 
 
 def wait_http(url, seconds=40):
@@ -532,8 +697,15 @@ def main():
 
     page_url = "http://127.0.0.1:%d/%s" % (APP_PORT, PAGE)
     real = db_snapshot()
-    tables = ("srv", "mdl", "tst_plan", "tst_plan_prompt", "tst_api_key", "tst_rec", "tst_rec_dtl")
+    tables = ("srv", "mdl", "tst_plan", "tst_plan_prompt", "tst_api_key",
+              "tst_rec", "tst_rec_dtl", "tst_db_conn")
+    # ⚠️ 存档隔离：先把 tst_db_conn 快照 + 清空，让「左栏起始为空」这个前提成立
+    #    （否则别人存过的库会被自动恢复进左栏，[1] 与后续按位置挑表全会偏）。
+    #    跑完在 [9] 之后原样补回去。
+    lib_snap = lib_snapshot()
+    lib_clear()
     before = {t: db_count(t) for t in tables}
+    lib_before_ids = lib_ids()
     secret = settings_secret()
 
     w("=" * 78)
@@ -593,17 +765,59 @@ def main():
 
         # ------------------------------------------------------------ [1] 打开页面
         w("")
-        w("■ [1] 打开页面 → 左栏是库里真实的表（不是演示数据）")
+        w("■ [1] 打开页面 → 左栏起始为空（14-18：不再自动挂应用自带库）")
         w("    页面：%s" % page_url)
         c.go(page_url, 5)
-        tree = wait_js(c, JS_TREE, "tree", lambda d: d.get("n", 0) > 0, seconds=20)
-        chk("左栏渲染出 %d 张真实表（库里共 %d 张）" % (len(real), len(real)),
+
+        # 先断言「空」这件事本身 —— 这是本轮需求的核心。
+        # ⚠️ 10-09 起页面会恢复**已保存的连接**，所以「起始为空」只在
+        #    「没有任何存档」时成立 ⇒ 这里**现场取**存档条数，不假设库是空的
+        #    （硬约束：基线一律现场取；写死的断言会被别的脚本留下的存档打翻）。
+        try:
+            _arch0 = (json.loads(urllib.request.urlopen(
+                "http://127.0.0.1:%d/api/db-conn" % APP_PORT, timeout=10)
+                .read().decode("utf-8")).get("list") or [])
+        except Exception:
+            _arch0 = []
+        t0 = c.ev_json(JS_TREE, "tree_empty")
+        if not _arch0:
+            chk("★ 左栏起始为空：一个库都没连（当前无存档）", (t0.get("n") or 0) == 0, t0.get("n"))
+        else:
+            chk("★ 有存档时左栏**只**恢复存档里的库，一个多余的都不挂",
+                (t0.get("n") or 0) == len(_arch0),
+                "dbs=%s archives=%s" % (t0.get("n"), len(_arch0)))
+        chk("★ 起始不含应用自带库那些模板表（srv / mdl / tst_* / django_migrations）",
+            not any(x in json.dumps(t0, ensure_ascii=False)
+                    for x in ("srv", "mdl", "tst_plan", "tst_rec", "django_migrations")),
+            t0.get("items"))
+        chk("★ 起始提示是「还没有连接数据库」而不是模板表清单",
+            "还没有连接数据库" in (t0.get("emptyText") or ""), t0.get("emptyText"))
+        chk("没勾选任何表 ⇒ 「提取表结构」是灰的", t0.get("extractDisabled") is True)
+
+        # 然后由「用户导入」把库接进来 —— 走页面自己的选文件流程
+        chk("导入：选「SQLite」弹出选文件窗口", c.ev(JS_OPEN_SQLITE_FLOW) == "opened")
+        c.send("DOM.enable")
+        doc = c.send("DOM.getDocument", {})
+        node = c.send("DOM.querySelector",
+                      {"nodeId": doc["root"]["nodeId"], "selector": "#fileInput"})["nodeId"]
+        c.send("DOM.setFileInputFiles", {"files": [DB_PATH], "nodeId": node})
+        time.sleep(1)
+        if not c.ev(JS_PICKED_FILE):
+            c.ev("(function(){document.getElementById('fileInput')"
+                 ".dispatchEvent(new Event('change',{bubbles:true}));return 1;})()")
+            time.sleep(0.5)
+        chk("导入：文件已挂到 #fileInput", bool(c.ev(JS_PICKED_FILE)), c.ev(JS_PICKED_FILE))
+        c.ev_json(JS_CLICK % "fileConfirm", "import_confirm")
+
+        tree = wait_js(c, JS_TREE, "tree", lambda d: d.get("n", 0) > 0, seconds=25)
+        chk("★ 导入后左栏渲染出 %d 张真实表（库里共 %d 张）" % (len(real), len(real)),
             tree.get("n") == len(real), "实际 %s 张" % tree.get("n"))
         got_names = [t["name"] for t in tree.get("items") or []]
-        chk("表清单 = 库内真实表清单", got_names == sorted(real.keys()),
+        chk("导入后的表清单 = 该库里真实表清单", got_names == sorted(real.keys()),
             "页面=%s" % got_names)
-        chk("库名 / 类型来自后端", tree.get("db") == os.path.basename(DB_PATH)
-            and tree.get("kind") == "SQLite", "%s / %s" % (tree.get("db"), tree.get("kind")))
+        chk("导入的库名来自上传的文件名",
+            tree.get("db") == os.path.basename(DB_PATH) and tree.get("kind") == "SQLite",
+            "%s / %s" % (tree.get("db"), tree.get("kind")))
         rows_ok = []
         for it in tree.get("items") or []:
             want = real.get(it["name"], (None,))[0]
@@ -611,9 +825,10 @@ def main():
             if got != str(want):
                 rows_ok.append("%s(%s!=%s)" % (it["name"], got, want))
         chk("每张表的行数 = 库里真实行数", not rows_ok, "%s" % rows_ok)
-        chk("还没勾选任何表 ⇒ 「提取表结构」是灰的", tree.get("extractDisabled") is True)
-        chk("演示种子已下线（左栏不是 demo_shop 那 6 张表）",
-            "demo_shop.sqlite" not in (tree.get("db") or ""))
+        chk("导入后仍没勾选任何表 ⇒ 「提取表结构」是灰的",
+            tree.get("extractDisabled") is True)
+        chk("导入的连接已登记（链接数据库调试要用：kind / 文件绝对路径 / 表名）",
+            c.ev(JS_DBLINK_META) is not None, c.ev(JS_DBLINK_META))
 
         # ------------------------------------------------------------ [2] 此时没调模型
         w("")
@@ -880,6 +1095,153 @@ CREATE TABLE only_here (               -- 只有这个库才有的表
             [(t["name"], t.get("desc")) for t in sc.get("tables") or []])
         chk("新增流程无 JS 异常", not (sc.get("errors") or []), sc.get("errors"))
 
+        # ============================================================ [8.5]
+        w("")
+        w("■ [8.5] 单库全选框（14-18 用户点名）：全选 / 半选 / 不误触折叠")
+        # ⚠️ 本段跑在前面用例之后，页面上**已经有勾选残留、也可能已经连了第二个库**
+        #   （实测起始就有 3 张已勾 + `pd_verify_other.sqlite`）。
+        #   所以先归零 + 只留第1 个库展开，全选框的初始态才有意义 —— 基线一律现场取。
+        c.ev(JS_DB_ALL_RESET)
+        # 只连一个库：把本段不额外连库，改为断开第二个（移除节点，不写库、无副作用）
+        c.ev("(function(){while(dbs.length>1){dbs.pop();}renderTree();return dbs.length;})()")
+        time.sleep(0.4)
+
+        d0 = c.ev_json(JS_DB_ALL_STATE, "db_all_init")
+        n0 = d0["nodes"][0]
+        w("    第 1 个库：%s（%s 张表）" % (n0["name"], n0["tables"]))
+        chk("库头前有全选框", n0["box"] is True, n0)
+        chk("★ 初始为未勾选、未半选（已先归零）",
+            n0["checked"] is False and n0["half"] is False and n0["on"] == 0, n0)
+        chk("本段只剩一个库（避免多库干扰计数）", len(d0["nodes"]) == 1, len(d0["nodes"]))
+
+        # 点一下 = 全选该库
+        c.ev(JS_DB_ALL_CLICK % 0)
+        d1 = c.ev_json(JS_DB_ALL_STATE, "db_all_on")
+        m1 = d1["nodes"][0]
+        chk("★ 点一下 = 该库全部表勾上", m1["on"] == m1["tables"] and m1["tables"] > 0,
+            "on=%s/%s" % (m1["on"], m1["tables"]))
+        chk("库级框变实勾", m1["checked"] is True and m1["half"] is False, m1)
+        chk("★ 点全选框不会误触折叠（最易回归的一条）", m1["collapsed"] is False, m1)
+
+        # 再点 = 取消
+        c.ev(JS_DB_ALL_CLICK % 0)
+        m2 = c.ev_json(JS_DB_ALL_STATE, "db_all_off")["nodes"][0]
+        chk("再点 = 取消全选", m2["on"] == 0, "on=%s" % m2["on"])
+        chk("库级框回到未勾选", m2["checked"] is False and m2["half"] is False, m2)
+
+        # 只勾一张表 => 半选（库级框与总全选框都要跟着半选）
+        first = c.ev_json(JS_DB_TABLES % 0, "db_all_first")["tables"][0]
+        c.ev(JS_PICK_DB_IX % (0, first))
+        time.sleep(0.4)
+        d3 = c.ev_json(JS_DB_ALL_STATE, "db_all_half")
+        m3 = d3["nodes"][0]
+        chk("★ 只勾一张表 => 库级框半选", m3["half"] is True and m3["checked"] is False
+            and m3["on"] == 1, m3)
+        chk("总全选框也跟着半选", (d3["total"] or {}).get("half") is True, d3["total"])
+
+        # 半选时再点 = 补成全选（不是取消）
+        c.ev(JS_DB_ALL_CLICK % 0)
+        m4 = c.ev_json(JS_DB_ALL_STATE, "db_all_full")["nodes"][0]
+        chk("★ 半选状态下再点是「补成全选」而不是取消",
+            m4["on"] == m4["tables"] and m4["checked"] is True,
+            "on=%s/%s" % (m4["on"], m4["tables"]))
+
+        # 全选后的勾选集合能直接喂给提取链路（selection 里就是该库全部表、同库聚合）
+        sel_all = c.ev_json(JS_SELECTION, "selection_all")
+        n_tables = m4["tables"]
+        n_sel = len(sel_all.get("on") or [])
+        dbs_in = len(set(x.split("|")[0] for x in (sel_all.get("on") or [])))
+        chk("★ 全选后 selection() 里是该库全部表、且同库聚合",
+            n_sel == n_tables and dbs_in == 1,
+            "sel=%s tables=%s dbs=%s" % (n_sel, n_tables, dbs_in))
+
+        # 总全选取消 => 各库级框同步清空
+        c.ev("document.getElementById('checkAllTables').click()")
+        time.sleep(0.4)
+        d5 = c.ev_json(JS_DB_ALL_STATE, "db_all_total_off")
+        chk("表名栏总全选取消 => 库级框同步清空",
+            all(n["on"] == 0 and n["checked"] is False and n["half"] is False
+                for n in d5["nodes"]), d5["nodes"])
+
+        # 折叠着也能全选（表仍在 DOM 里，不受折叠影响）
+        # ⚠️ 先确保是「展开」态再点头部折叠 —— 上一段结束时展开/折叠态不确定，
+        #   直接点头部可能变成「展开」，断言就会假失败（踩过一次）。
+        cur = c.ev_json(JS_DB_ALL_STATE, "db_all_pre_collapse")["nodes"][0]
+        if not cur["collapsed"]:
+            c.ev("document.querySelector('#dbTree .db-node .db-node-head').click()")
+            time.sleep(0.3)
+        c.ev(JS_DB_ALL_CLICK % 0)
+        m6 = c.ev_json(JS_DB_ALL_STATE, "db_all_collapsed")["nodes"][0]
+        chk("库折叠着也能全选", m6["collapsed"] is True and m6["on"] == m6["tables"], m6)
+
+        # 点库名 = 只折叠，勾选态不受影响
+        c.ev("document.querySelector('#dbTree .db-node .db-node-head').click()")
+        time.sleep(0.3)
+        b4 = c.ev_json(JS_DB_ALL_STATE, "db_all_before_name")["nodes"][0]
+        c.ev("document.querySelector('#dbTree .db-node .db-name').click()")
+        time.sleep(0.3)
+        af = c.ev_json(JS_DB_ALL_STATE, "db_all_after_name")["nodes"][0]
+        chk("点库名 = 只折叠、勾选态不变", af["collapsed"] is True and af["on"] == b4["on"],
+            "before on=%s after on=%s" % (b4["on"], af["on"]))
+        c.ev("document.querySelector('#dbTree .db-node .db-node-head').click()")   # 复原展开
+
+        # 归零 + 再全选，确认不是「只能全选一次」
+        c.ev(JS_DB_ALL_RESET)
+        c.ev(JS_DB_ALL_CLICK % 0)
+        m7 = c.ev_json(JS_DB_ALL_STATE, "db_all_again")["nodes"][0]
+        chk("归零后还能重新全选（不是一次性状态）",
+            m7["on"] == m7["tables"] and m7["checked"] is True,
+            "on=%s/%s" % (m7["on"], m7["tables"]))
+        chk("单库全选流程无 JS 异常", not (c.ev_json(JS_ERR_ONLY, "err_all").get("errors") or []))
+
+        # ---------------------------------------- [8.7] 已连接数据库存档（10-09 用户点名）
+        w("")
+        w("■ [8.7] 已连接数据库存档：连上就存 → 刷新后左栏自己回来（含表结构快照）")
+
+        def _ts_api(method, path, body=None):
+            req = urllib.request.Request(
+                "http://127.0.0.1:%d%s" % (APP_PORT, path),
+                data=(json.dumps(body).encode("utf-8") if body is not None else None),
+                method=method)
+            if body is not None:
+                req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
+        _lst = (_ts_api("GET", "/api/db-conn").get("list") or [])
+        w("    存档条数：%d" % len(_lst))
+        chk("★ 导入后页面**自动**存了档（没点任何「保存」按钮）", len(_lst) >= 1, len(_lst))
+        _lib = _lst[0] if _lst else {}
+        chk("★ 存档里有库名 / 类型 / 表结构快照",
+            bool(_lib.get("name")) and _lib.get("kind") == "SQLite"
+            and len(((_lib.get("schema") or {}).get("tables")) or []) > 0,
+            {k: _lib.get(k) for k in ("name", "kind")})
+        chk("★ SQLite 存档带上了服务端落盘路径（file）",
+            bool(_lib.get("file")), _lib.get("file"))
+        _dump = json.dumps(_lib, ensure_ascii=False).lower()
+        chk("★ 存档内容里没有密码字样（pwd / password 都不该出现）",
+            "pwd" not in _dump and "password" not in _dump)
+
+        # —— 刷新页面：存档的全部意义就在这一步之后 ——
+        c.go(page_url, 5)
+        stl = c.ev_json(JS_LIB_STATE, "lib_restore")
+        w("    刷新后左栏：dbs=%s  nodes=%s" % (stl.get("dbs"), stl.get("nodes")))
+        chk("★ 刷新后左栏**自己恢复**出存档里的库（不用重新导入）",
+            (stl.get("dbs") or 0) >= 1, stl.get("dbs"))
+        _names = [n.get("name") for n in (stl.get("nodes") or [])]
+        chk("★ 恢复出来的库名与存档一致", _lib.get("name") in _names, _names)
+        chk("★ 恢复出来的库带着表（表数与快照一致 ⇒ 能直接勾选 / 提取，不用重连）",
+            any((n.get("tables") or 0) > 0 for n in (stl.get("nodes") or [])),
+            stl.get("nodes"))
+        chk("★ 连接登记（PD_CONN）也恢复了 ⇒「链接数据库调试 / 页面内调试」拿得到元数据",
+            (stl.get("connCount") or 0) >= 1, stl.get("connCount"))
+        _cn = json.loads(c.ev(JS_LIB_CONN % json.dumps(_lib.get("name") or "")))
+        chk("★ 恢复出来的连接信息里带着服务端文件路径（file）",
+            bool(_cn) and _cn.get("hasFile") is True, _cn)
+        chk("★ 恢复后左栏不再显示「还没有连接数据库」",
+            "还没有连接数据库" not in (stl.get("emptyText") or ""), stl.get("emptyText"))
+        chk("恢复流程无 JS 异常", not (c.ev_json(JS_ERR_ONLY, "err_lib").get("errors") or []))
+
     finally:
         try:
             if edge:
@@ -905,10 +1267,27 @@ CREATE TABLE only_here (               -- 只有这个库才有的表
 
     # ------------------------------------------------------------ [9] 收尾
     w("")
-    w("■ [9] 收尾：库表计数回到基线（本页只读库，不写任何表）")
+    w("■ [9] 收尾：自清理后库表计数回到基线")
+    w("    （本页 10-09 起会写 tst_db_conn —— 连接后自动存档；"
+      "收尾按「跑前记 id、跑完差集删」清掉本次造的行，用户自己的连接记录不动）")
+    try:
+        with sqlite3.connect(DB_PATH) as conn:
+            _now = [r[0] for r in conn.execute("SELECT id FROM tst_db_conn")]
+            _mine = [i for i in _now if i not in lib_before_ids]
+            for i in _mine:
+                conn.execute("DELETE FROM tst_db_conn WHERE id = ?", (i,))
+            conn.commit()
+        w("    本次自清 %d 行存档" % len(_mine))
+    except sqlite3.Error as exc:
+        w("    （tst_db_conn 自清跳过：%s）" % exc)
     after = {t: db_count(t) for t in tables}
     for t in tables:
         chk("%s 回到基线" % t, after[t] == before[t], "%d -> %d" % (before[t], after[t]))
+
+    # 最后把跑前那份存档放回去（只补缺，测试期间用户新存的连接不受影响）
+    _back = lib_restore(lib_snap)
+    if lib_snap:
+        w("    已放回跑前的存档 %d 行" % _back)
 
     w("")
     w("=" * 78)

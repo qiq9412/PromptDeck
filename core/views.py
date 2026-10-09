@@ -9,6 +9,7 @@
 接口清单与上一版（Starlette）完全对齐，另外新增本次迭代的主角 /api/tp：
     GET    /api/srv     列表（?platform= &company= 模糊过滤）
     POST   /api/srv     新增        PUT 修改        DELETE 批量删除 {"ids":[...]}
+                        ⚠️ base_url 查重（用户点名）：命中已有网址回 409（前端也拦一道）
     GET    /api/mdl     列表        POST 新增       PUT 修改   DELETE 批量删除
     POST   /api/chat    调试（转发给真实模型）
     GET    /api/tp      提示词方案列表
@@ -26,17 +27,35 @@
     POST   /api/schema         上传的 .sqlite 文件的真实表结构（multipart: file）
     POST   /api/schema/connect 用真实驱动连 MySQL/PG/SQL Server/Oracle/Db2 并读结构
     POST   /api/schema/desc    只给「库里没有注释」的表 / 字段调 DeepSeek 补说明
+
+第三次迭代新增（「链接数据库调试」）：
+    POST   /api/dbeaver/link   唤起 DBeaver 打开表结构提取时记录的那个连接，
+                               并把最新一次模型生成的 SQL 放进新的 SQL 编辑器标签
+
+第四次迭代新增（「页面内调试」弹窗，与上面的 DBeaver 路线**并存**）：
+    POST   /api/database/execute-sql
+                               服务端真连库执行**只读** SQL，把结果集回给页面。
+                               密码由弹窗临时提交，只活这一次请求 ——
+                               不落库、不写文件、不进会话。
+
+第四次迭代新增（已连接数据库存档）：
+    GET    /api/db-conn        列出已保存的连接（含表结构快照）
+    POST   /api/db-conn        保存 / 覆盖一个已连接的库（按「库名+类型」覆盖）
+    DELETE /api/db-conn        按 {"ids":[…]} 或 {"name","kind"} 删除
+                               ⚠️ 本组接口**只收不含密码的连接信息**：
+                                  前端交接时就不登记密码，store 落库前再白名单式过滤一次。
 """
 import json
 import os
 import tempfile
+import time
 
 from django.conf import settings
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
 
-from . import chat, schema, store
+from . import chat, dbeaver, schema, sqlrun, store
 
 # 允许托管的原型页（白名单，顺带挡住路径穿越）
 PAGES = {
@@ -134,6 +153,12 @@ def srv_api(request):
 
     if request.method == "POST":
         d = payload(request)
+        dup = store.find_srv_by_url(to_str(d.get("base_url")))
+        if dup is not None:
+            return JsonResponse({
+                "ok": False, "error": "已存在服务器API网址",
+                "dupId": dup.id, "dupUrl": dup.base_url or "",
+            }, status=409)
         new_id = store.create_srv(
             to_str(d.get("plat_name")),
             to_str(d.get("base_url")),
@@ -147,6 +172,12 @@ def srv_api(request):
         srv_id = d.get("id")
         if srv_id in (None, ""):
             return JsonResponse({"ok": False, "error": "缺少 id"}, status=400)
+        dup = store.find_srv_by_url(to_str(d.get("base_url")), exclude_id=srv_id)
+        if dup is not None:
+            return JsonResponse({
+                "ok": False, "error": "已存在服务器API网址",
+                "dupId": dup.id, "dupUrl": dup.base_url or "",
+            }, status=409)
         n = store.update_srv(
             int(srv_id),
             to_str(d.get("plat_name")),
@@ -383,18 +414,47 @@ def rec_api(request):
 
 
 # ------------------------------------------------------------------ 数据库表结构（第二次迭代新增）
+def _prune_uploads(up_dir, keep=20):
+    """清理 data/uploads/ 里太老的副本，只留最近 `keep` 个。
+
+    这些副本是**故意保留**的（表结构页上传的 .sqlite 要留给 DBeaver 打开），
+    所以会一直堆积 —— 每上传一次多一个文件。不清理的话目录会无限变大。
+    按修改时间倒序保留最近的；删不掉就跳过（不因为清理失败影响主流程）。
+    """
+    try:
+        items = []
+        for name in os.listdir(up_dir):
+            p = os.path.join(up_dir, name)
+            if os.path.isfile(p):
+                items.append((os.path.getmtime(p), p))
+        items.sort(reverse=True)
+        for _, p in items[keep:]:
+            try:
+                os.remove(p)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
 @csrf_exempt
 def schema_api(request):
     """GET  → 应用库的真实表结构（core/schema.default_db_path()）
     POST → 上传的 .sqlite 文件的真实表结构（multipart，字段名 file）
 
-    两者回同一个形状：{ok, name, kind, tables, relations}。
+    两者回同一个形状：{ok, name, kind, path, tables, relations}。
     库里**本来就有注释**的表 / 字段把注释直接带回来（`descFrom: "db"`），
     没有注释的留空 —— 由页面在「提取表结构」时再走 /api/schema/desc 补。
     这里只读结构，不写任何库，也不做任何业务校验。
+
+    `path` = 该库的**绝对路径**（上传的落盘副本）。这是「链接数据库调试」唤起
+    DBeaver 打开 SQLite 时唯一需要的定位信息 —— 浏览器拿不到本机路径，只能由服务端回传。
     """
     if request.method == "GET":
-        res = schema.read_sqlite(schema.default_db_path())
+        db_path = schema.default_db_path()
+        res = schema.read_sqlite(db_path)
+        if res.get("ok"):
+            res["path"] = os.path.abspath(db_path)
         return JsonResponse(res, status=200 if res.get("ok") else 400)
 
     if request.method != "POST":
@@ -405,24 +465,187 @@ def schema_api(request):
         return JsonResponse({"ok": False, "error": "没有收到文件（字段名应为 file）"},
                             status=400)
 
-    # 浏览器只给文件内容、不给本机路径 ⇒ 落一个临时文件再看结构，看完即删。
-    tmp = ""
+    # 浏览器只给文件内容、不给本机路径 ⇒ 落一份到 data/uploads/ 再读结构。
+    # ⚠️ 刻意**保留**这份副本（原来读完即删）：「链接数据库调试」要在 DBeaver 里打开
+    #    这个文件，删了就没有可指的路径了。名字加时间戳，避免同名互相覆盖。
+    up_dir = os.path.abspath(os.path.join(str(getattr(settings, "BASE_DIR", ".")),
+                                          "data", "uploads"))
     try:
-        with tempfile.NamedTemporaryFile(prefix="pd_schema_", suffix=".sqlite",
-                                         delete=False) as fp:
+        os.makedirs(up_dir, exist_ok=True)
+        _prune_uploads(up_dir)
+        base = os.path.basename(up.name or "") or "upload.sqlite"
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        target = os.path.join(up_dir, "%s_%s" % (stamp, base))
+        with open(target, "wb") as fp:
             for chunk in up.chunks():
                 fp.write(chunk)
-            tmp = fp.name
-        res = schema.read_sqlite(tmp, name=os.path.basename(up.name or "") or "未命名.sqlite")
-        return JsonResponse(res, status=200 if res.get("ok") else 400)
     except Exception as exc:                       # 超大文件 / 落盘失败等
-        return JsonResponse({"ok": False, "error": "读取上传文件失败：%s" % exc}, status=400)
-    finally:
-        if tmp:
-            try:
-                os.remove(tmp)
-            except OSError:
-                pass
+        return JsonResponse({"ok": False, "error": "保存上传文件失败：%s" % exc}, status=400)
+
+    res = schema.read_sqlite(target, name=os.path.basename(up.name or "") or "未命名.sqlite")
+    if res.get("ok"):
+        res["path"] = os.path.abspath(target)
+    return JsonResponse(res, status=200 if res.get("ok") else 400)
+
+
+@csrf_exempt
+def dbeaver_link_api(request):
+    """POST /api/dbeaver/link —— 「链接数据库调试」：唤起 DBeaver 并送 SQL 进去。
+
+    请求体（JSON）：{"meta": {kind, name, mode, host, port, dbname, user, file, tables},
+                     "sql": "模型生成的 SQL 原文"}
+    响应体：{"ok":true, exe, sqlFile, target, note}
+             {"ok":false, "error": 缺什么 / 路径不对 / 启动失败}
+
+    ⚠️ 请求体里**永远不该有密码**：表结构页交接时就不登记它，这里也不接收 ——
+       认证交给 DBeaver 自己已保存的凭据，不经我们的手。
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method not allowed"}, status=405)
+
+    d = payload(request)
+    meta = d.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+    # tables 只用来写进脚本头部的注释，认「数组或逗号分隔串」两种写法。
+    # ⚠️ 10-09 起前端交来的元素**可能是对象**（页面内调试弹窗要字段结构，
+    #    于是 tables 升级成 [{name,rows,desc,cols}]）—— 这里只取 name，
+    #    不能直接 to_str(x)，否则脚本注释里会写出一串 Python dict 原文。
+    tables = meta.get("tables")
+    if isinstance(tables, str):
+        tables = [x.strip() for x in tables.split(",") if x.strip()]
+    elif isinstance(tables, (list, tuple)):
+        out = []
+        for x in tables:
+            if isinstance(x, dict):
+                n = to_str(x.get("name"))
+            else:
+                n = to_str(x)
+            if n:
+                out.append(n)
+        tables = out
+    else:
+        tables = []
+
+    clean = {
+        "kind":   to_str(meta.get("kind")),
+        "name":   to_str(meta.get("name")),
+        "mode":   to_str(meta.get("mode")) or "host",
+        "host":   to_str(meta.get("host")),
+        "port":   to_str(meta.get("port")),
+        "dbname": to_str(meta.get("dbname")),
+        "user":   to_str(meta.get("user")),
+        "file":   to_str(meta.get("file")),
+        "tables": tables,
+    }
+
+    res = dbeaver.launch(clean, to_str(d.get("sql")))
+    return JsonResponse(res, status=200)
+
+
+@csrf_exempt
+def sql_execute_api(request):
+    """POST /api/database/execute-sql —— 「页面内调试」：服务端代跑只读 SQL。
+
+    请求体（JSON）：
+        {"kind": "MySQL"|"PostgreSQL"|"SQL Server"|"Oracle"|"Db2 for LUW"|"SQLite",
+         "meta": {…表结构页交接来的连接信息…},
+         "pwd": "弹窗里临时输入的密码",
+         "sql": "要执行的 SQL 原文"}
+
+    响应体：{"ok":true,  columns, rows, elapsed, rowCount, truncated}
+             {"ok":false, error:"…"}
+
+    三条口径（与本文件其余接口的差异，都是刻意为之）：
+      1. **密码只活这一次请求**：`pwd` 从请求体取出后直接进 `sqlrun`，函数返回即丢。
+         **不写 tst_api_key、不写 session、不写任何文件** —— 与 `/api/dbeaver/link`
+         「认证交给 DBeaver 已存凭据」是同一道安全地基，两条路线都不落密码。
+      2. **只放行只读语句**：SQL 原文进 `sqlrun.check_readonly`，写/管理语句一律拒。
+         这里**刻意做服务端二次校验**，与项目「不做二次校验」的通例不同：
+         其余接口校验错了只是页面报错，这里漏一条就是数据损坏。
+      3. **驱动真实报错原样透出**：不加工、不兜底成「执行失败」，让页面能显示
+         `no such table: xxx` 这种用户看得懂、能自己改的信息。
+    """
+    if request.method != "POST":
+        return JsonResponse({"ok": False, "error": "method not allowed"}, status=405)
+
+    d = payload(request)
+    meta = d.get("meta")
+    if not isinstance(meta, dict):
+        meta = {}
+
+    kind = to_str(d.get("kind") or meta.get("kind"))
+    sql = to_str(d.get("sql"))
+    pwd = to_str(d.get("pwd"))          # 弹窗临时输入的密码
+
+    # 连接信息与「表结构提取」页交接的形状保持一致；meta 里**从来没有密码**
+    cfg = dict(meta)
+    cfg["kind"] = kind
+    cfg["pwd"] = pwd                    # 只在这里挂上，函数返回后随 cfg 一起消失
+    cfg.pop("tables", None)             # 表清单对执行没用，去掉省得白传一遍
+
+    res = sqlrun.run_sql(kind, cfg, sql)
+
+    # 双保险：即便 run_sql 内部漏了清理，这里也不让密码残留在任何长期引用里
+    cfg["pwd"] = ""
+    d["pwd"] = ""
+
+    return JsonResponse(res, status=200)
+
+
+@csrf_exempt
+def db_conn_api(request):
+    """已连接数据库存档的三个动词（第四次迭代新增）。
+
+    GET    → {"ok":true, "list":[…]}
+    POST   → {"ok":true, "id":N, "action":"created"|"updated"}
+    DELETE → {"ok":true, "deleted":N}
+
+    口径：
+      · 保存键 = (库名, 类型)，同一个库重复导入 / 重连只更新那一条；
+      · **密码不进这张表**：请求体里就算带了 pwd 也会被 store 白名单式剔除；
+      · 表没就位（线上老库）时 GET 回 `needSetup:true` 的空列表，不报 500。
+    """
+    if request.method == "GET":
+        return JsonResponse(store.list_db_conn(), status=200)
+
+    d = payload(request)
+
+    if request.method == "POST":
+        # meta 里才是连接信息本体；也接受把字段平铺在顶层（两种写法都认）
+        meta = d.get("meta")
+        if not isinstance(meta, dict):
+            meta = d
+        entry = {
+            "name": to_str(meta.get("name")),
+            "kind": to_str(meta.get("kind")),
+            "mode": to_str(meta.get("mode")),
+            "host": to_str(meta.get("host")),
+            "port": to_str(meta.get("port")),
+            "dbname": to_str(meta.get("dbname")),
+            "user": to_str(meta.get("user")),
+            "file": to_str(meta.get("file")),
+            "schema": d.get("schema") if isinstance(d.get("schema"), dict) else meta.get("schema"),
+            "checked": d.get("checked"),
+        }
+        new_id, action = store.save_db_conn(entry)
+        if new_id is None:
+            # needSetup / 缺库名类型 —— 都按「未成功」回，但不 500
+            return JsonResponse({"ok": False, "error": action}, status=200)
+        return JsonResponse({"ok": True, "id": new_id, "action": action}, status=200)
+
+    if request.method == "DELETE":
+        ids = d.get("ids")
+        if isinstance(ids, (list, tuple)) and ids:
+            n = store.delete_db_conn(ids)
+            return JsonResponse({"ok": True, "deleted": n}, status=200)
+        # 也支持按「库名 + 类型」删（页面「移除该库」时手上只有这两个）
+        n = store.delete_db_conn_by_key(d.get("name"), d.get("kind"))
+        if not to_str(d.get("name")) or not to_str(d.get("kind")):
+            return JsonResponse({"ok": False, "error": "缺少 ids 或 name/kind"}, status=200)
+        return JsonResponse({"ok": True, "deleted": n}, status=200)
+
+    return JsonResponse({"ok": False, "error": "method not allowed"}, status=405)
 
 
 @csrf_exempt

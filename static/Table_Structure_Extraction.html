@@ -671,6 +671,12 @@
     transition:transform .18s ease;
   }
   .db-node.is-collapsed .db-caret{transform:rotate(-90deg);}
+  /* 单库全选框（14-18 用户点名）：放在库名左侧、caret 右边。
+     外观直接吃基座 input[type="checkbox]，这里只补 flex 对齐，
+     尺寸比表行复选框（20px）略小一点，让「库的层级」和「表的层级」在视觉上可区分。 */
+  .db-all-check{width:17px;height:17px;border-radius:4px;flex:0 0 auto;}
+  .db-all-check:disabled{cursor:not-allowed;background:var(--fill);border-color:#E3D9CC;}
+  .db-all-check:disabled:hover{border-color:#E3D9CC;}
   .db-name{font-size:13.5px;font-weight:800;letter-spacing:-.1px;color:var(--ink);word-break:break-all;}
   .db-kind{
     font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
@@ -1165,6 +1171,19 @@
 
 <div class="toast-wrap" id="toastWrap"></div>
 
+<!-- ========== 复制后：是否同时填入「提示词构造」页（10-09 新增，用户点名） ========== -->
+<div class="mask" id="copyMask" role="dialog" aria-modal="true" aria-labelledby="copyTitle">
+  <div class="modal">
+    <h3 id="copyTitle">复制到提示词构造页？</h3>
+    <p>表内容已复制到剪贴板。是否<b>同时填入「提示词构造」页的系统提示词</b>并跳转过去？</p>
+    <div class="names">系统提示词 = 「你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句」+ 下面的表结构</div>
+    <div class="modal-foot">
+      <button type="button" class="btn btn-ghost" id="copyCancel">取消</button>
+      <button type="button" class="btn btn-add" id="copyConfirm">确认</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* =======================================================================
    数据库表结构提取 · 交互层（原型态：内置演示表结构，不连接真实数据库）
@@ -1280,6 +1299,8 @@ function pdConnectDb(kind, cfg, name){
     if (!d || !d.ok){ toast((d && d.error) || ("连接 " + kind + " 失败"), "warn"); return null; }
     var db = addDb(name, kind, true, d);
     toast("已连接数据库：" + name + "（" + ((d.tables || []).length) + " 张表）", "ok");
+    /* 10-09：连上就存档 —— 下次进页面左栏还是这些库（pdLibSave 只送「连得上哪儿」+ 结构快照，不含密码） */
+    pdLibSave(db);
     return db;
   }, function(){
     toast("连接失败，请确认服务已启动", "warn");
@@ -1350,6 +1371,11 @@ var $fieldPwd   = document.getElementById("fieldPwd");
 var $fieldDbName= document.getElementById("fieldDbName");
 var $connCancel = document.getElementById("connCancel");
 var $connConfirm= document.getElementById("connConfirm");
+
+/* 复制后「是否填入提示词构造页」（10-09 新增） */
+var $copyMask   = document.getElementById("copyMask");
+var $copyCancel = document.getElementById("copyCancel");
+var $copyConfirm= document.getElementById("copyConfirm");
 
 /* ================= 轻提示 ================= */
 function toast(msg, type){
@@ -1478,12 +1504,16 @@ function addDb(name, kind, silent, sch){
   pdFillDb(db, sch);
   renderTree();
   if (!silent) toast("已连接数据库：" + name, "ok");
+  return db;          /* 返回新建的库：调用方拿它去存档（pdLibSave） */
   return db;
 }
 function removeDb(id){
+  var gone = null;
   for (var i = 0; i < dbs.length; i++){
-    if (dbs[i].id === id){ dbs.splice(i, 1); break; }
+    if (dbs[i].id === id){ gone = dbs.splice(i, 1)[0]; break; }
   }
+  /* 服务端那份存档也要跟着删 —— 否则下次进来它又被恢复出来了 */
+  if (gone) pdLibDelete(gone);
   renderTree();
   toast("已移除该数据库", "ok");
 }
@@ -1509,9 +1539,21 @@ function renderTree(){
   var h = "", i, j;
   for (i = 0; i < dbs.length; i++){
     var db = dbs[i];
+    /* 单库全选框的三态：全选=勾上 / 选了一部分=半选 / 一张没选=空。
+       状态是**从表行实时算出来的**，不单独存 —— 这样表行怎么变它都跟着对。 */
+    var tot = db.tables.length, seld = 0;
+    for (j = 0; j < tot; j++){ if (db.tables[j].checked) seld++; }
     h += '<div class="db-node' + (db.collapsed ? ' is-collapsed' : '') + '" data-db="' + db.id + '">';
     h +=   '<div class="db-node-head">'
         +     '<svg class="db-caret" viewBox="0 0 12 12" fill="none"><path d="M3 4.6 L6 7.8 L9 4.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        +     '<input type="checkbox" class="db-all-check" data-db-all="' + db.id + '"'
+        +            (tot === 0 ? ' disabled' : '')
+        +            (seld > 0 && seld < tot ? ' data-half="1"' : '')
+        +            (seld > 0 && seld === tot ? ' checked' : '')
+        +            ' title="' + (tot === 0 ? '该数据库没有表'
+                                    : (seld > 0 && seld < tot ? '已选 ' + seld + ' / ' + tot + ' 张，点一下全选'
+                                       : '全选 / 取消全选（' + tot + ' 张表）'))
+        +            '" aria-label="全选数据库 ' + esc(db.name) + ' 的所有表" />'
         +     '<span class="db-name">' + esc(db.name) + '</span>'
         +     '<span class="db-kind">' + esc(db.kind) + '</span>'
         +     '<span class="db-count">' + db.tables.length + ' 张表</span>'
@@ -1548,6 +1590,7 @@ function syncPick(){
     : '勾选需要提取的表';
   $btnExtract.disabled = sel.length === 0;
   syncAllCheck();
+  syncDbAllChecks();
 
   /* 勾选内容变了 → 之前生成的表结构已过期，重置展示栏 */
   if (sig !== lastSig){
@@ -1570,6 +1613,26 @@ function syncAllCheck(){
   $allCheck.checked       = total > 0 && on === total;
   $allCheck.indeterminate = on > 0 && on < total;
   $allCheck.disabled      = total === 0;
+}
+
+/* 每个库自己的全选框（14-18 用户点名）：跟着**表行的勾选态**实时同步三态。
+   ⚠️ 必须独立于 renderTree 的一条路径来刷 ——
+   点单个表行时只改 li 的 class、不重画整棵树（否则会丢滚动位置与焦点），
+   所以库级复选框得在这里补上。 */
+function syncDbAllChecks(){
+  var boxes = $dbTree.querySelectorAll("[data-db-all]");
+  for (var i = 0; i < boxes.length; i++){
+    var box = boxes[i];
+    var db = findDb(Number(box.getAttribute("data-db-all")));
+    if (!db || !db.tables.length){ box.checked = false; box.indeterminate = false; continue; }
+    var on = 0;
+    for (var j = 0; j < db.tables.length; j++){ if (db.tables[j].checked) on++; }
+    box.checked       = on === db.tables.length;
+    box.indeterminate = on > 0 && on < db.tables.length;
+    box.title = box.checked ? "全选 / 取消全选（" + db.tables.length + " 张表）"
+                            : (box.indeterminate ? ("已选 " + on + " / " + db.tables.length + " 张，点一下全选")
+                                                 : "全选 / 取消全选（" + db.tables.length + " 张表）");
+  }
 }
 
 /* 表结构栏的「重新生成 / 清空」：没勾选表就不能重新生成；没生成过就没得清空 */
@@ -1774,12 +1837,14 @@ $fileInput.addEventListener("change", function(){
   $fileName.classList.remove("empty");
 });
 $fileCancel.addEventListener("click", function(){ hideMask($fileMask); });
+/* 10-09：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端落一份到
+   data/uploads/ 并读出真实表结构（含外键）后回传。
+   ⚠️ 这一份**要留着**（原来读完即删）——「链接数据库调试」要在 DBeaver 里打开它，
+   删了就没有可指的路径了；服务端把绝对路径放在 res.path 里回传。 */
 $fileConfirm.addEventListener("click", function(){
   if (!pickedFile){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
   var f = $fileInput.files && $fileInput.files[0];
   if (!f){ toast("请先选择 SQLite 数据库文件", "warn"); return; }
-  /* 二次迭代：浏览器拿不到本机路径，改为把选中的 .sqlite 交给服务端临时打开、
-     读出真实表结构（含外键）后回传；说明仍在「提取表结构」时由 DeepSeek 补。 */
   var fd = new FormData();
   fd.append("file", f);
   hideMask($fileMask);
@@ -1788,7 +1853,11 @@ $fileConfirm.addEventListener("click", function(){
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d || !d.ok){ toast((d && d.error) || "读取数据库结构失败", "warn"); return; }
-      addDb(d.name || f.name, d.kind || "SQLite", false, d);
+      /* 连接登记：文件绝对路径由服务端回传（浏览器侧拿不到，本机路径只有服务端知道） */
+      pdRememberConn(d.name || f.name, d.kind || "SQLite",
+        { mode: "file", file: d.path || "", host: "", port: "", dbname: "", user: "" });
+      /* 10-09：导入成功就存档（含表结构快照）—— 下次进来左栏还在，且能直接提取 */
+      pdLibSave(addDb(d.name || f.name, d.kind || "SQLite", false, d));
     }, function(){ toast("读取数据库结构失败，请确认服务已启动", "warn"); });
 });
 $fileMask.addEventListener("click", function(e){ if (e.target === $fileMask) hideMask($fileMask); });
@@ -1874,6 +1943,11 @@ $connConfirm.addEventListener("click", function(){
   }
   var name = deriveName(kind, $inpAddr.value, $inpDbName.value);
   hideMask($connMask);
+  /* 连接登记（供「链接数据库调试」）：⚠️ 密码不登记，认证走 DBeaver 自己的凭据 */
+  pdRememberConn(name, kind, {
+    mode: connMode, host: $inpAddr.value, port: $inpPort.value,
+    dbname: $inpDbName.value, user: $inpUser.value, file: ""
+  });
   /* 二次迭代（第二批）：**真接驱动** —— 把弹窗里的连接信息交给后端，由后端用真实驱动
      （MySQL = pymysql / PostgreSQL = psycopg2 / SQL Server = pymssql /
        Oracle = oracledb / Db2 for LUW = ibm_db）连上去读真实表结构。
@@ -1888,12 +1962,135 @@ $connConfirm.addEventListener("click", function(){
 });
 $connMask.addEventListener("click", function(e){ if (e.target === $connMask) hideMask($connMask); });
 
+/* ================= 「复制 → 是否填入提示词构造页」（10-09 新增，用户点名） =================
+   口径（逐条选定）：
+     · 点「复制」照旧把表结构写进剪贴板（原能力一个字不动），紧接着弹窗问一句是否**同时**
+       填入「提示词构造」页的系统提示词；取消就只当复制过了，什么都不发生；
+     · 确认 → 把内容暂存在 sessionStorage（同标签页），跳 prompt.html?pdSchema=1，
+       构造页认领后**整段覆盖**系统提示词文本框，并在表结构前加一句固定前缀。
+   前缀句是用户逐字给的原话，别改写。
+   16:32 用户点名在这句后面**再加一句输出约束**：「不要有其他解释，仅返回sql语句」——
+   起因是模型常在 SQL 前后带自然语言说明 / ```sql 围栏，粘进 DBeaver 后没法直接跑。
+   ⚠️ 这句同样是用户逐字给的原话，**别改写、别润色**（`verify_pages` 与 `verify_ui_edit` 都逐字钉住）。 */
+var PD_SCHEMA_KEY    = "pd_schema_handoff";
+var PD_DBLINK_KEY    = "pd_db_link_meta";
+var PD_SCHEMA_PREFIX = "你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\n\n"
+                     + "不要有其他解释，仅返回sql语句\n\n";
+
+/* ---- 连接元数据登记（10-09 新增，「链接数据库调试」的前置条件之一）----
+   按「库名|类型」记住每个已连接库的连接信息，勾选表 → 复制交接时取出来，
+   连同「本次提取了哪几张表」一起写进 sessionStorage，构造页据此唤起 DBeaver。
+   ⚠️ 密码一律不登记、不外传：DBeaver 用它自己已保存的凭据。 */
+var PD_CONN = {};
+
+function pdRememberConn(name, kind, info){
+  PD_CONN[name + "|" + kind] = {
+    kind: kind, name: name,
+    mode:  (info && info.mode)  || "host",
+    host:  (info && info.host)  || "",
+    port:  (info && info.port)  || "",
+    dbname:(info && info.dbname)|| "",
+    user:  (info && info.user)  || "",
+    file:  (info && info.file)  || ""
+  };
+}
+function pdFindConn(db){
+  return PD_CONN[(db && db.name) + "|" + (db && db.kind)] || null;
+}
+
+/* 本次交接要带走的元数据：取「第一个被勾选表所属的库」的连接信息 + 全部勾选表名。
+   跨多个库勾选时，只认第一个库（表名仍全部带上，供提示与定位参考）。
+
+   ⚠️ 10-09 修订：`tables` 从「纯表名数组」升级成**结构化表清单**。
+      起因：构造页的「页面内调试」弹窗左栏要展示已关联的表结构 + 外键，
+      而纯表名数组渲染不出字段（形状对不上，左栏一直空白）。
+      字段数据的真源就在本页的 `schemaOf()`，顺手带上即可 —— **不必回连一次库**。
+      `name` 字段保持不变 ⇒ 所有只读表名的老代码（如 dbeaver 拼脚本注释）零改动。 */
+function pdDbLinkMeta(sel){
+  var first = null, tables = [], rels = [], i;
+  for (i = 0; i < sel.length; i++){
+    /* ⚠️ 必须传第二个参数 db：应用侧 build_static 把 schemaOf 改成
+       `schemaOf(name, db)`（结构按库取，一次连多个库时同名表不串）。
+       只传表名会走全局 SCHEMA 回落 —— 真实库里那张表就查不到，cols 会是空的。 */
+    var sch = schemaOf(sel[i].t.name, sel[i].db);
+    tables.push({
+      name: sel[i].t.name,
+      rows: (typeof sel[i].t.rows === "number") ? sel[i].t.rows : null,
+      desc: sch.desc || "",
+      /* cols 沿用 buildText 的四元组 [字段名, 类型逻辑值, 说明, 真实类型]，
+         其中类型逻辑值 ==="pk" 表示主键 —— 与 buildText / 后端 dbx 的口径完全一致。 */
+      cols: (sch.cols || []).map(function(c){
+        return [c[0], c[1] || "", c[2] || "", c[3] || ""];
+      })
+    });
+    if (!first) first = sel[i].db;
+  }
+  /* 外键：与系统提示词里那份用同一个来源（collectRels）。
+     ⚠️ fromTable 必须带上 `r[0]`（**从表名**）—— 弹窗左栏靠它把外键挂到对应表下面。
+        r[4] 是关系说明（"外键关联"），db.name 是库名，两者别混。 */
+  var rl = collectRels(sel);
+  for (i = 0; i < rl.length; i++){
+    var r = rl[i].r || [];
+    rels.push({ fromTable: r[0], column: r[1], refTable: r[2],
+                refColumn: r[3], label: r[4],
+                db: (rl[i].db && rl[i].db.name) || "" });
+  }
+  var c = pdFindConn(first) || { kind: first.kind, name: first.name, mode: "", host: "",
+                                 port: "", dbname: "", user: "", file: "" };
+  return {
+    kind: c.kind, name: c.name, mode: c.mode,
+    host: c.host, port: c.port, dbname: c.dbname, user: c.user, file: c.file,
+    tables: tables, relations: rels, savedAt: new Date().toISOString()
+  };
+}
+
+function pdSendSchemaToPrompt(){
+  var sel  = selection();
+  if (!sel.length){ toast("请先勾选要提取的表", "warn"); return; }
+  var text = PD_SCHEMA_PREFIX + buildText(sel, collectRels(sel));
+  try{
+    window.sessionStorage.setItem(PD_SCHEMA_KEY,
+      JSON.stringify({ text: text, savedAt: new Date().toISOString() }));
+    /* 连接元数据单独存一个 key：交接内容被构造页认领后会清掉，
+       但「链接数据库调试」在生成 SQL 之后才用得上，所以不能跟着一起清。 */
+    window.sessionStorage.setItem(PD_DBLINK_KEY, JSON.stringify(pdDbLinkMeta(sel)));
+  }catch (e){
+    toast("浏览器不允许暂存内容，请手动复制过去", "warn");
+    return;
+  }
+  window.location.href = "prompt.html?pdSchema=1";
+}
+
+$copyCancel.addEventListener("click", function(){ hideMask($copyMask); });
+$copyMask.addEventListener("click", function(e){ if (e.target === $copyMask) hideMask($copyMask); });
+$copyConfirm.addEventListener("click", function(){
+  hideMask($copyMask);
+  pdSendSchemaToPrompt();
+});
+
 /* ================= 交互：数据库树 ================= */
 $dbTree.addEventListener("click", function(e){
   var t = e.target;
 
   var del = t.closest ? t.closest("[data-db-del]") : null;
   if (del){ e.stopPropagation(); removeDb(Number(del.getAttribute("data-db-del"))); return; }
+
+  /* 单库全选框：必须在「折叠 / 展开」与「点表行」之前拦下来。
+     ⚠️ 它自己就在 .db-node-head 里，不拦住的话点它会顺手把库折叠掉（实测会）。 */
+  var all = t.closest ? t.closest("[data-db-all]") : null;
+  if (all){
+    e.stopPropagation();
+    var dbAll = findDb(Number(all.getAttribute("data-db-all")));
+    if (dbAll && dbAll.tables.length){
+      var on = !dbAll.tables.every(function(x){ return x.checked; });
+      for (var k = 0; k < dbAll.tables.length; k++){ dbAll.tables[k].checked = on; }
+      /* 重画整棵树：表行的勾选态、单库框的三态、计数提示都要一起更新 */
+      renderTree();
+      toast(on ? ("已全选「" + dbAll.name + "」的 " + dbAll.tables.length + " 张表")
+               : ("已取消全选「" + dbAll.name + "」"), on ? "ok" : "");
+    }
+    return;
+  }
 
   var head = t.closest ? t.closest(".db-node-head") : null;
   if (head){
@@ -1969,6 +2166,8 @@ $btnCopy.addEventListener("click", function(){
   }
   var sel = selection();
   copyText(buildText(sel, collectRels(sel)), "表内容已复制到剪贴板");
+  /* 10-09 新增：复制照旧，紧接着问一句要不要直接填进「提示词构造」页（见 pdSendSchemaToPrompt） */
+  showMask($copyMask);
 });
 
 /* ================= 侧边栏 / 移动端 =================
@@ -2025,24 +2224,120 @@ var scrim = document.getElementById("scrim");
 hamburger.addEventListener("click", function(){ document.body.classList.toggle("nav-open"); });
 scrim.addEventListener("click", function(){ document.body.classList.remove("nav-open"); });
 
+/* ================= 已连接数据库存档（10-09 新增，用户点名） =================
+   把「已经连接好的库」存到服务端，下次进来左栏还是那些库 —— 不用重新导入 / 重连。
+   存的内容 = 「连得上哪儿」+「库长什么样」（表结构快照 + 上次勾了哪些表）。
+
+   ⚠️ **不含密码**：pdRememberConn 本来就不登记密码（认证走 DBeaver 自己的凭据），
+      服务端那张表连密码列都没有。想在这里顺手存密码是**破地基**，不是优化。
+
+   恢复走的是与「手动连接」**同一条路**（addDb + pdFillDb）⇒ 恢复出来的库
+   照样能直接勾选、提取、复制，不用再连一次。
+
+   原型态：单开这一页没有后端，三个 PD_LIB_* 是空实现、不发请求；
+           应用侧由 build_static 原地换成真调 /api/db-conn。 */
+
+/* 攒出要存档的那份 entry —— 字段与后端 tst_db_conn 一一对应，**没有密码位** */
+function pdLibEntry(db){
+  var c = pdFindConn(db) || {};
+  return {
+    name: db.name, kind: db.kind,
+    mode: c.mode || "", host: c.host || "", port: c.port || "",
+    dbname: c.dbname || "", user: c.user || "", file: c.file || "",
+    schema: db.schema || { tables: [], relations: [] },
+    checked: (db.tables || []).filter(function(t){ return t.checked; })
+                              .map(function(t){ return t.name; })
+  };
+}
+
+function pdLibSave(db){ if (db) PD_LIB_SAVE(pdLibEntry(db)); }
+function pdLibDelete(db){ if (db) PD_LIB_DEL(db.name, db.kind); }
+
+/* 启动时恢复。一条记录就是一个库：建库 → 登记连接 → 还原勾选。 */
+function pdLibRestore(){
+  PD_LIB_LOAD(function(list){
+    if (!list || !list.length) return;
+    for (var i = 0; i < list.length; i++){
+      var r = list[i];
+      var db = addDb(r.name, r.kind, true, r.schema || { tables: [], relations: [] });
+      /* 连接登记也要还原：构造页的「链接数据库调试」/「页面内调试」靠它 */
+      pdRememberConn(r.name, r.kind, {
+        mode: r.mode, host: r.host, port: r.port,
+        dbname: r.dbname, user: r.user, file: r.file
+      });
+      var want = r.checked || [];
+      for (var j = 0; j < db.tables.length; j++){
+        if (want.indexOf(db.tables[j].name) >= 0) db.tables[j].checked = true;
+      }
+    }
+    renderTree();
+    toast("已恢复 " + list.length + " 个已连接的数据库", "ok");
+  });
+}
+
+/* ================= 数据层接线：已连接数据库存档 =================
+   原型态那三个空实现到此为止；这里真调后端 /api/db-conn 三个动词。
+
+   ⚠️ 送出去的 entry **不含密码**（pdLibEntry 只挑「连得上哪儿」+ 结构快照）——
+      服务端那张表也没有密码列，这条地基两端都锁着。
+   ⚠️ **存档失败绝不打扰用户**：连接本身已经成功了，存档只是锦上添花。
+      只有服务端**明确回错**（且不是「表还没就位」）才提示一句，网络抖动一律静默。 */
+function PD_LIB_SAVE(entry){
+  fetch("/api/db-conn", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(entry)
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (res && res.ok === false && res.error && res.error !== "needSetup"){
+      toast("数据库已连接，但存档失败：" + res.error, "warn");
+    }
+  }).catch(function(){ /* 静默：存档失败不影响本次连接 */ });
+}
+
+function PD_LIB_DEL(name, kind){
+  fetch("/api/db-conn", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name, kind: kind })
+  }).catch(function(){ /* 静默：删除失败不挡「已从页面移除」这件事 */ });
+}
+
+function PD_LIB_LOAD(onOk){
+  fetch("/api/db-conn", { method: "GET" })
+    .then(function(r){ return r.json(); })
+    .then(function(res){ if (onOk) onOk((res && res.list) || []); })
+    .catch(function(){ if (onOk) onOk([]); });   /* 取不到就当没有存档 */
+}
+
 /* ================= 启动 ================= */
 initCombo("comboDbType", function(v){ currentType = v; openConnectFlow(v); });
 
-/* 二次迭代（第二批）：打开页面先连上后端自己的应用库（SQLite，真实结构），
-   其余 5 种类型由用户从「连接数据库」弹窗**真连**（见 pdConnectDb）。
-   「演示种子」换成「真实结构」，字段 / 排版 / CSS 一字未动。
-   说明文字不在这一步生成 —— 点「提取表结构」时才调 DeepSeek 补，且只补勾选到的表。 */
-function pdBoot(){
-  fetch("/api/schema").then(function(r){ return r.json(); }).then(function(d){
-    if (!d || !d.ok){ toast((d && d.error) || "读取库结构失败", "warn"); resetSchema(); return; }
-    addDb(d.name, d.kind, true, d);
-    resetSchema();
-  }, function(){
-    toast("读取库结构失败，请确认服务已启动", "warn");
-    resetSchema();
-  });
-}
-pdBoot();
+/* 14-18 用户点名：**不再自动挂应用自带库**。
+   之前这里调了一次 GET /api/schema，把后端自己的 SQLite（srv / mdl / tst_* / django_migrations
+   等模板表）自动连上，用户一开页面左栏就挂着这十几张与「调提示词」无关的表。
+   现在改成：**左栏起始为空**，一切由用户自己导入 / 连接驱动 ——
+     · SQLite  → 选本机 .sqlite 文件（POST /api/schema 上传，服务端落 data/uploads/ 并回绝对路径）
+     · 其余 5 种 → 连接弹窗真连驱动（POST /api/schema/connect）
+   后续「提取表结构 / 复制 → 送提示词 / 链接数据库调试」全部只认用户导入的库。
+   ⚠️ 服务端的 GET /api/schema 仍然保留（外部调试 / 手工调用要用），只是页面不再自动调它。
+   ⚠️ 自动挂库那条链路里的 pdRememberConn 也随之不需要了 —— 连接登记只发生在用户
+   真正导入 / 连接的那一刻（ts-6 上传成功、ts-7 连接确认）。
+   ⚠️ 本注释里刻意不写那条 fetch 的完整字面量：`pack_modelscope.EXPECT_FETCH`
+   是在 static/*.html 里逐次数那串前缀的，注释里出现一次就会把打包脚本的计数带偏（踩过一次）。 */
+
+/* ⚠️ `renderTree()` 这句不能少：#dbTree 在 HTML 里是**空的**，那句「还没有连接数据库」的
+   提示是由 renderTree() 在 dbs 为空时渲染出来的（原来靠自动挂库间接触发）。
+   现在启动不挂库了，不显式调一次的话左栏就是一片空白、用户不知道该去连接 / 导入。 */
+renderTree();
+
+/* 10-09 用户点名：恢复上次**保存下来**的已连接数据库。
+   顺序很重要 —— 先 renderTree() 出「还没有连接数据库」的引导态，
+   等 /api/db-conn 回来再把存过的库逐个恢复进左栏（异步，网络慢也不挡页面）。
+   ⚠️ 恢复出来的库与「手动连接」走的是同一条路（addDb + pdFillDb），
+      所以照样能直接勾选 / 提取 / 复制，不用重连。 */
+pdLibRestore();
+
+resetSchema();
 </script>
 </body>
 </html>

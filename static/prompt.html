@@ -729,6 +729,10 @@
   }
   .pb-copy:hover{background:var(--fill);color:var(--ink);border-color:#DCD0C2;}
   .pb-copy svg{flex:0 0 auto;}
+  /* 「链接数据库调试」（10-09 新增，用户点名）：外观沿用 .pb-copy，
+     只在「前置条件不满足」时置灰（aria-disabled 走 CSS，禁掉点击由 JS 拦）。 */
+  .pb-dbg[aria-disabled="true"]{color:#B3A79A;background:#FAF7F3;border-color:#EFE7DD;cursor:not-allowed;}
+  .pb-dbg[aria-disabled="true"]:hover{background:#FAF7F3;color:#B3A79A;border-color:#EFE7DD;}
   .pb-block-head h2 .req{font-size:12px;}
 
   /* API_key 掩码开关 */
@@ -760,6 +764,10 @@
   .pb-run-row{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;}
   .pb-run{flex:0 0 auto;width:auto;height:38px;padding:0 18px;gap:6px;font-size:13.5px;letter-spacing:.2px;}
   .pb-clear{flex:0 0 auto;height:38px;padding:0 16px;gap:6px;font-size:13.5px;}
+  /* 「清空草稿」按钮（10-09 新增，用户点名）：外观沿用 .pb-clear，
+     只在「从编辑 / 修改跳进来的那次」出现 ⇒ 必须补一条 [hidden] 规则
+     （本页 .btn 自带 display，光加 hidden 属性压不住它，本页既有惯例同款）。 */
+  .pb-cleardraft[hidden]{display:none;}
   .pb-run svg,.pb-clear svg{width:13px;height:13px;}
 
   /* 多轮会话 · 轮次删除 */
@@ -784,6 +792,171 @@
   @media (max-width:900px){
     .pb-block-body{padding:16px;}
     .pb-block-head{padding:14px 16px;}
+  }
+
+  /* ---------- 页面内调试弹窗（10-09 新增，用户点名） ----------
+   三栏：左=已关联表结构（40%）／右上=AI 生成 SQL／右下=执行结果。
+   ⚠️ 全部样式都带 .pdx 前缀，与既有类零冲突；.mask/.modal 直接复用，
+      不改它们任何一条声明。 */
+  #dbgRunMask{padding:24px;}
+  #dbgRunMask .modal{
+    max-width:1180px;width:100%;height:86vh;max-height:860px;
+    padding:0;display:flex;flex-direction:column;overflow:hidden;
+  }
+  .pdx-top{
+    flex:0 0 auto;display:flex;align-items:center;gap:12px;
+    padding:18px 22px;border-bottom:1px solid var(--line);
+  }
+  .pdx-top h3{margin:0;font-size:17px;font-weight:800;letter-spacing:-.2px;color:var(--ink);}
+  .pdx-top .pdx-sub{font-size:12.5px;font-weight:600;color:var(--text-3);}
+  .pdx-top .pdx-sp{flex:1 1 auto;}
+  .pdx-x{
+    width:34px;height:34px;border-radius:10px;border:1px solid var(--line);
+    background:#fff;color:var(--text-2);cursor:pointer;display:flex;
+    align-items:center;justify-content:center;
+  }
+  .pdx-x:hover{background:var(--fill);color:var(--ink);}
+
+  /* 主体：左栏 + 右栏（右上 SQL / 右下 结果） */
+  .pdx-main{flex:1 1 auto;display:flex;min-height:0;}
+  .pdx-left{
+    flex:0 0 40%;min-width:0;display:flex;flex-direction:column;
+    border-right:1px solid var(--line);background:#FDFCFA;
+  }
+  .pdx-right{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .pdx-half{display:flex;flex-direction:column;min-height:0;}
+  .pdx-half:first-child{border-bottom:1px solid var(--line);}
+  .pdx-half:last-child{flex:1 1 auto;}
+
+  .pdx-head{
+    flex:0 0 auto;display:flex;align-items:center;gap:8px;
+    padding:11px 16px;border-bottom:1px solid var(--line);
+  }
+  .pdx-head h4{margin:0;font-size:13px;font-weight:800;color:var(--ink);}
+  .pdx-head .pdx-sp{flex:1 1 auto;}
+  .pdx-tag{
+    font-family:var(--mono);font-size:11px;font-weight:500;color:var(--text-3);
+    padding:2px 7px;border-radius:6px;background:var(--fill);
+  }
+  .pdx-mini{
+    height:26px;padding:0 10px;border-radius:8px;border:1px solid var(--line);
+    background:#fff;color:var(--text-2);font-size:11.5px;font-weight:700;
+    cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;
+  }
+  .pdx-mini:hover:not(:disabled){background:var(--fill);color:var(--ink);}
+  .pdx-mini:disabled{opacity:.45;cursor:not-allowed;}
+  .pdx-body{flex:1 1 auto;overflow:auto;min-height:0;}
+
+  /* 左栏表结构树 */
+  .pdx-tree{padding:10px 12px;font-size:12.5px;}
+  .pdx-tb{
+    border:1px solid var(--line);border-radius:10px;margin-bottom:8px;
+    background:#fff;overflow:hidden;
+  }
+  .pdx-tb-h{
+    display:flex;align-items:center;gap:7px;padding:9px 11px;cursor:pointer;
+    font-family:var(--mono);font-size:12px;font-weight:700;color:var(--ink);
+  }
+  .pdx-tb-h:hover{background:var(--fill);}
+  .pdx-tb-h .pdx-car{transition:transform .15s ease;color:var(--text-3);}
+  .pdx-tb.open .pdx-car{transform:rotate(90deg);}
+  .pdx-tb-c{display:none;padding:2px 0 6px;border-top:1px solid var(--line);}
+  .pdx-tb.open .pdx-tb-c{display:block;}
+  .pdx-desc{
+    padding:5px 11px 5px 26px;font-size:11.5px;color:var(--text-3);line-height:1.6;
+  }
+  .pdx-col{
+    display:flex;align-items:center;gap:8px;padding:4px 11px 4px 26px;
+    font-size:12px;color:var(--text-2);
+  }
+  .pdx-col .pdx-cn{font-family:var(--mono);font-weight:600;color:var(--ink);}
+  .pdx-col .pdx-ct{font-family:var(--mono);font-size:11px;color:#A89684;flex:0 0 auto;}
+  .pdx-col .pdx-cc{
+    flex:1 1 auto;min-width:0;color:var(--text-3);font-size:11.5px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .pdx-pk{
+    flex:0 0 auto;font-size:9.5px;font-weight:800;color:var(--orange);
+    padding:1px 5px;border-radius:4px;background:var(--orange-soft);
+  }
+  .pdx-fk{
+    margin:2px 11px 4px 26px;padding:5px 9px;border-radius:7px;
+    background:#F4F7FB;color:#4A6480;font-size:11px;
+  }
+  .pdx-empty{padding:28px 16px;text-align:center;color:var(--text-3);font-size:12.5px;}
+
+  /* SQL 展示 */
+  .pdx-sql{
+    margin:0;padding:13px 16px;font-family:var(--mono);font-size:12.5px;
+    line-height:1.75;color:#3D3229;white-space:pre-wrap;word-break:break-word;
+  }
+  .pdx-kw{color:#B4553A;font-weight:700;}
+  .pdx-str{color:#4E7A56;}
+  .pdx-num{color:#7A5EA8;}
+  .pdx-punct{color:#94867A;}
+
+  /* 结果区 */
+  .pdx-run{
+    display:flex;align-items:center;gap:10px;padding:10px 16px;
+    border-bottom:1px solid var(--line);background:#FDFCFA;flex-wrap:wrap;
+  }
+  .pdx-run label{font-size:12px;font-weight:700;color:var(--text-2);}
+  .pdx-run input{
+    height:32px;padding:0 10px;border:1px solid var(--line);border-radius:9px;
+    font-family:var(--mono);font-size:12px;color:var(--ink);background:#fff;
+    min-width:150px;outline:none;
+  }
+  .pdx-run input:focus{border-color:var(--orange);}
+  .pdx-run .pdx-sp{flex:1 1 auto;}
+  .pdx-note{font-size:11.5px;color:var(--text-3);flex-basis:100%;}
+  .pdx-go{
+    height:32px;padding:0 16px;border-radius:9px;border:0;background:var(--orange);
+    color:#fff;font-size:12.5px;font-weight:800;cursor:pointer;font-family:inherit;
+  }
+  .pdx-go:hover{filter:brightness(1.05);}
+  .pdx-go:disabled{opacity:.5;cursor:not-allowed;}
+  .pdx-st{font-size:12px;font-weight:700;}
+  .pdx-st.ok{color:#3F7D4E;}
+  .pdx-st.err{color:#B4483C;}
+  .pdx-st.run{color:var(--text-3);}
+
+  .pdx-res{padding:0;font-size:12.5px;}
+  .pdx-alert{
+    margin:12px 16px;padding:11px 13px;border-radius:10px;
+    background:#FDF0EE;border:1px solid #F2CFC9;color:#8E3A2E;
+    font-size:12.5px;font-weight:600;line-height:1.65;word-break:break-word;
+  }
+  .pdx-alert b{display:block;margin-bottom:3px;font-weight:800;}
+  .pdx-skel{padding:16px;}
+  .pdx-skel i{
+    display:block;height:11px;border-radius:5px;margin-bottom:9px;
+    background:linear-gradient(90deg,#F3EFE9 25%,#FBF9F6 50%,#F3EFE9 75%);
+    background-size:200% 100%;animation:pdxsk 1.1s infinite;
+  }
+  @keyframes pdxsk{from{background-position:200% 0}to{background-position:-200% 0}}
+  table.pdx-tab{width:100%;border-collapse:collapse;font-size:12px;}
+  table.pdx-tab th{
+    position:sticky;top:0;z-index:2;background:#F7F4F0;text-align:left;
+    padding:8px 11px;font-family:var(--mono);font-size:11.5px;font-weight:700;
+    color:var(--text-2);border-bottom:1px solid var(--line);white-space:nowrap;
+  }
+  table.pdx-tab td{
+    padding:7px 11px;border-bottom:1px solid #F3EFE9;color:var(--ink);
+    font-family:var(--mono);font-size:12px;max-width:280px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  table.pdx-tab tr:hover td{background:#FDFAF6;}
+  .pdx-tabwrap{max-height:100%;overflow:auto;}
+  .pdx-pager{
+    display:flex;align-items:center;gap:8px;padding:9px 16px;
+    border-top:1px solid var(--line);font-size:11.5px;color:var(--text-3);
+  }
+  .pdx-pager .pdx-sp{flex:1 1 auto;}
+  .pdx-cut{color:var(--orange);font-weight:700;}
+
+  @media (max-width:900px){
+    .pdx-main{flex-direction:column;}
+    .pdx-left{flex:0 0 42%;border-right:0;border-bottom:1px solid var(--line);}
   }
 
   /* ---------- 保存提示词方案弹窗（09-29 新增） ---------- */
@@ -1133,6 +1306,10 @@
               <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2.8 4.4h10.4M6.6 4.4V3.2h2.8v1.2M4.4 4.4l.7 8.6h5.8l.7-8.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               清空用户提示词
             </button>
+            <button type="button" class="btn btn-ghost pb-clear pb-cleardraft" id="btnClearDraft" hidden>
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.4 2.6h6l3.2 3.2v7.6H3.4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 7.7l3.2 3.2M9.7 7.7l-3.2 3.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              清空草稿
+            </button>
           </div>
 
           <div class="pb-block">
@@ -1140,6 +1317,14 @@
               <h2>模型输出</h2>
               <span class="head-chip">output</span>
               <div class="pb-head-act">
+                <button type="button" class="pb-copy pb-dbg" id="btnDbgRun" aria-disabled="true" title="请先生成 SQL">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.2 8.4l3.2 3.2 6.4-7.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  页面内调试
+                </button>
+                <button type="button" class="pb-copy pb-dbg" id="btnDbgLink" aria-disabled="true" title="请先生成 SQL">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5.4" ry="2.2" stroke="currentColor" stroke-width="1.5"/><path d="M2.6 4v8c0 1.2 2.4 2.2 5.4 2.2 1.1 0 2.1-.16 2.9-.44M13.4 4v4.6c0 1.2-2.4 2.2-5.4 2.2-.6 0-1.2-.05-1.7-.13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M6.6 6.2v3.6M4.8 8h3.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                  链接数据库调试
+                </button>
                 <button type="button" class="pb-copy" id="btnCopyOut">
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5.6" y="5.6" width="8.4" height="8.4" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 3.4H4.2A2.2 2.2 0 0 0 2 5.6v6.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
                   复制
@@ -1201,6 +1386,68 @@
     <div class="modal-foot">
       <button type="button" class="btn btn-ghost" id="saveCancel">取消</button>
       <button type="button" class="btn btn-add" id="saveConfirm">保存方案</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= 页面内调试弹窗（10-09 新增，用户点名） =================
+     三栏：左=已关联表结构 / 右上=AI 生成 SQL / 右下=执行结果。
+     与「链接数据库调试」（唤起 DBeaver）并存，不是替代。 -->
+<div class="mask" id="dbgRunMask" role="dialog" aria-modal="true" aria-labelledby="dbgRunTitle">
+  <div class="modal">
+    <div class="pdx-top">
+      <h3 id="dbgRunTitle">页面内调试</h3>
+      <span class="pdx-sub" id="pdxConn">—</span>
+      <span class="pdx-sp"></span>
+      <button type="button" class="pdx-x" id="pdxClose" aria-label="关闭">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="pdx-main">
+      <!-- 左：已关联数据库结构 -->
+      <section class="pdx-left">
+        <div class="pdx-head">
+          <h4>已关联数据库结构</h4>
+          <span class="pdx-sp"></span>
+          <span class="pdx-tag" id="pdxTblCount">0 张表</span>
+        </div>
+        <div class="pdx-body"><div class="pdx-tree" id="pdxTree"></div></div>
+      </section>
+
+      <section class="pdx-right">
+        <!-- 右上：模型生成的 SQL -->
+        <div class="pdx-half">
+          <div class="pdx-head">
+            <h4>AI 生成 SQL</h4>
+            <span class="pdx-sp"></span>
+            <button type="button" class="pdx-mini" id="pdxCopy">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="5.6" y="5.6" width="8.4" height="8.4" rx="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M10.4 3.4H4.2A2.2 2.2 0 0 0 2 5.6v6.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+              复制
+            </button>
+          </div>
+          <div class="pdx-body"><pre class="pdx-sql" id="pdxSql">—</pre></div>
+        </div>
+
+        <!-- 右下：执行结果 -->
+        <div class="pdx-half">
+          <div class="pdx-head">
+            <h4>执行结果</h4>
+            <span class="pdx-sp"></span>
+            <span class="pdx-st" id="pdxStatus"></span>
+            <button type="button" class="pdx-mini" id="pdxRefresh">重新执行</button>
+          </div>
+          <!-- 密码栏：服务器型数据库才要；只在本次请求里用一下，不落库不写文件 -->
+          <div class="pdx-run" id="pdxPwdRow">
+            <label for="pdxPwd">数据库密码</label>
+            <input type="password" id="pdxPwd" placeholder="本次执行临时使用，不保存" autocomplete="off">
+            <span class="pdx-note">该密码只随这一次请求发送，不会保存到服务器或浏览器。</span>
+          </div>
+          <div class="pdx-body" id="pdxResult">
+            <div class="pdx-empty">点击「执行」在页面内直接跑这条只读 SQL</div>
+          </div>
+        </div>
+      </section>
     </div>
   </div>
 </div>
@@ -1360,6 +1607,28 @@ function setComboValue(combo, value){
   combo.refresh();
 }
 
+/* ================= 下拉就绪登记（10-09 新增） =================
+   原型里下面三个下拉是在这里**同步**初始化完的；但应用侧（build_static.py 的
+   prompt-1 ~ prompt-4）把初始化搬进了 initCombos()，只在脚本末尾的 boot() 里、
+   等 /api/srv + /api/mdl 回来之后才调用。而「从编辑 / 修改跳进来」的回填是在
+   脚本中部同步跑的 —— 那一刻 comboServer 还是 undefined，pbPickCombo 一取
+   combo.items 就抛异常，**整段回填（连系统提示词 / 用户提示词 / 密钥）全部中断**。
+   ⇒ 回填一律走 pdWhenCombosReady()：原型里立即执行，应用侧等下拉就绪再执行。 */
+var pdComboReady = false;
+var pdComboWaiters = [];
+function pdCombosReadyNow(){
+  pdComboReady = true;
+  var ws = pdComboWaiters;
+  pdComboWaiters = [];
+  for (var i = 0; i < ws.length; i++){
+    try{ ws[i](); }catch (e){}
+  }
+}
+function pdWhenCombosReady(fn){
+  if (pdComboReady){ fn(); return; }
+  pdComboWaiters.push(fn);
+}
+
 /* 三个下拉的选项由后端数据注入后再初始化（HTML 未改动，只换数据来源） */
 var comboServer, comboModelType, comboModel;
 
@@ -1409,6 +1678,8 @@ comboModel = initCombo("comboModel", function(it){
     setComboValue(comboModelType, tp);
   }
 }, modelKeep);
+
+pdCombosReadyNow();          /* 下拉就绪：三个 initCombo 都跑完了，回填可以执行 */
 
 }
 
@@ -1492,6 +1763,410 @@ document.getElementById("btnCopySys").addEventListener("click", function(){
 document.getElementById("btnCopyOut").addEventListener("click", function(){
   copyText($modelOut.value, "已复制模型输出");
 });
+
+/* ================= 链接数据库调试（10-09 新增，用户点名） =================
+   按钮在「模型输出」区块头部，作用：把**最新一次生成的 SQL** 送进 DBeaver 的
+   SQL 编辑器，并按表结构提取时记录的连接信息打开对应的库 / 表。
+   三个前置条件（缺一即置灰，title 里写明缺哪一项）：
+     ① 系统提示词来自「数据库表结构提取」（sessionStorage 的 pd_db_link_meta）；
+     ② 模型已成功生成过 SQL（输出框有内容、且不是失败文案）；
+     ③ 连接元数据齐了：SQLite 要有文件绝对路径，服务器型要有主机 / 端口 / 库名。
+   ⚠️ 密码全程不过我们的手：交接时就不登记，DBeaver 用它自己已保存的凭据。 */
+var PD_DBLINK_KEY = "pd_db_link_meta";
+
+function pdDbgMeta(){
+  try{ return JSON.parse(window.sessionStorage.getItem(PD_DBLINK_KEY) || "null"); }
+  catch (e){ return null; }
+}
+
+/* 当前输出框里算不算「一条可调试的 SQL」：空 / 占位 / 失败文案都算没有 */
+function pdDbgSql(){
+  var t = String($modelOut.value || "");
+  if (!t.trim()) return "";
+  if (t === "正在链接模型") return "";
+  if ($modelOut.classList.contains("is-error")) return "";
+  return t;
+}
+
+/* 返回缺失原因；空串 = 条件齐了可点 */
+function pdDbgMissing(){
+  var meta = pdDbgMeta();
+  if (!meta || !meta.kind) return "未检测到数据库连接信息，请先从「数据库表结构提取」复制表结构";
+  if (!pdDbgSql()) return "请先生成 SQL";
+  if (meta.kind === "SQLite"){
+    if (!meta.file) return "未检测到 SQLite 数据库文件路径，请重新在「数据库表结构提取」选择文件";
+  } else {
+    if (!meta.host && !meta.url) return "未检测到数据库连接信息（主机 / URL）";
+    if (meta.mode !== "url" && !meta.dbname) return "未检测到数据库名";
+  }
+  return "";
+}
+
+function pdDbgSync(){
+  var miss = pdDbgMissing();
+  /* 两个按钮共用同一份前置条件（pdDbgMissing），必须**同步**置灰 ——
+     只更新一个会出现「一个能点一个不能点」的怪状态。 */
+  var b = document.getElementById("btnDbgLink");
+  if (b){
+    b.setAttribute("aria-disabled", miss ? "true" : "false");
+    b.title = miss || "在 DBeaver 中打开该数据库并粘贴这条 SQL";
+  }
+  var r = document.getElementById("btnDbgRun");
+  if (r){
+    r.setAttribute("aria-disabled", miss ? "true" : "false");
+    r.title = miss || "在本页面内直接执行这条只读 SQL 并查看结果";
+  }
+}
+
+/* 生成结果一变就重算按钮状态。调试成功时输出框**不变 class**（只变 value），
+   所以 MutationObserver 只盯得住失败态；再用一个极轻的轮询比对 value 兜底
+   （纯本地字符串比较，不发任何请求）。 */
+var pdDbgLastSql = null;
+function pdDbgPoll(){
+  var cur = pdDbgSql();
+  if (cur !== pdDbgLastSql){ pdDbgLastSql = cur; pdDbgSync(); }
+  setTimeout(pdDbgPoll, 800);
+}
+
+document.getElementById("btnDbgLink").addEventListener("click", function(){
+  var miss = pdDbgMissing();
+  if (miss){ toast(miss, "warn"); return; }
+  PD_DBG_API(pdDbgMeta(), pdDbgSql());
+});
+
+/* ================= 数据层接线：链接数据库调试 =================
+   原型态那句「原型演示」提示到此为止；这里换成真调后端 /api/dbeaver/link，
+   由服务端去唤起本机 DBeaver（找可执行文件 → 拼 -con → 写临时 .sql → Popen）。
+   ⚠️ meta 里**没有密码**：表结构页交接时就没登记，认证走 DBeaver 自己的凭据。
+   ⚠️ 必须原地替换同名函数：按钮的点击回调只认 PD_DBG_API 这一个名字。 */
+function PD_DBG_API(meta, sql){
+  var b = document.getElementById("btnDbgLink");
+  b.setAttribute("aria-disabled", "true");
+  toast("正在唤起 DBeaver…", "ok");
+
+  fetch("/api/dbeaver/link", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ meta: meta, sql: sql })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok){
+      toast((res && res.error) || "唤起 DBeaver 失败", "warn");
+      return;
+    }
+    /* 目标表写在标签名与脚本首行注释里 —— DBeaver 命令行没法在导航树里高亮某张表 */
+    var tb = (res.tables || []).length ? ("（目标表：" + res.tables.join(", ") + "）") : "";
+    toast("已打开 " + (res.target || "DBeaver") + tb + "，SQL 已放进新的编辑器标签", "ok");
+  }).catch(function(err){
+    toast("唤起 DBeaver 失败：" + err, "warn");
+  }).then(function(){
+    /* 无论成败都把按钮状态还回去（请求期间不允许重复点） */
+    b.setAttribute("aria-disabled", pdDbgMissing() ? "true" : "false");
+  });
+}
+
+pdDbgLastSql = pdDbgSql();
+pdDbgSync();
+pdDbgPoll();
+
+/* ================= 页面内调试弹窗（10-09 新增，用户点名） =================
+   与上面「链接数据库调试」**并存**：那个唤起 DBeaver，这个在页面内跑。
+   左侧表结构读的是同一个 pd_db_link_meta（表结构提取页交接过来的元数据），
+   不再连一次库。
+   ⚠️ 密码口径：只在弹窗里现填，随这一次请求发出去，**不存 sessionStorage、
+      不写库、不写文件**；请求结束立刻清空输入框。 */
+var $pdxMask   = document.getElementById("dbgRunMask");
+var $pdxTree   = document.getElementById("pdxTree");
+var $pdxSql    = document.getElementById("pdxSql");
+var $pdxRes    = document.getElementById("pdxResult");
+var $pdxStat   = document.getElementById("pdxStatus");
+var $pdxPwd    = document.getElementById("pdxPwd");
+var $pdxPwdRow = document.getElementById("pdxPwdRow");
+var $pdxCount  = document.getElementById("pdxTblCount");
+
+var pdxState = { sql:"", kind:"", meta:null, page:0, per:20 };
+
+function pdxEsc(s){
+  return String(s == null ? "" : s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+
+/* 极简 SQL 高亮：只区分关键字 / 字符串 / 数字 / 标点，不引外部库 */
+function pdxHi(s){
+  var KW = ("select|from|where|and|or|not|null|is|in|between|like|as|on|join|left|right|inner|outer|group|by|order|having|limit|offset|union|all|distinct|count|sum|avg|min|max|case|when|then|else|end|with|asc|desc|exists|top|fetch|first|only|into").split("|");
+  var re = new RegExp(
+    "('(?:[^']|'')*')"                      // 1 字符串
+  + "|(\\b\\d+(?:\\.\\d+)?\\b)"                        // 2 数字
+  + "|(\\b(?:" + KW.join("|") + ")\\b)"                // 3 关键字
+  + "|([(),;.*=<>+\\-/])",                           // 4 标点
+    "gi");
+  return pdxEsc(s).replace(re, function(m, a, b, c, d){
+    if (a) return '<span class="pdx-str">'+a+"</span>";
+    if (b) return '<span class="pdx-num">'+b+"</span>";
+    if (c) return '<span class="pdx-kw">'+c+"</span>";
+    if (d) return '<span class="pdx-punct">'+d+"</span>";
+    return m;
+  });
+}
+
+/* 左栏：把表结构元数据画成可折叠的表树 + 外键。
+   数据源 = sessionStorage 的 pd_db_link_meta（表结构提取页「复制交接」时写下的那份）。
+   ⚠️ 10-09 修订：那份 tables 从「纯表名数组」升级成结构化表清单
+      [{name,rows,desc,cols:[[名,类型,说明,真实类型]]}]，外键走顶层 relations。
+      这里同时兼容两种形状 —— 老会话里存下来的旧结构照样能显示，
+      不至于因为之前跳转过一次就变成空白。 */
+function pdxRenderTree(meta){
+  var tables = (meta && meta.tables) || [];
+  /* 归一成统一形状；纯字符串元素（旧结构）只出表名一行 */
+  var norm = [];
+  for (var i = 0; i < tables.length; i++){
+    var t = tables[i];
+    if (typeof t === "string"){ norm.push({ name:t, rows:null, desc:"", cols:[] }); continue; }
+    t = t || {};
+    norm.push({
+      name: t.name || t.tableName || ("表" + (i+1)),
+      rows: (typeof t.rows === "number") ? t.rows : null,
+      desc: t.desc || "",
+      cols: t.cols || t.columns || []
+    });
+  }
+
+  if (!norm.length){
+    $pdxTree.innerHTML = '<div class="pdx-empty">该连接没有登记表清单<br>'
+      + '请回到「数据库表结构提取」勾选表后点「复制 → 送到提示词构造」</div>';
+    $pdxCount.textContent = "0 张表";
+    return;
+  }
+
+  /* 外键按「从表」归组，好挂在对应表下面。
+     ⚠️ 归组键是 fromTable（从表名）；db 是**库名**，别拿它当表名用。 */
+  var rels = (meta && meta.relations) || [];
+  var byTable = {};
+  for (var r = 0; r < rels.length; r++){
+    var rr = rels[r] || {};
+    var from = Array.isArray(rr) ? rr[0] : (rr.fromTable || rr.from || "");
+    if (!from) continue;
+    (byTable[from] = byTable[from] || []).push({
+      column: Array.isArray(rr) ? rr[1] : (rr.column || ""),
+      refTable: Array.isArray(rr) ? rr[2] : (rr.refTable || ""),
+      refColumn: Array.isArray(rr) ? rr[3] : (rr.refColumn || ""),
+      label: (Array.isArray(rr) ? rr[4] : (rr.label || "")) || ""
+    });
+  }
+
+  $pdxCount.textContent = norm.length + " 张表";
+  var html = "";
+  for (var i = 0; i < norm.length; i++){
+    var t = norm[i];
+    html += '<div class="pdx-tb' + (i < 2 ? " open" : "") + '" data-i="' + i + '">';
+    html +=   '<div class="pdx-tb-h"><svg class="pdx-car" width="9" height="9" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+           +   '<span>' + pdxEsc(t.name) + '</span>'
+           +   (t.rows != null ? '<span class="pdx-tag">' + t.rows + ' 行</span>' : "")
+           + '</div>';
+    html +=   '<div class="pdx-tb-c">';
+    if (t.desc) html += '<div class="pdx-desc">' + pdxEsc(t.desc) + '</div>';
+    for (var j = 0; j < t.cols.length; j++){
+      var c = t.cols[j] || [];
+      /* 四元组 [名,类型逻辑值,说明,真实类型]；也兼容 {name,type,comment} 写法 */
+      var cn   = (c[0] != null) ? c[0] : (c.name || "");
+      var logic= (c[1] != null) ? c[1] : (c.type || "");
+      var cmt  = (c[2] != null) ? c[2] : (c.comment || "");
+      var real = (c[3] != null && c[3]) ? c[3] : "";
+      var isPk = (logic === "pk") || (real === "pk");
+      html += '<div class="pdx-col">'
+           +   '<span class="pdx-cn">' + pdxEsc(cn) + '</span>'
+           +   '<span class="pdx-ct">' + pdxEsc(isPk ? "pk" : real) + '</span>'
+           +   (isPk ? '<span class="pdx-pk">主键</span>' : "")
+           +   '<span class="pdx-cc">' + pdxEsc(cmt) + '</span>'
+           + '</div>';
+    }
+    var fk = (t.foreignKeys || t.fks || []).concat(byTable[t.name] || []);
+    for (var k = 0; k < fk.length; k++){
+      var f = fk[k] || {};
+      html += '<div class="pdx-fk">↳ '
+           +   pdxEsc(f.column || f[0] || "") + ' → '
+           +   pdxEsc(f.refTable || f[2] || "") + '.'
+           +   pdxEsc(f.refColumn || f[3] || "")
+           +   (f.label || f[4] ? '　' + pdxEsc(f.label || f[4]) : "")
+           + '</div>';
+    }
+    html +=   '</div></div>';
+  }
+  $pdxTree.innerHTML = html;
+}
+
+function pdxSetStatus(txt, cls){
+  $pdxStat.textContent = txt || "";
+  $pdxStat.className = "pdx-st" + (cls ? " " + cls : "");
+}
+
+function pdxSkeleton(){
+  var s = '<div class="pdx-skel">';
+  for (var i = 0; i < 6; i++) s += '<i style="width:' + (95 - i*9) + '%"></i>';
+  return $pdxRes.innerHTML = s + "</div>";
+}
+
+function pdxRenderResult(res){
+  if (!res || res.ok !== true){
+    $pdxRes.innerHTML = '<div class="pdx-alert"><b>执行失败</b>'
+                      + pdxEsc((res && res.error) || "未知错误") + "</div>";
+    pdxSetStatus("执行失败", "err");
+    return;
+  }
+  var cols = res.columns || [], rows = res.rows || [];
+  if (!cols.length){
+    $pdxRes.innerHTML = '<div class="pdx-empty">查询成功，但没有返回任何字段</div>';
+    pdxSetStatus("查询成功 · 0 行", "ok");
+    return;
+  }
+  pdxState.page = 0;
+  pdxPaint(rows, cols, !!res.truncated, res.elapsed);
+}
+
+function pdxPaint(rows, cols, truncated, elapsed){
+  var per = pdxState.per;
+  var pages = Math.max(1, Math.ceil(rows.length / per));
+  if (pdxState.page >= pages) pdxState.page = pages - 1;
+  var from = pdxState.page * per;
+  var slice = rows.slice(from, from + per);
+
+  var h = '<div class="pdx-tabwrap"><table class="pdx-tab"><thead><tr>';
+  for (var i = 0; i < cols.length; i++) h += "<th>" + pdxEsc(cols[i].title) + "</th>";
+  h += "</tr></thead><tbody>";
+  for (var r = 0; r < slice.length; r++){
+    h += "<tr>";
+    for (var c = 0; c < cols.length; c++){
+      var v = slice[r][cols[c].key];
+      h += "<td title=\"" + pdxEsc(v == null ? "" : v) + "\">"
+         + (v == null || v === "" ? '<span style="color:#C4B7A8">NULL</span>' : pdxEsc(v))
+         + "</td>";
+    }
+    h += "</tr>";
+  }
+  if (!slice.length) h += '<tr><td colspan="' + cols.length + '" style="text-align:center;color:#A89684;padding:22px">没有数据</td></tr>';
+  h += "</tbody></table></div>";
+
+  h += '<div class="pdx-pager"><span>共 ' + rows.length + " 行</span>";
+  if (truncated) h += '<span class="pdx-cut">（已截断，只返回前 ' + rows.length + " 行）</span>";
+  h += '<span class="pdx-sp"></span>'
+     + '<button type="button" class="pdx-mini" id="pdxPrev"' + (pdxState.page ? "" : " disabled") + '>上一页</button>'
+     + '<span>' + (pdxState.page + 1) + " / " + pages + "</span>"
+     + '<button type="button" class="pdx-mini" id="pdxNext"' + (pdxState.page < pages - 1 ? "" : " disabled") + '>下一页</button>'
+     + "</div>";
+
+  $pdxRes.innerHTML = h;
+  pdxSetStatus("查询成功 · " + rows.length + " 行 · 耗时 " + (elapsed || 0) + "ms", "ok");
+
+  var pv = document.getElementById("pdxPrev"), nx = document.getElementById("pdxNext");
+  if (pv) pv.onclick = function(){ pdxState.page--; pdxPaint(rows, cols, truncated, elapsed); };
+  if (nx) nx.onclick = function(){ pdxState.page++; pdxPaint(rows, cols, truncated, elapsed); };
+}
+
+/* 真正发请求。原型态下没有后端，PDX_RUN_API 被 build_static 换成真调。 */
+function pdxExecute(){
+  var meta = pdxState.meta || {};
+  var kind = pdxState.kind || "";
+  var needPwd = (kind && kind !== "SQLite");
+  var pwd = needPwd ? ($pdxPwd.value || "") : "";
+
+  pdxSkeleton();
+  pdxSetStatus("执行中…", "run");
+  document.getElementById("pdxRefresh").disabled = true;
+
+  PDX_RUN_API({ kind:kind, meta:meta, pwd:pwd, sql:pdxState.sql },
+    function(res){
+      document.getElementById("pdxRefresh").disabled = false;
+      /* ⚠️ 密码清理放 finally：渲染即便抛异常（如结果结构异常）也绝不能把密码留在框里 */
+      try { pdxRenderResult(res); } finally { pdxWipePwd(); }
+    },
+    function(msg){
+      document.getElementById("pdxRefresh").disabled = false;
+      $pdxRes.innerHTML = '<div class="pdx-alert"><b>请求失败</b>' + pdxEsc(msg) + "</div>";
+      pdxSetStatus("请求失败", "err");
+      pdxWipePwd();
+    },
+    function(){                 // 收尾兜底：正常路径也在此清一次
+      pdxWipePwd();
+    });
+}
+
+/* 清掉密码输入框。抽成独立函数，是要保证**任何**收尾路径都调得到它。 */
+function pdxWipePwd(){ if ($pdxPwd) $pdxPwd.value = ""; }
+
+function pdxOpen(){
+  var miss = pdDbgMissing();
+  if (miss){ toast(miss, "warn"); return; }
+  var meta = pdDbgMeta() || {};
+  pdxState.sql  = pdDbgSql();
+  pdxState.kind = meta.kind || "";
+  pdxState.meta = meta;
+  pdxState.page = 0;
+
+  var label = pdxState.kind + (meta.name ? " · " + meta.name : "")
+            + (meta.host ? " @ " + meta.host : "");
+  document.getElementById("pdxConn").textContent = label;
+  $pdxSql.innerHTML = pdxHi(pdxState.sql);
+  pdxRenderTree(meta);
+
+  // SQLite 是本地文件、不需要密码；服务器型才显示密码栏
+  $pdxPwdRow.style.display = (pdxState.kind === "SQLite") ? "none" : "";
+  $pdxPwd.value = "";
+  $pdxRes.innerHTML = '<div class="pdx-empty">点击「执行」在页面内直接跑这条只读 SQL</div>';
+  pdxSetStatus("", "");
+  document.getElementById("pdxRefresh").disabled = false;
+
+  $pdxMask.classList.add("show");
+  if (pdxState.kind !== "SQLite") setTimeout(function(){ $pdxPwd.focus(); }, 60);
+}
+
+function pdxClose(){ $pdxMask.classList.remove("show"); $pdxPwd.value = ""; }
+
+document.getElementById("btnDbgRun").addEventListener("click", pdxOpen);
+document.getElementById("pdxClose").addEventListener("click", pdxClose);
+document.getElementById("pdxRefresh").addEventListener("click", pdxExecute);
+document.getElementById("pdxCopy").addEventListener("click", function(){
+  copyText(pdxState.sql, "已复制 SQL");
+});
+
+/* 点遮罩空白处关闭（点在弹窗体内不关） */
+$pdxMask.addEventListener("click", function(e){ if (e.target === $pdxMask) pdxClose(); });
+
+/* Esc 关闭：只在弹窗开着时抢键，不影响页面其他输入框 */
+document.addEventListener("keydown", function(e){
+  if (e.key === "Escape" && $pdxMask.classList.contains("show")){
+    e.preventDefault();
+    pdxClose();
+  }
+});
+
+/* 表树折叠 */
+$pdxTree.addEventListener("click", function(e){
+  var h = e.target.closest(".pdx-tb-h");
+  if (h && h.parentNode) h.parentNode.classList.toggle("open");
+});
+
+/* ================= 数据层接线：页面内调试 =================
+   原型态那份假数据到此为止；这里真调后端 /api/database/execute-sql，
+   由服务端连库执行**只读** SQL（写语句在服务端就被拒了）并回结果集。
+   ⚠️ pwd 是弹窗里现填的密码，只随这一次请求发出去 ——
+      不写库、不写文件、不进 sessionStorage，请求结束（onDone）即清空输入框。
+   ⚠️ 必须原地替换同名函数：弹窗只认 PDX_RUN_API 这一个名字。 */
+function PDX_RUN_API(req, onOk, onErr, onDone){
+  fetch("/api/database/execute-sql", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: req.kind, meta: req.meta, pwd: req.pwd, sql: req.sql })
+  }).then(function(r){
+    return r.json().catch(function(){
+      throw new Error("服务返回了非 JSON 内容（HTTP " + r.status + "）");
+    });
+  }).then(function(res){
+    onOk(res);
+  }).catch(function(err){
+    onErr(String((err && err.message) || err));
+  }).then(function(){
+    if (onDone) onDone();
+  });
+}
 
 /* ================= 清空用户提示词 ================= */
 document.getElementById("btnClearUser").addEventListener("click", function(){
@@ -1825,6 +2500,7 @@ document.getElementById("saveConfirm").addEventListener("click", function(){
       pdWriteSchemes(arr);
     }
     pdClearEditEntry();      /* 覆盖完成：这次编辑流结束，把入口参数摘掉 */
+    pdDraftDrop();           /* 内容已落库 ⇒ 草稿作废（本页 600ms 后跳列表页，表单不必清） */
 
     var okMsg = (res.result === "updated")
       ? "已覆盖提示词方案「" + name + "」，相关测试结果已同步"
@@ -1939,6 +2615,142 @@ function pdClearEditEntry(){
   }catch (e){}
 }
 
+/* ================= 构造页草稿：跳走再回来内容不清空（10-09 新增，用户点名） =================
+   要解决的问题：从「编辑 / 修改」跳进来填好的内容，只要去别的页面转一圈再回来，
+   页面重新加载 ⇒ 表单值全没了（它们本来就只活在内存里，pdEditId 也是页面级变量）。
+   口径（10-09 逐条选定）：
+     · 存在 **sessionStorage** —— 同一标签页里跳来跳去不丢，关掉标签页就自然消失；
+     · **只有从「编辑 / 修改」跳进来的那一次才开草稿**（pdDraftStart 只被该路径调用）；
+       直接打开构造页仍是空白页，页面上也不会冒出「清空草稿」按钮；
+     · 保存成功后自动丢弃；另有「清空草稿」按钮可手动丢弃（点了把构造页刷回空白）。
+   ⚠️ 草稿里必须带上 editId / editName —— 否则恢复之后再保存会变成「新增一份」，
+      而不是覆盖原方案（这是本功能的成败点，校验脚本专门断言）。 */
+var PD_DRAFT_KEY = "pd_prompt_draft";
+var pdDraftOn    = false;    /* 当前是否处于「草稿会话」 */
+var pdDraftTimer = null;
+
+function pdComboVal(id){
+  var el = document.getElementById(id);
+  var inp = el ? el.querySelector("input") : null;
+  return inp ? String(inp.value || "") : "";
+}
+
+/* 草稿要记的字段：只认这几个输入位 + 动态轮次框（别的改动不打扰） */
+function pdIsDraftField(t){
+  if (!t) return false;
+  if (t.id && /^(baseUrl|apiKey|sysPrompt|userPrompt|multiTurn)$/.test(t.id)) return true;
+  return !!(t.closest && t.closest("#rounds, #roundBase"));
+}
+
+/* 把表单现状读成一份草稿（只读 DOM 与页面变量，不改任何东西） */
+function pdReadDraft(){
+  var us = [];
+  try{ us = collectUserPrompts() || []; }catch (e){ us = []; }
+  return {
+    editId:    (pdEditId === null || pdEditId === undefined) ? null : Number(pdEditId),
+    editName:  String(pdEditName || ""),
+    server:    pdComboVal("comboServer"),
+    modelType: pdComboVal("comboModelType"),
+    model:     pdComboVal("comboModel"),
+    base:      String($baseUrl.value || ""),
+    sys:       String($sysPrompt.value || ""),
+    user:      us,
+    multi:     !!$multi.checked,
+    apiKey:    String($apiKey.value || ""),
+    savedAt:   new Date().toISOString()
+  };
+}
+
+function pdDraftSave(){
+  if (!pdDraftOn) return;
+  try{ window.sessionStorage.setItem(PD_DRAFT_KEY, JSON.stringify(pdReadDraft())); }catch (e){}
+}
+
+/* 输入很密集（每敲一个字都会来），合并成一次写 */
+function pdDraftSchedule(){
+  if (!pdDraftOn) return;
+  if (pdDraftTimer) clearTimeout(pdDraftTimer);
+  pdDraftTimer = setTimeout(function(){ pdDraftTimer = null; pdDraftSave(); }, 150);
+}
+
+function pdDraftBtn(on){
+  var b = document.getElementById("btnClearDraft");
+  if (b) b.hidden = !on;
+}
+
+/* 只丢草稿、退出草稿会话（**不动表单**）—— 保存成功后走这里 */
+function pdDraftDrop(){
+  pdDraftOn = false;
+  if (pdDraftTimer){ clearTimeout(pdDraftTimer); pdDraftTimer = null; }
+  try{ window.sessionStorage.removeItem(PD_DRAFT_KEY); }catch (e){}
+  pdDraftBtn(false);
+}
+
+/* 开启草稿会话：只被「编辑 / 修改 跳进来的那次」调用 */
+function pdDraftStart(){
+  pdDraftOn = true;
+  pdDraftSave();
+  pdDraftBtn(true);
+}
+
+/* 表单回填：服务器 → 模型类型 → 模型 → 文案 → 密钥。
+   顺序不能变（切服务器会清掉类型 / 模型）；「编辑跳进来」与「草稿恢复」共用这一份。 */
+function pdFillForm(d){
+  if (d.server)    pbPickCombo(comboServer,    String(d.server));
+  if (d.modelType) pbPickCombo(comboModelType, String(d.modelType));
+  if (d.model)     pbPickCombo(comboModel,     String(d.model));
+
+  if (!$baseUrl.value && d.base) $baseUrl.value = String(d.base);   /* 兜底：Base_url 未被联动写上 */
+
+  var sBox = document.getElementById("sysName");
+  if (sBox && d.name) sBox.value = String(d.name);
+  $sysPrompt.value = String(d.sys || "");
+  pbFillUserPrompts(d.user);
+  if (d.apiKey) $apiKey.value = String(d.apiKey);
+}
+
+/* 跳走再回来：把草稿还原回表单（连 pdEditId 一起，保证再保存仍是覆盖原方案） */
+function pdDraftRestore(){
+  var d = null;
+  try{ d = JSON.parse(window.sessionStorage.getItem(PD_DRAFT_KEY) || "null"); }catch (e){ d = null; }
+  if (!d || typeof d !== "object") return false;
+
+  pdEditId   = (d.editId === null || d.editId === undefined) ? null : Number(d.editId);
+  pdEditName = String(d.editName || "");
+  pdEditAck  = true;
+
+  /* 恢复同样要等下拉就绪（应用侧下拉是异步初始化的） */
+  pdWhenCombosReady(function(){
+    pdFillForm(d);
+    pdDraftStart();
+  });
+  return true;
+}
+
+document.getElementById("btnClearDraft").addEventListener("click", function(){
+  pdDraftDrop();
+  /* 连一次性入口一起作废，然后刷新 —— 回来的是**真正干净的空白构造页**。
+     手写一套「表单归零」很容易漏字段（轮次框 / 费用标签 / 联动状态），
+     刷新天然等价于「刚打开这一页」，不会漏。 */
+  pdClearEditEntry();
+  window.location.reload();
+});
+
+/* 草稿自动落盘：输入框 / 多选框 / 动态轮次 / 下拉选中，任一变化都记一笔 */
+document.addEventListener("input", function(e){
+  if (pdDraftOn && pdIsDraftField(e.target)) pdDraftSchedule();
+}, true);
+document.addEventListener("change", function(e){
+  if (pdDraftOn && e.target && e.target.id === "multiTurn") pdDraftSchedule();
+}, true);
+document.addEventListener("mousedown", function(e){
+  /* 下拉选中：initCombo 的 pick() 是直接写 input.value，不触发 input 事件。
+     这条监听在捕获阶段先跑，但 pdDraftSchedule 有 150ms 合并，落盘时值已写好。 */
+  if (!pdDraftOn || !e.target || !e.target.closest) return;
+  if (e.target.closest(".combo-item")) pdDraftSchedule();
+}, true);
+window.addEventListener("pagehide", pdDraftSave);   /* 跳页前最后兜一次 */
+
 (function(){
   var params = null;
   try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
@@ -1965,24 +2777,62 @@ function pdClearEditEntry(){
   pdEditAck = true;
   pdEditName = String(src.name || "");
 
-  /* ---- 逐项预填：id 相同串 → 服务器 → 模型类型 → 模型 → 文案 → 密钥 ---- */
-  var sidBox = document.getElementById("schemeId");
-  if (sidBox) sidBox.value = String(id);
+  /* ---- 逐项预填 ----
+     ⚠️ 必须等三个下拉就绪再填：应用侧的下拉是脚本末尾 boot() 里、等 /api/srv + /api/mdl
+        回来之后才初始化的；这里若同步跑，comboServer 还是 undefined，pbPickCombo 取
+        combo.items 会抛异常 ⇒ **整段回填中断**（10-09 实测：跳过来页面是全空的）。
+        原型里三个下拉在本脚本中部已同步初始化，pdWhenCombosReady 会立即执行，行为不变。 */
+  pdWhenCombosReady(function(){
+    var sidBox = document.getElementById("schemeId");
+    if (sidBox) sidBox.value = String(id);
 
-  if (src.server) pbPickCombo(comboServer, String(src.server));
-  if (src.modelType) pbPickCombo(comboModelType, String(src.modelType));
-  if (src.model) pbPickCombo(comboModel, String(src.model));
+    pdFillForm({
+      name: src.name, server: src.server, modelType: src.modelType, model: src.model,
+      base: src.base, sys: src.sys, user: src.user, apiKey: src.apiKey
+    });
 
-  if (!$baseUrl.value && src.base) $baseUrl.value = String(src.base);   /* 兜底：Base_url 未被联动写上 */
+    pdClearEditEntry();
+    pdDraftStart();          /* 编辑流一开始就把草稿打开：跳走再回来内容不清空 */
+    toast("已从「提示词方案」带入「" + (src.name || "未命名方案") + "」，保存将覆盖该方案；切到别的页面再回来内容仍在", "ok");
+  });
+})();
 
-  var sBox = document.getElementById("sysName");
-  if (sBox) sBox.value = String(src.name || "");
-  $sysPrompt.value = String(src.sys || "");
-  pbFillUserPrompts(src.user);
-  if (src.apiKey) $apiKey.value = String(src.apiKey);
+/* 草稿恢复：编辑流刚带入时以带入内容为准（pdEditAck 已置位，上面那个回调先跑）；
+   其余情况（跳走再回来、F5）把草稿还原回表单。没有草稿就什么都不做，按钮保持隐藏。 */
+pdWhenCombosReady(function(){
+  if (pdEditAck) return;
+  if (!pdDraftRestore()) pdDraftBtn(false);
+});
 
-  pdClearEditEntry();
-  toast("已从「提示词方案」带入「" + (src.name || "未命名方案") + "」，保存将覆盖该方案", "ok");
+/* ================= 从「表结构提取」页点「复制 → 确认」跳进来的回填（10-09 新增，用户点名） =================
+   入口形如 prompt.html?pdSchema=1，内容走 sessionStorage 的 pd_schema_handoff（同一标签页）。
+   口径（逐条选定）：
+     · 把「固定前缀句 + 表结构」**整段覆盖**进「系统提示词」文本框（非空也覆盖）；
+     · 跟着开启草稿 —— 与「编辑 / 修改」跳进来同款：切到别的页面再回来，内容仍在；
+     · 认领后立刻清掉暂存并把地址栏参数摘掉，刷新（F5）不再重复填。
+   ⚠️ 这一段必须注册在**草稿恢复之后**：就绪回调按登记顺序跑，先让草稿把表单还原，
+      再拿表结构覆盖系统提示词 —— 反过来会被草稿里的旧值盖掉。 */
+var PD_SCHEMA_KEY = "pd_schema_handoff";
+
+(function(){
+  var params = null;
+  try{ params = new URLSearchParams(window.location.search); }catch (e){ params = null; }
+  if (!params || !params.get("pdSchema")) return;
+
+  var sent = null;
+  try{ sent = JSON.parse(window.sessionStorage.getItem(PD_SCHEMA_KEY) || "null"); }catch (e){ sent = null; }
+
+  pdWhenCombosReady(function(){
+    if (sent && sent.text){
+      $sysPrompt.value = String(sent.text);     /* 覆盖式填入 */
+      pdDraftStart();                           /* 跳走再回来内容不清空 */
+      toast("表结构已填入「系统提示词」", "ok");
+    } else {
+      toast("没有取到表结构内容，请回到「表结构提取」页重新复制", "warn");
+    }
+    try{ window.sessionStorage.removeItem(PD_SCHEMA_KEY); }catch (e){}
+    pdClearEditEntry();                         /* 摘掉 ?pdSchema=1：刷新不会重复填 */
+  });
 })();
 
 /* ================= 侧边栏 =================

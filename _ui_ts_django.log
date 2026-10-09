@@ -1,9 +1,15 @@
-[01/Oct/2026 00:29:05] "GET /api/health HTTP/1.1" 200 2
-[01/Oct/2026 00:29:06] "GET /Table_Structure_Extraction.html HTTP/1.1" 200 89384
-[01/Oct/2026 00:29:06] "GET /api/schema HTTP/1.1" 200 3215
+[09/Oct/2026 19:52:53] "GET /api/health HTTP/1.1" 200 2
+[09/Oct/2026 19:52:54] "GET /Table_Structure_Extraction.html HTTP/1.1" 200 106633
+[09/Oct/2026 19:52:54] "GET /api/db-conn HTTP/1.1" 200 24
 Not Found: /favicon.ico
-[01/Oct/2026 00:29:06] "GET /favicon.ico HTTP/1.1" 404 4048
-[01/Oct/2026 00:29:12] "POST /api/schema/desc HTTP/1.1" 200 888
-[01/Oct/2026 00:29:15] "POST /api/schema/desc HTTP/1.1" 200 1242
-[01/Oct/2026 00:29:18] "POST /api/schema/connect HTTP/1.1" 200 241
-[01/Oct/2026 00:29:23] "POST /api/schema HTTP/1.1" 200 579
+[09/Oct/2026 19:52:54] "GET /favicon.ico HTTP/1.1" 404 4528
+[09/Oct/2026 19:53:01] "POST /api/schema HTTP/1.1" 200 3930
+[09/Oct/2026 19:53:01] "POST /api/schema/desc HTTP/1.1" 200 888
+[09/Oct/2026 19:53:01] "POST /api/db-conn HTTP/1.1" 200 42
+[09/Oct/2026 19:53:05] "POST /api/schema/desc HTTP/1.1" 200 1242
+[09/Oct/2026 19:53:08] "POST /api/schema/connect HTTP/1.1" 200 241
+[09/Oct/2026 19:53:14] "POST /api/schema HTTP/1.1" 200 816
+[09/Oct/2026 19:53:14] "POST /api/db-conn HTTP/1.1" 200 42
+[09/Oct/2026 19:53:21] "GET /api/db-conn HTTP/1.1" 200 5620
+[09/Oct/2026 19:53:22] "GET /Table_Structure_Extraction.html HTTP/1.1" 200 106633
+[09/Oct/2026 19:53:22] "GET /api/db-conn HTTP/1.1" 200 5620

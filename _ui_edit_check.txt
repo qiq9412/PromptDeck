@@ -1,0 +1,154 @@
+============================================================================
+PromptDeck（Django 版）· 跨页编辑流 + 构造页草稿（真实浏览器 Edge/CDP）
+库文件：D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\prompt_test_DB_twe.db（tst_plan 基线 1 条）
+方案：UI复现编辑流-1791547380（id=187 / deepseek / Qwen/Qwen3-8B）
+============================================================================
+
+■ [1][2] 「提示词方案」页点「编辑」→ 跳构造页回填 + 开草稿
+  [PASS] 方案库页列出该方案
+  [PASS] 点中该行「编辑」
+  [PASS] 已跳到 prompt.html  http://127.0.0.1:8502/prompt.html?pdEditOff=1
+  [PASS] 服务器 / 模型类型 / 模型 三项回填正确  server='deepseek' type='对话' model='Qwen/Qwen3-8B'
+  [PASS] Base_url 回填正确  https://api.deepseek.com
+  [PASS] 系统提示词 / 用户提示词 / API_key 回填正确  sys='系统提示词-原值-1791547380' user='用户提示词-原值-1791547380' key='sk-ui-edit-1791547380'
+  [PASS] pdEditId 记住了要覆盖的方案  187
+  [PASS] 页面加载期无 JS 异常（修复前这里 pbPickCombo 抛 TypeError）
+  [PASS] 一次性的回填入口已消费（地址栏变成 ?pdEditOff=1）  http://127.0.0.1:8502/prompt.html?pdEditOff=1
+  [PASS] 「清空草稿」按钮出现且可见  hidden=False visible=True
+  [PASS] 草稿已落 sessionStorage，且带上了 editId / editName（否则再保存会变成新增）  {'editId': 187, 'editName': 'UI复现编辑流-1791547380', 'server': 'deepseek', 'model': 'Qwen/Qwen3-8B', 'sys': '系统提示词-原值-1791547380', 'apiKey': 'sk-ui-edit-1791547380'}
+
+■ [3] 在构造页改内容 → 跳去别的页面 → 回来：内容不清空
+  [PASS] 侧栏点去「服务器列表」
+  [PASS] 确实到了别的页面  http://127.0.0.1:8502/list_server.html
+  [PASS] 从别的页面点回「提示词构造」
+  [PASS] 回到 construct 页（无任何 query 参数）  http://127.0.0.1:8502/prompt.html
+  [PASS] ★ 跳走再回来内容没清空：服务器 / 模型仍选中  server='deepseek' model='Qwen/Qwen3-8B'
+  [PASS] ★ 改过的系统提示词也还在  系统提示词-原值-1791547380-已改
+  [PASS] 用户提示词 / API_key 仍在  user='用户提示词-原值-1791547380' key='sk-ui-edit-1791547380'
+  [PASS] pdEditId 仍指向原方案（再保存是覆盖、不是新增）  187
+  [PASS] 恢复过程无 JS 异常
+
+■ [4] 保存 → 服务端按 id 覆盖 + 草稿自动清除
+  [PASS] 保存弹窗按编辑流带出原方案名
+  [PASS] 保存后方案行数不变（是覆盖、不是新增）  建完后=[100, 187] 保存后=[100, 187]
+  [PASS] 库里该方案的系统提示词已更新为改后的值  {'id': 187, 'name': 'UI复现编辑流-1791547380', 'base': 'https://api.deepseek.com', 'sys': '系统提示词-原值-1791547380-已改'}
+  [PASS] 草稿已被自动清除  True
+
+■ [5] 「提示词测试」页点「修改」→ 同一条链路
+  [PASS] 测试页左栏选中该方案
+  [PASS] 点「修改」
+  [PASS] 测试页「修改」也跳到 prompt.html 且回填正确  href=http://127.0.0.1:8502/prompt.html?pdEditOff=1 server='deepseek' sys='系统提示词-原值-1791547380-已改'
+  [PASS] 测试页「修改」也开了草稿会话 + 按钮可见  draft=True visible=True
+  [PASS] 测试页「修改」链路无 JS 异常
+
+■ [6] 点「清空草稿」→ 刷新后回到空白构造页
+  [PASS] 清空后表单是空白的（下拉 / 文案 / 密钥都空）  server='' model='' sys='' user='' key=''
+  [PASS] 清空后草稿没了 + 按钮隐藏  draft=None hidden=True
+  [PASS] 清空后 pdEditId 归零（不再指向原方案）
+  [PASS] 清空链路无 JS 异常
+
+■ [7] 直接打开构造页：不受影响（无草稿、按钮隐藏）
+  [PASS] 直接打开时按钮隐藏、没有草稿、表单空白  hidden=True draft=None server=''
+  [PASS] 直接打开无 JS 异常
+
+■ [7b] 「表结构提取」页点「复制」→ 弹窗确认 → 跳构造页填系统提示词（10-09 用户点名）
+  [PASS] 导入前左栏为空（14-18：不再自动挂自带库）
+  [PASS] 导入：选「SQLite」弹出选文件窗口
+  [PASS] 导入：文件已挂到 #fileInput
+  [PASS] 没提取过就点「复制」：按原型口径拦下、不弹窗  {'shown': False, 'toast': '请先点「提取表结构」生成表结构'}
+    左栏表数：9，选了第一张：django_migrations
+  [PASS] 左栏已列出真实库的表  {'n': 9, 'name': 'django_migrations'}
+    生成的表内容首行：['数据库 prompt_test_DB_twe.db（SQLite）']
+  [PASS] 已生成表内容（extracted=true）且文本里有该表名  True
+  [PASS] 点「复制」后弹出确认框  {'shown': True, 'toast': '请先点「提取表结构」生成表结构'}
+  [PASS] 选「取消」：弹窗关闭 + 仍停在表结构页 + 没留下待填内容  {'href': 'http://127.0.0.1:8502/Table_Structure_Extraction.html', 'shown': False, 'held': None}
+    跳到：http://127.0.0.1:8502/prompt.html?pdEditOff=1
+  [PASS] 已跳到 prompt.html 且带上 ?pdSchema=1 入口  http://127.0.0.1:8502/prompt.html?pdEditOff=1
+  [PASS] 服务端确实拿表结构填了系统提示词（不是空）  277
+  [PASS] 前缀句在**最开头**（用户逐字给的原话）  你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句
+
+不要有其他解释，仅返回sql语句
+
+数据库
+  [PASS] ★ 第二句「不要有其他解释，仅返回sql语句」紧跟第一句（逐字原话）  '你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\n\n不要有其他解释，仅返回sql语句\n\n数据'
+  [PASS] ★ 两句前缀与表结构之间各空一行，表结构里有刚选的那张表  '你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\n\n不要有其他解释，仅返回sql语句\n\n数据库 prompt_test_DB_twe.db（SQLite）\n\n表 django_migrations\n注释: \n字段:\n  - id   '
+  [PASS] 前缀句只出现一次（不是拼了两遍）  1
+  [PASS] ★ 输出约束也只出现一次  1
+  [PASS] ★ 交接后 pd_db_link_meta 仍在（弹窗左栏靠它，不靠会被清掉的 pd_schema_handoff）  {'kind': 'SQLite', 'nTables': 1, 'firstName': 'django_migrations', 'firstCols': 4, 'firstColSample': ['id', 'pk', '', 'INTEGER'], 'hasRows': True, 'hasDesc': False, 'nRels': 0, 'relSample': None, 'allNamed': True}
+  [PASS] ★ tables 已升级成结构化表清单（不再是纯表名数组）  {'kind': 'SQLite', 'nTables': 1, 'firstName': 'django_migrations', 'firstCols': 4, 'firstColSample': ['id', 'pk', '', 'INTEGER'], 'hasRows': True, 'hasDesc': False, 'nRels': 0, 'relSample': None, 'allNamed': True}
+  [PASS] ★ 每张表都带得到字段名/类型/说明四元组  ['id', 'pk', '', 'INTEGER']
+  [PASS] ★ relations 字段存在（本次该库无外键，跳过逐条验形）  本次 nRels=0（该库本来就没有外键）
+  [PASS] ★ 交接载荷里仍没有密码（安全口径没因为加字段而破）
+  [PASS] ★ 前缀里没有 Markdown 围栏 / 多余说明（否则 DBeaver 里跑不了）  '你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\n\n不要有其他解释，仅返回sql语句\n\n数据库 '
+  [PASS] 一次性入口已消费：暂存清掉、地址栏变成 ?pdEditOff=1  left=True href=http://127.0.0.1:8502/prompt.html?pdEditOff=1
+  [PASS] 这条链路也开了草稿会话（按钮可见 + 草稿里的 sys 就是它）  visible=True draft.sys.head='你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\n\n不'
+  [PASS] ★ 跳走再回来：表结构还在系统提示词里  你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句
+
+不要有其他解释，仅返回sql语句
+
+数据库
+  [PASS] ★ 跳走再回来：那句输出约束也在（草稿恢复的是整段）  你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句
+
+不要有其他解释，仅返回sql语句
+
+数据库 prompt_test_DB_twe.db（SQLite）
+  [PASS] 这条链路无 JS 异常
+
+■ [7c] 「链接数据库调试」按钮：前置条件 → 灰 / 可点（10-09 用户点名）
+  [PASS] 先把 PD_DBG_API 换成探针（避免本用例真把 DBeaver 拉起来）
+  [PASS] 按钮文案就是「链接数据库调试」  链接数据库调试
+  [PASS] 表结构交接时数据库元数据也带过来了（kind / 表名齐）  {'kind': 'SQLite', 'name': 'prompt_test_DB_twe.db', 'mode': 'file', 'hasFile': True, 'tables': 1, 'hasPwd': False}
+  [PASS] ★ 元数据里**没有密码**（安全口径）  {'kind': 'SQLite', 'name': 'prompt_test_DB_twe.db', 'mode': 'file', 'hasFile': True, 'tables': 1, 'hasPwd': False}
+  [PASS] 没生成 SQL 时按钮置灰  off=true title='请先生成 SQL'
+  [PASS] 置灰时 title 点明缺「请先生成 SQL」  请先生成 SQL
+  [PASS] 置灰时点它**不会**调后端
+  [PASS] ★ 输出框一有 SQL，按钮自动变为可点  off=false title='在 DBeaver 中打开该数据库并粘贴这条 SQL'
+  [PASS] 可点时 title 说的是「打开该数据库并粘贴这条 SQL」  在 DBeaver 中打开该数据库并粘贴这条 SQL
+  [PASS] ★ 点按钮调了一次后端接线，且参数带的是最新那条 SQL  [{'kind': 'SQLite', 'name': 'prompt_test_DB_twe.db', 'sqlLen': 70}]
+  [PASS] ★ 在**生成 SQL 之前**点过灰按钮，一次都不该调后端（调用次数口径）  [{'kind': 'SQLite', 'name': 'prompt_test_DB_twe.db', 'sqlLen': 70}]
+  [PASS] 模型失败态下按钮退回置灰（不拿错误文案去调试）  off=true
+  [PASS] 没有数据库元数据时置灰，并提示去表结构提取页复制  未检测到数据库连接信息，请先从「数据库表结构提取」复制表结构
+  [PASS] 后端对不存在的 SQLite 文件回明确提示（ok=false，不抛 500）  {'ok': False, 'error': 'SQLite 文件不存在或路径无效：/no/such/file.db'}
+
+■ [7d] 「页面内调试」弹窗：三栏骨架 + 调用时机 + 密码不留存（10-09 用户点名）
+  [PASS] 换成探针（挡掉真请求，避免本节打后端）
+  [PASS] ★ 按钮文案是「页面内调试」（与「链接数据库调试」并存，两个都在）  页面内调试
+  [PASS] 与另一条路线**同口径**：同一份 SQL 决定置灰与否  off=false
+  [PASS] ★ 打开前弹窗是关的、结果区没有表格  {'off': 'false', 'label': '页面内调试', 'open': False, 'tables': 0, 'cols': 0, 'colText': [], 'tbText': [], 'fkText': [], 'pkCount': 0, 'sql': '—', 'pwdVisible': True, 'resRows': 0, 'resHead': [], 'status': '', 'alert': ''}
+  [PASS] ★ 点按钮弹窗打开  True
+  [PASS] ★ 打开时**不自动发请求**（等用户填密码 / 点执行）
+  [PASS] 左栏渲染出 2 张表的表结构  tables=2 cols=6
+  [PASS] ★ 左栏列出的表名就是交接过来的那两张  ['tst_plan', 'tst_rec']
+  [PASS] ★ 左栏渲染出**真实字段名**（不是空壳 —— 形状对不上时这里会空）  ['plan_name', 'base_url', 'id', 'rec_id', 'score', 'plan_id']
+  [PASS] ★ 主键被标出来  2
+  [PASS] ★ 外键挂在对应表下（顶层 relations 带 fromTable 才挂得上）  ['↳ plan_id → tst_plan.id 外键关联']
+  [PASS] 右上展示的就是模型那条 SQL  SELECT plan_name FROM tst_plan WHERE plan_name LIKE '%E2E%';
+  [PASS] ★ SQLite 不需要密码 ⇒ 密码栏隐藏
+  [PASS] ★ 点「执行」才调一次接线，且参数齐（kind/meta/sql）  [{'kind': 'SQLite', 'hasMeta': True, 'metaHasPwd': False, 'pwdLen': 0, 'sqlLen': 60}]
+  [PASS] ★ meta 里**不含密码**（密码只能走顶层 pwd 字段）  [{'kind': 'SQLite', 'hasMeta': True, 'metaHasPwd': False, 'pwdLen': 0, 'sqlLen': 60}]
+  [PASS] 结果表格渲染出来了（表头 + 数据行）  head=['plan_name'] rows=1
+  [PASS] 状态行显示成功与耗时  查询成功 · 1 行 · 耗时 7ms
+  [PASS] ★ Esc 能关弹窗
+  [PASS] ★ 点遮罩空白处能关弹窗
+  [PASS] ★ 服务器型数据库显示密码栏  True
+  [PASS] ★ 密码随这一次请求发出（只走顶层 pwd）  [{'kind': 'SQLite', 'hasMeta': True, 'metaHasPwd': False, 'pwdLen': 0, 'sqlLen': 60}, {'kind': 'MySQL', 'hasMeta': True, 'metaHasPwd': False, 'pwdLen': 12, 'sqlLen': 60}]
+  [PASS] ★ 请求结束后密码输入框已清空（不留存）
+  [PASS] ★ 密码没被写进 sessionStorage
+  [PASS] ★ 重载后接线是页面自带的真实现（不是探针）
+  [PASS] ★ 真调后端：失败时错误条展示服务端原话（不白屏、不吞错）  执行失败SQLite 数据库文件不存在：/no/such/file.db
+  [PASS] 失败时状态行标红为 err  执行失败
+  [PASS] ★ 后端对写语句返回 ok=false（前端不崩、只是显示错误）
+  [PASS] [7c] 全程无 JS 异常
+
+■ [8] 全程 JS 异常汇总
+  [PASS] 不仅页面内钩子、CDP 侧也没抓到 JS 异常
+
+■ [9] 收尾（先自清理再断言回基线 —— 断言写在 finally 的清理之前会永远看到待删那条）
+  [PASS] tst_plan 回到跑之前的基线  base=[100] now=[100]
+  [FAIL] ★ tst_db_conn 跑完仍为空（页面自动存的那些由收尾统一放回原状）  [9]
+（已放回跑前的存档 1 行）
+
+============================================================================
+结果：有失败（失败 1 项）
+  - ★ tst_db_conn 跑完仍为空（页面自动存的那些由收尾统一放回原状）
+============================================================================

@@ -1,0 +1,50 @@
+# -*- coding: utf-8 -*-
+"""临时诊断：找到占用 8502 的进程（本项目约定：改完 core/*.py 必须手动重启）。"""
+import os
+import subprocess
+import sys
+
+# netstat -ano | findstr :8502
+try:
+    out = subprocess.run(["netstat", "-ano"], capture_output=True,
+                         timeout=30).stdout.decode("gbk", "replace")
+except Exception as e:
+    print("netstat 失败:", e)
+    sys.exit(0)
+
+pids = set()
+for line in out.splitlines():
+    if ":8502" in line and "LISTENING" in line.upper():
+        parts = line.split()
+        if len(parts) >= 5:
+            pids.add(parts[-1])
+
+if not pids:
+    print("netstat 里没有 8502 的 LISTENING 记录")
+    sys.exit(0)
+
+for pid in sorted(pids):
+    print("=" * 60)
+    print("PID =", pid)
+    try:
+        import wmi
+    except ImportError:
+        wmi = None
+    # 用 tasklist 兜底
+    try:
+        r = subprocess.run(["tasklist", "/FI", "PID eq %s" % pid, "/V"],
+                           capture_output=True, timeout=30)
+        txt = r.stdout.decode("gbk", "replace")
+        for ln in txt.splitlines():
+            if pid in ln:
+                print("tasklist:", ln.strip()[:200])
+    except Exception as e:
+        print("tasklist 失败:", e)
+    # 命令行
+    try:
+        r = subprocess.run(["powershell", "-NoProfile", "-Command",
+                            "(Get-CimInstance Win32_Process -Filter \"ProcessId=%s\").CommandLine" % pid],
+                           capture_output=True, timeout=60)
+        print("命令行:", r.stdout.decode("gbk", "replace").strip()[:500] or "(取不到)")
+    except Exception as e:
+        print("取命令行失败:", e)

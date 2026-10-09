@@ -62,7 +62,19 @@ SEED_VER_NAME = "seed.version"
 
 # ------------------------------------------------------------------ 期望命中数
 # 源码一变这些数字就对不上，脚本会直接报错、不写盘 —— 逼着人核对，而不是默默产出一个错包。
-EXPECT_FETCH = 25        # static/*.html 里 fetch("/api/ 的出现次数（9 页合计）
+EXPECT_FETCH = 30        # static/*.html 里 fetch("/api/ 的出现次数（9 页合计）
+                         # 10-09 由 25 → 26：new_server.html 的 base_url 查重（pdUrlTaken）
+                         # 新增一处 fetch("/api/srv") 读真实清单
+                         # 再由 26 → 27：prompt.html 的「链接数据库调试」新增 fetch("/api/dbeaver/link")
+                         # 末了又由 27 → 26：表结构提取页**不再自动挂应用自带库**，
+                         # 启动时那句 fetch("/api/schema") 整段下线（左栏起始为空，由用户导入驱动）
+                         # 再由 26 → 27：prompt.html 的「页面内调试」新增 fetch("/api/database/execute-sql")
+                         # 再由 27 → 30：表结构提取页「已连接数据库存档」三个动词
+                         # （GET 列表 / POST 保存 / DELETE 删除）—— 都在 PD_LIB_* 里
+                         # ⚠️ 注释里**别写这几条 fetch 的字面量**：本文件是在产物页里逐次数的，
+                         #    注释写一次就多算一次（历史上踩过，直接 die）。
+                         # ⚠️ 每加一处 fetch 都要回来改这个数，否则打包会在最后一步 die。
+                         #    自查：python -c 逐页 text.count('fetch("/api/') 求和
 EXPECT_REDIRECT = 1      # core/views.py 里 redirect("/" + HOME_PAGE)
 EXPECT_DEBUG = 1         # config/settings.py 里 DEBUG = True
 EXPECT_KEY = 1           # config/settings.py 里 DEEPSEEK_API_KEY 的明文兜底值
@@ -165,12 +177,15 @@ CUR_VER="$(cat "$MARK" 2>/dev/null || echo '')"
 # 库可用 = 能打开、且这套表都在。
 #   · 拿到 LFS 指针文件 ⇒ not a database
 #   · 上一版 Starlette 留下的库只有 srv / mdl，缺 tst_* ⇒ 判不可用，用新种子重建
+#   · tst_db_conn（已连接数据库存档）是第四次迭代加的表：老容器里的持久化库没有它，
+#     一并纳入判据 ⇒ 走「用新种子刷新（旧库备份 .bak）」这条既有的自愈路，
+#     而不是让页面带着一张缺表跑（页面本身也容错，但这里判掉更干净）。
 db_ok() {
   python -c "
 import sqlite3, sys
 c = sqlite3.connect(sys.argv[1])
 for t in ('srv', 'mdl', 'tst_plan', 'tst_plan_prompt', 'tst_api_key',
-          'tst_rec', 'tst_rec_dtl'):
+          'tst_rec', 'tst_rec_dtl', 'tst_db_conn'):
     c.execute('select count(*) from ' + t)
 c.close()
 " "$1" 2>/dev/null
@@ -247,22 +262,22 @@ license: apache-2.0
 
 | 页面 | 文件 | 说明 |
 |---|---|---|
-| 提示词构造 | `prompt.html` | **首页**；调试会把请求转发给所选服务器的真实模型 |
+| 提示词构造 | `prompt.html` | **首页**；调试会把请求转发给所选服务器的真实模型。模型输出区另有两个按钮：「页面内调试」（连库真跑只读 SQL）、「链接数据库调试」（把 SQL 直接送进 DBeaver 编辑器） |
 | 提示词方案库 | `prompt_scheme.html` | 方案的增删改查（系统提示词 + 逐轮用户提示词 + 密钥） |
 | 提示词测试 | `prompt_test.html` | 逐题调模型 + DeepSeek 判定对错 + 保存结果 |
 | 测试结果列表 | `prompt_test_results_list.html` | 历史测试记录与准确率 |
 | 服务器列表 | `list_server.html` | |
 | 新增服务器 | `new_server.html` | |
-| 模型列表 | `foundation1_models.html` | 基础模型数据（抓取的 1.6k 条按「平台 + 模型名」去重后随包发布 45 条） |
+| 模型列表 | `foundation1_models.html` | 基础模型数据（抓取的 1.6k 条按「平台 + 模型名」去重后随包发布，**条数以包内 `data/seed.sqlite` 为准**） |
 | 新增模型 | `model_add.html` | |
-| 数据库表结构提取 | `Table_Structure_Extraction.html` | 读真实库结构；缺注释的表 / 字段用 DeepSeek 补说明；可连 MySQL / PG / SQL Server / Oracle / Db2 |
+| 数据库表结构提取 | `Table_Structure_Extraction.html` | 读真实库结构；可直连 MySQL / PG / SQL Server / Oracle / Db2，也可**上传 SQLite 文件**解析；缺注释的表 / 字段用 DeepSeek 补说明；「已连接数据库存档」记住常用连接；表结构可一键复制填入「提示词构造」 |
 
 ## 目录结构
 
 ```
 manage.py             Django 入口
 config/               settings.py / urls.py / wsgi.py / asgi.py
-core/                 视图 + 数据层 + 模型（views / store / chat / schema / dbx / models）
+core/                 视图 + 数据层 + 模型（views / store / chat / schema / dbx / sqlrun / dbeaver / models）
 static/*.html         9 个页面（原型产物，fetch 已改成相对路径）
 data/seed.sqlite      默认数据库种子（首次启动会拷到持久化目录）
 data/seed.version     种子版本（内容 sha1 前 12 位），决定容器要不要刷新持久化库
@@ -344,6 +359,10 @@ git push origin master                          # 默认分支是 master，不�
 | `PD_DEEPSEEK_API_KEY` | 「数据库表结构提取」页给缺注释的表 / 字段补说明时调 DeepSeek 用的密钥 | 填你自己的 `sk-…`；不填则该功能会提示「未配置 DEEPSEEK_API_KEY」，其余功能照常 |
 | `PD_DEEPSEEK_BASE_URL` | 接口地址 | 默认 `https://api.deepseek.com` |
 | `PD_DEEPSEEK_MODEL` | 模型名 | 默认 `deepseek-v4-pro` |
+| `PD_SQL_MAX_ROWS` | 「页面内调试」单次最多返回的行数 | 默认 `500` |
+| `PD_SQL_TIMEOUT` | 「页面内调试」执行 SQL 的超时（秒） | 默认 `30` |
+| `PROMPTDECK_DBEAVER` | DBeaver 可执行文件路径（**容器里用不到**） | 不填则自动探测 |
+| `PD_DBEAVER_SCAN` | 设为 `0` 可关掉便携版 DBeaver 的浅层扫盘 | 默认 `1` |
 | `PD_DEBUG` | 设为 `1` 才开 Django 调试页 | **平时不要设** —— 调试页会暴露配置内容 |
 | `PROMPTDECK_SEED_REFRESH` | 设为 `off` 可跳过种子刷新 | 不想被新包冲掉线上数据时才用 |
 
@@ -424,6 +443,17 @@ python verify_upload.py --remote Zhuqiwen112/PromptDeck    # 查线上仓库根�
   当成普通表列出来（未做过滤，如实展示）。
 - `data/seed.sqlite` 只是**默认数据**，容器首次启动会把它拷进 `/mnt/workspace`；之后线上看到的
   以那份库为准（想改默认数据，重新打包并带上新的 `data/seed.version`）。
+- **线上点「链接数据库调试」会报「未检测到 DBeaver，请配置 DBEAVER_PATH」——这是预期，不是 bug。**
+  容器镜像里没有 DBeaver。这个按钮是给「库跑在自己机器上、又从本机浏览器打开页面」的用法准备的。
+- **线上点「页面内调试」也连不上库**：容器里没有你要连的那些数据库。它会稳定返回一条可读的
+  连接失败原因（不会 500 白屏），同样属预期。
+- 「已连接数据库存档」的线上默认数据是**空的**：连接信息（主机 / 库名 / 用户名 / 落盘路径）
+  按约定不随包上线，要用的时候自己连一次即可。该表**不存密码**。
+- 「数据库表结构提取」页上传的 SQLite 文件会在容器内落一份副本到 `/app/data/uploads/`
+  （留给「链接数据库调试」指路径用）；容器重启后副本会消失，重新上传即可。
+- 「页面内调试」**只放行只读 SQL**（`SELECT` / `WITH` 白名单，禁写语句、禁多语句），并强制行数上限。
+  这是本应用里**唯一**一处刻意做服务端二次校验的地方 —— 别处的校验写错了只是页面报错，
+  这里漏放一条写语句就是数据损坏。
 """
 
 
@@ -507,7 +537,7 @@ UNIT_ALLOWED = ("K", "万", "十万", "百万")
 # 端到端脚本造的数据前缀；正常打包前已自清，这里只是兜底，避免把测试行带上公网
 TEST_PREFIXES = ("UI复现", "MS校验")
 CORE_TABLES = ("srv", "mdl", "tst_plan", "tst_plan_prompt",
-               "tst_api_key", "tst_rec", "tst_rec_dtl")
+               "tst_api_key", "tst_rec", "tst_rec_dtl", "tst_db_conn")
 
 
 def clean_seed(conn):
@@ -544,6 +574,12 @@ def clean_seed(conn):
 
     # 5) 密钥：一条都不带上线（AI 判定密钥 + 各方案自带的密钥）
     run("清空 tst_api_key（密钥不带上线）", "delete from tst_api_key")
+
+    # 6) 已连接数据库存档：**一条都不带上线**
+    #    里面是开发机连过的库（主机 / 库名 / 用户名 / 落盘文件路径），
+    #    对使用者毫无意义，还等于把内网拓扑顺手公开。用户要用就自己连一次。
+    #    （本表本来就不含密码 —— 见 setup_db_conn.py 的注释；这里是第二道闸。）
+    run("清空 tst_db_conn（连接信息不带上线）", "delete from tst_db_conn")
 
     after = {t: count("select count(*) from %s" % t) for t in CORE_TABLES}
     return stats, before, after

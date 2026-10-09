@@ -28,7 +28,7 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.dirname(HERE)
 OUT_DIR = os.path.join(HERE, "static")
-NODE = r"C:\Users\Lenovo\.workbuddy\binaries\node\versions\22.22.2-3\node.exe"
+NODE = r"C:\Users\Lenovo\.workbuddy\binaries\node\versions\22.22.2-6\node.exe"
 
 buf = io.StringIO()
 FAILS = []
@@ -132,8 +132,16 @@ CHECKS = {
         "verify_snippets": [],
         "must_have": ['fetch("/api/srv", {', 'plat_name: $platform.value.trim()',
                       # base_url 的格式锁定（必填校验之外的网址格式校验）
-                      'checkUrl($baseUrl)'],
-        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:"],
+                      'checkUrl($baseUrl)',
+                      # 10-09 新增：base_url 查重（用户点名）
+                      #   前端：pdUrlTaken 改读真实库（原型读的是演示清单）+ 命中就停在本页
+                      #   后端：POST /api/srv 命中回 409，页面照样给同一句提示
+                      'function pdNormUrl(', 'function pdUrlTaken(',
+                      'function pdSaveServer(', 'r.status === 409',
+                      '已存在服务器API网址'],
+        "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
+                     # 演示用的网址清单必须已经下线（应用侧读 /api/srv）
+                     '"https://api.openai.com/v1"', '"https://api.deepseek.com"'],
     },
     # 提示词构造：HTML / CSS 一字未动，三个下拉的选项在运行时由后端数据注入
     "prompt.html": {
@@ -154,12 +162,70 @@ CHECKS = {
                       '.pb-textarea.is-error',
                       '$modelOut.value = "正在链接模型";',
                       'classList.remove("is-error")', 'classList.add("is-error")',
-                      '链接模型失败', "pdFillMetrics(0, 0)"],
+                      '链接模型失败', "pdFillMetrics(0, 0)",
+                      # 10-09 新增：跨页编辑流（方案页「编辑」/ 测试页「修改」→ 跳本页回填）
+                      #   —— 三个下拉是 initCombos() 里**异步**初始化的，回填必须等它就绪，
+                      #   否则 pbPickCombo(comboServer,…) 抛 TypeError、整段回填中断（页面全空）。
+                      'function pdCombosReadyNow(', 'function pdWhenCombosReady(',
+                      'pdWhenCombosReady(function(){',
+                      # 10-09 新增：构造页草稿（sessionStorage，仅当前标签页）
+                      'var PD_DRAFT_KEY = "pd_prompt_draft";',
+                      'function pdDraftStart(', 'function pdDraftSchedule(', 'function pdDraftSave(',
+                      'function pdDraftDrop(', 'function pdDraftRestore(', 'function pdFillForm(',
+                      'function pdIsDraftField(', 'function pdComboVal(',
+                      'window.sessionStorage.setItem(PD_DRAFT_KEY',
+                      'window.addEventListener("pagehide", pdDraftSave)',
+                      # 「清空草稿」按钮：只在编辑流出现，按钮自带 display ⇒ 必须有 [hidden] 规则压住
+                      'id="btnClearDraft"', 'document.getElementById("btnClearDraft")',
+                      '.pb-cleardraft[hidden]{display:none;}',
+                      # 保存成功 → 内容已落库，草稿作废
+                      'pdDraftDrop();',
+                      # 10-09 新增：从「表结构提取」页「复制 → 确认」跳进来（?pdSchema=1）
+                      #   —— 把「前缀句 + 表结构」整段覆盖进系统提示词，认领后清暂存 + 开草稿
+                      'var PD_SCHEMA_KEY = "pd_schema_handoff";',
+                      'params.get("pdSchema")',
+                      '$sysPrompt.value = String(sent.text);',
+                      'pd_schema_handoff',
+                      '表结构已填入「系统提示词」',
+                      # 10-09 新增：模型输出区的「链接数据库调试」按钮（用户点名）
+                      #   —— 三个前置条件（表结构交接过 / 已生成 SQL / 连接元数据齐）
+                      #      由 pdDbgMissing() 判，缺项置灰 + title 说明缺什么；
+                      #      真调用由 PD_DBG_API 注入（原型态只弹一句演示提示、不发请求）。
+                      'id="btnDbgLink"', '.pb-dbg[aria-disabled="true"]',
+                      'var PD_DBLINK_KEY = "pd_db_link_meta";',
+                      'function pdDbgMeta(', 'function pdDbgSql(',
+                      'function pdDbgMissing(', 'function pdDbgSync(',
+                      'function PD_DBG_API(', 'fetch("/api/dbeaver/link"',
+                      '请先生成 SQL', '未检测到数据库连接信息',
+                      # 10-09 新增：「页面内调试」弹窗（用户点名，与上面那条并存）
+                      #   —— 三栏骨架 + 只读执行 + 密码弹窗内临时输入不留存
+                      'id="btnDbgRun"', 'id="dbgRunMask"', 'id="pdxTree"',
+                      'id="pdxSql"', 'id="pdxResult"', 'id="pdxPwd"',
+                      'function pdxOpen(', 'function pdxExecute(',
+                      'function pdxRenderResult(', 'function pdxWipePwd(',
+                      'function PDX_RUN_API(', 'fetch("/api/database/execute-sql"',
+                      '本次执行临时使用，不保存', 'try { pdxRenderResult(res); } finally { pdxWipePwd(); }'],
+        "must_count": {
+            # ① 定义 1 处；② initCombos() **里面**的就绪信号 1 处。合计恰好 2 处。
+            #    原型里那句顶层的（在 initCombos 之外）必须被接线吃掉 —— 若它活到产物里，
+            #    pdWhenCombosReady 一看「已就绪」就立刻回填，等于白等（踩过一遍）。
+            "pdCombosReadyNow()": 2,
+        },
         "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
                      # 原型里那段本地造的假输出必须已经消失
                      "（模拟输出", "estTokens(outText)",
                      # 费用不再四舍五入（金额用 fmtNum；单价属性不再走 num2 两位小数）
-                     "toFixed(4)", "num2("],
+                     "toFixed(4)", "num2(",
+                     # 就绪信号不许留在 initCombos() 之外（原型那句的原文，接线后会消失）
+                     "pdCombosReadyNow();          /* 原型：三个下拉已同步初始化完成",
+                     # ⚠️ 演示分支不许活到产物里：产物必须走 PD_DBG_API 真调后端，
+                     #    否则点了按钮只会弹一句「原型演示」。
+                     '原型演示：将唤起 DBeaver',
+                     # ⚠️ 弹窗里那几个函数是**裸声明**（pdxXxx），调用处却写成 $pdxXxx
+                     #    的话，运行时 ReferenceError 会静默打断整条渲染链 ——
+                     #    e2e 才发现过一次，这里在静态层就挡住。
+                     '$pdxSetStatus(', '$pdxRenderResult(', '$pdxExecute(',
+                     '$pdxOpen(', '$pdxWipePwd('],
     },
     # 提示词方案列表：第二次迭代起，方案库的真源是服务端 tp 表
     "prompt_scheme.html": {
@@ -167,6 +233,10 @@ CHECKS = {
         "must_have": [
             # 列表 / 删除接后端
             'fetch("/api/tp")', 'apiTpDelete(ids)', 'function pdBoot()', 'pdBoot();',
+            # 编辑入口（10-09 纳入断言）：点「编辑」写整份快照 + 带 query 跳构造页
+            'var PD_EDIT_SNAP_KEY = "pd_edit_snapshot";', 'function pdGotoEdit(',
+            '"&pdEntry=" + encodeURIComponent("prompt.html")',
+            'var d = e.target.closest ? e.target.closest("[data-edit]") : null;',
             # 原型的示例方案改为由迁移 0002_seed_tp 灌库，页面不再自己播种
             "var schemes = [];"],
         "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
@@ -189,7 +259,11 @@ CHECKS = {
             'fetch("/api/chat"', 'fetch("/api/judge"',
             'function pdRunQuestion(', 'function pdJudgeQuestion(',
             # 「保存结果」同时落 tst_rec / tst_rec_dtl
-            'fetch("/api/rec"', 'planId:  currentScheme.id'],
+            'fetch("/api/rec"', 'planId:  currentScheme.id',
+            # 「修改」入口（10-09 纳入断言）：与方案库页「编辑」同口径
+            'window.sessionStorage.setItem("pd_edit_snapshot", JSON.stringify({',
+            'location.href = "prompt.html?pdSchemeId=" + encodeURIComponent(String(s.id))'
+            ' + "&pdEntry=prompt.html";'],
         "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
                      # 原型态的「假输出 + 本地比对」两处调用点必须已经不在了
                      "pdMockAnswer(t.q, t.ans, seed + i)",
@@ -216,16 +290,58 @@ CHECKS = {
             "function pdMergeDesc(",
             # 第二批：主机 / URL 连接真接驱动
             "function pdConnectDb(", 'fetch("/api/schema/connect"',
-            # 打开页面连真实库；提取前先补「库里没有注释」的表 / 字段说明
-            "function pdBoot(", "pdBoot();", 'fetch("/api/schema")',
+            # 打开页面**不再自动挂应用自带库**（14-18 用户点名）：左栏起始为空，
+            # 后续流程全部由用户导入 / 连接的库驱动。
+            # ⚠️ 必须钉住「启动时不调 GET 那个 schema 接口」—— 只断言没有 addDb 是不够的，
+            #    那句自动挂库正是靠一次 fetch 触发的。
+            "resetSchema();",
+            # 第二批：主机 / URL 连接真接驱动
+            "function pdConnectDb(", 'fetch("/api/schema/connect"',
+            # 打开页面不再连应用库；说明仍由 DeepSeek 在「提取表结构」时补
             "function pdFetchDesc(", 'fetch("/api/schema/desc"', "function pdRunExtract(",
             # SQLite 选文件改成真上传
-            'method: "POST", body: fd'],
+            'method: "POST", body: fd',
+            # 10-09 新增：复制后弹窗确认 → 跳「提示词构造」页填系统提示词（用户点名）
+            #   · 复制到剪贴板的老能力保留，弹窗只是「是否同时送过去」；
+            #   · 内容走 sessionStorage 的 pd_schema_handoff，构造页按 ?pdSchema=1 认领；
+            #   · 前缀句是用户逐字给的原话 —— 断言里带上它，防止被顺手改写。
+            # 16:32 用户点名在其后追加一句输出约束「不要有其他解释，仅返回sql语句」
+            #   （起因：模型爱在 SQL 前后带自然语言说明 / ```sql 围栏，粘进 DBeaver 跑不了）。
+            #   ⚠️ 断言写成**两段拼接**的形状，与原型一致；哪一段都不许被润色。
+            'var PD_SCHEMA_KEY    = "pd_schema_handoff";',
+            'var PD_SCHEMA_PREFIX = "你是一个专业的sql语句工程师，现有表结构如下，根据用户问题返回sql语句\\n\\n"',
+            '+ "不要有其他解释，仅返回sql语句\\n\\n";',
+            '不要有其他解释，仅返回sql语句',
+            "function pdSendSchemaToPrompt(",
+            'window.location.href = "prompt.html?pdSchema=1";',
+            'id="copyMask"', "$copyConfirm.addEventListener(",
+            "showMask($copyMask);",
+            # 10-09 新增：「链接数据库调试」需要的数据库元数据随同交接一起带走
+            #   （连接方式 / 主机 / 端口 / 库名 / 用户名，SQLite 则是文件绝对路径 + 表名）。
+            #   ⚠️ 密码**不登记**：交接体里只应该有 user，不该有 pwd / password。
+            'var PD_DBLINK_KEY    = "pd_db_link_meta";',
+            "function pdRememberConn(", "function pdFindConn(", "function pdDbLinkMeta(",
+            'window.sessionStorage.setItem(PD_DBLINK_KEY',
+            "pdRememberConn(name, kind, {",
+            # SQLite 上传后由后端回传绝对路径（浏览器拿不到本机路径）⇒ 必须补写进登记项
+            "pdRememberConn(d.name || f.name",
+            # 14-18 新增：库头前的单库全选框（可全选单个库里所有表）
+            #   · 三态（全选 / 半选 / 空）**从表行实时算**，不单独存 ⇒ 表行怎么变它都跟着对
+            "function syncDbAllChecks(",
+            'class="db-all-check" data-db-all="',
+            'data-db-all]',          # 点击拦截：必须在折叠 / 展开之前拦，否则点它会顺手折叠库
+            "t.closest(\"[data-db-all]\")",
+        ],
         "must_not": ["PD.value", "isStreamlitMessage", "streamlit:",
                      # 演示种子与演示表结构必须已经下线
                      "demo_shop.sqlite", 'desc:"用户主表"', '["orders","user_id","users","id"',
                      # 第二批：「其余类型未实现」的占位提示 + 单库全局变量必须已经下线
-                     "本机暂只支持 SQLite 直连", "pdApplySchema", "PD_DB",
+                     "本机暂只支持 SQLite 直连", "pdApplySchema",
+                     # ⚠️ 只认「单库全局变量」那一句的原文，别用裸 PD_DB ——
+                     #    本轮新增的 PD_DBLINK_KEY / PD_CONN 里都含这四个字母（踩过一次）
+                     "var PD_DB ",
+                     # 14-18：启动时自动挂应用自带库的那段（含 pdBoot 与那次 GET schema）必须下线
+                     "function pdBoot(", "pdBoot();",
                      # ⚠️ 新增同名函数会被原型里「后写的那个」盖掉 ⇒ 必须原地替换
                      #    （踩过：addDb 出现两份，原版生效 ⇒ 左栏 0 张表）
                      "function addDb(name, kind, silent){"],
@@ -315,6 +431,30 @@ def main():
             chk("含 %s" % s, s in gen)
         for s in spec["must_not"]:
             chk("无残留 %s" % s, s not in gen)
+        # 「必须恰好出现 N 次」—— 光有 must_have（存在性）挡不住「多留了一份」这类回归：
+        # 原型里那句顶层的就绪信号若没被接线吃掉，产物会变成 3 处（踩过）。
+        for s, n in spec.get("must_count", {}).items():
+            actual = gen.count(s)
+            chk("%s 恰好出现 %d 次（实际 %d）" % (s, n, actual), actual == n)
+
+        # 10-09：「链接数据库调试」的元数据交接**不许带密码**。
+        #   逐个 pdRememberConn(...) 调用点检查（连接登记是唯一入口）。
+        for page, fname in (("Table_Structure_Extraction.html", "pdRememberConn("),):
+            if page not in CHECKS:
+                continue
+            body = read(os.path.join(OUT_DIR, page))
+            hits = []
+            pos = 0
+            while True:
+                i = body.find(fname, pos)
+                if i < 0:
+                    break
+                j = body.find("});", i)
+                seg = body[i:(j + 3 if j > 0 else i + 300)]
+                if "pwd" in seg or "password" in seg:
+                    hits.append(seg[:80])
+                pos = i + len(fname)
+            chk("%s 登记连接信息时不带密码" % page, not hits, "命中 %s" % hits)
 
         w("  5) JS 语法 node --check")
         ok = js_syntax_ok(js_b, name)
@@ -348,9 +488,16 @@ def main():
     chk("服务端无必填校验（无 required/checkRequired）",
         "required" not in srv and "checkRequired" not in srv)
     chk("服务端无网址格式校验", "URL_RE" not in srv and "is-invalid" not in srv)
+    # 10-09：用户点名的唯一例外 —— base_url 查重（前端提示 + 后端兜底）。
+    #   它拦的是「这条网址已经存在」，不是「必填 / 格式」，所以上面两条仍然成立。
+    chk("服务端有 base_url 查重（用户点名的例外）",
+        "def find_srv_by_url(" in srv and "已存在服务器API网址" in srv)
     w("  说明：store.create_srv / create_mdl / save_tp 直接落库，"
       "仅做 空串->NULL 的类型归一。")
     w("        /api/chat 也只做「组装 messages -> 转发 -> 归一返回」，不复现前端的必填校验。")
+    w("        例外（10-09 用户点名）：base_url 不可重复 ⇒ POST /api/srv 回 409、"
+      "PUT 排除自己那条；")
+    w("        前端 new_server.html 保存前也拦一道，两边提示同一句话。")
 
     w("")
     w("=" * 78)

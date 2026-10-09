@@ -9,14 +9,20 @@ PromptDeck · 「数据库表结构提取」页端到端校验（真实 Edge + C
   [PASS] settings.py 里能读到 DeepSeek 密钥（本轮要证明它被真的用了）  sk-••••••••4a88
   [PASS] Edge devtools 已就绪  port=9353
 
-■ [1] 打开页面 → 左栏是库里真实的表（不是演示数据）
+■ [1] 打开页面 → 左栏起始为空（14-18：不再自动挂应用自带库）
     页面：http://127.0.0.1:8505/Table_Structure_Extraction.html
-  [PASS] 左栏渲染出 8 张真实表（库里共 8 张）  实际 8 张
-  [PASS] 表清单 = 库内真实表清单  页面=['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']
-  [PASS] 库名 / 类型来自后端  prompt_test_DB_twe.db / SQLite
+  [PASS] ★ 左栏起始为空：一个库都没连
+  [PASS] ★ 起始不含应用自带库那些模板表（srv / mdl / tst_* / django_migrations）
+  [PASS] ★ 起始提示是「还没有连接数据库」而不是模板表清单  还没有连接数据库先在上方选择「数据库类型」，SQLite 从本机选文件，其余类型填写主机 / URL、用户名与密码后连接。
+  [PASS] 没勾选任何表 ⇒ 「提取表结构」是灰的
+  [PASS] 导入：选「SQLite」弹出选文件窗口
+  [PASS] 导入：文件已挂到 #fileInput  prompt_test_DB_twe.db
+  [PASS] ★ 导入后左栏渲染出 9 张真实表（库里共 9 张）  实际 9 张
+  [PASS] 导入后的表清单 = 该库里真实表清单  页面=['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_db_conn', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']
+  [PASS] 导入的库名来自上传的文件名  prompt_test_DB_twe.db / SQLite
   [PASS] 每张表的行数 = 库里真实行数  []
-  [PASS] 还没勾选任何表 ⇒ 「提取表结构」是灰的
-  [PASS] 演示种子已下线（左栏不是 demo_shop 那 6 张表）
+  [PASS] 导入后仍没勾选任何表 ⇒ 「提取表结构」是灰的
+  [PASS] 导入的连接已登记（链接数据库调试要用：kind / 文件绝对路径 / 表名）  {"dbs":1,"conn":1,"meta":null}
 
 ■ [2] 说明只在「提取」时生成 —— 页面打开阶段模型一次都不该被调用
   [PASS] 打开页面后模型调用次数为 0  实际 0
@@ -79,7 +85,7 @@ PromptDeck · 「数据库表结构提取」页端到端校验（真实 Edge + C
 ■ [8.2] 真上传第二个 .sqlite → 左栏两个库，同名表结构互不串（按库隔离）
   [PASS] 选「SQLite」后打开的是「选文件」弹窗（不是连接弹窗）  {'kind': 'MySQL', 'connShown': False, 'fileShown': True, 'picked': 'SQLite'}
   [PASS] 文件已挂到原型的 #fileInput 上  pd_verify_other.sqlite
-  [PASS] 上传后左栏变成 2 个库  [{'name': 'prompt_test_DB_twe.db', 'kind': 'SQLite', 'tables': ['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']}, {'name': 'pd_verify_other.sqlite', 'kind': 'SQLite', 'tables': ['only_here', 'srv']}]
+  [PASS] 上传后左栏变成 2 个库  [{'name': 'prompt_test_DB_twe.db', 'kind': 'SQLite', 'tables': ['django_migrations', 'mdl', 'srv', 'tst_api_key', 'tst_db_conn', 'tst_plan', 'tst_plan_prompt', 'tst_rec', 'tst_rec_dtl']}, {'name': 'pd_verify_other.sqlite', 'kind': 'SQLite', 'tables': ['only_here', 'srv']}]
   [PASS] 第 2 个库就是刚上传的那个文件  ['prompt_test_DB_twe.db', 'pd_verify_other.sqlite']
   [PASS] 第 2 个库的表清单 = 该库里真实的表  {'srv', 'only_here'}
   [PASS] 两个库的 srv 都勾上了（靠 db 区分，不是靠表名）  ['prompt_test_DB_twe.db|mdl', 'prompt_test_DB_twe.db|srv', 'prompt_test_DB_twe.db|tst_api_key', 'pd_verify_other.sqlite|srv']
@@ -87,14 +93,52 @@ PromptDeck · 「数据库表结构提取」页端到端校验（真实 Edge + C
   [PASS] 上传库的结构里能看到它自己的表说明（注释来自该库的 DDL）  [('mdl', '表说明·mdl'), ('srv', '表说明·srv'), ('tst_api_key', '表说明·tst_api_key'), ('srv', '另一台机器的服务器表')]
   [PASS] 新增流程无 JS 异常
 
-■ [9] 收尾：库表计数回到基线（本页只读库，不写任何表）
-  [PASS] srv 回到基线  17 -> 17
-  [PASS] mdl 回到基线  16 -> 16
-  [PASS] tst_plan 回到基线  0 -> 0
-  [PASS] tst_plan_prompt 回到基线  0 -> 0
-  [PASS] tst_api_key 回到基线  1 -> 1
-  [PASS] tst_rec 回到基线  0 -> 0
-  [PASS] tst_rec_dtl 回到基线  0 -> 0
+■ [8.5] 单库全选框（14-18 用户点名）：全选 / 半选 / 不误触折叠
+    第 1 个库：prompt_test_DB_twe.db（9 张表）
+  [PASS] 库头前有全选框  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': False, 'half': False, 'tables': 9, 'on': 0}
+  [PASS] ★ 初始为未勾选、未半选（已先归零）  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': False, 'half': False, 'tables': 9, 'on': 0}
+  [PASS] 本段只剩一个库（避免多库干扰计数）  1
+  [PASS] ★ 点一下 = 该库全部表勾上  on=9/9
+  [PASS] 库级框变实勾  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': True, 'half': False, 'tables': 9, 'on': 9}
+  [PASS] ★ 点全选框不会误触折叠（最易回归的一条）  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': True, 'half': False, 'tables': 9, 'on': 9}
+  [PASS] 再点 = 取消全选  on=0
+  [PASS] 库级框回到未勾选  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': False, 'half': False, 'tables': 9, 'on': 0}
+  [PASS] ★ 只勾一张表 => 库级框半选  {'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': False, 'half': True, 'tables': 9, 'on': 1}
+  [PASS] 总全选框也跟着半选  {'checked': False, 'half': True}
+  [PASS] ★ 半选状态下再点是「补成全选」而不是取消  on=9/9
+  [PASS] ★ 全选后 selection() 里是该库全部表、且同库聚合  sel=9 tables=9 dbs=1
+  [PASS] 表名栏总全选取消 => 库级框同步清空  [{'name': 'prompt_test_DB_twe.db', 'collapsed': False, 'box': True, 'checked': False, 'half': False, 'tables': 9, 'on': 0}]
+  [PASS] 库折叠着也能全选  {'name': 'prompt_test_DB_twe.db', 'collapsed': True, 'box': True, 'checked': True, 'half': False, 'tables': 9, 'on': 9}
+  [PASS] 点库名 = 只折叠、勾选态不变  before on=9 after on=9
+  [PASS] 归零后还能重新全选（不是一次性状态）  on=9/9
+  [PASS] 单库全选流程无 JS 异常
+
+■ [8.7] 已连接数据库存档：连上就存 → 刷新后左栏自己回来（含表结构快照）
+    存档条数：2
+  [PASS] ★ 导入后页面**自动**存了档（没点任何「保存」按钮）  2
+  [PASS] ★ 存档里有库名 / 类型 / 表结构快照  {'name': 'prompt_test_DB_twe.db', 'kind': 'SQLite'}
+  [PASS] ★ SQLite 存档带上了服务端落盘路径（file）  D:\北京作业\产品经理课程内容练习\谷老师教学\9.24调试提示词\promptdeck\data\uploads\20261009_195301_prompt_test_DB_twe.db
+  [PASS] ★ 存档内容里没有密码字样（pwd / password 都不该出现）
+    刷新后左栏：dbs=2  nodes=[{'name': 'prompt_test_DB_twe.db', 'tables': 9}, {'name': 'pd_verify_other.sqlite', 'tables': 2}]
+  [PASS] ★ 刷新后左栏**自己恢复**出存档里的库（不用重新导入）  2
+  [PASS] ★ 恢复出来的库名与存档一致  ['prompt_test_DB_twe.db', 'pd_verify_other.sqlite']
+  [PASS] ★ 恢复出来的库带着表（表数与快照一致 ⇒ 能直接勾选 / 提取，不用重连）  [{'name': 'prompt_test_DB_twe.db', 'tables': 9}, {'name': 'pd_verify_other.sqlite', 'tables': 2}]
+  [PASS] ★ 连接登记（PD_CONN）也恢复了 ⇒「链接数据库调试 / 页面内调试」拿得到元数据  2
+  [PASS] ★ 恢复出来的连接信息里带着服务端文件路径（file）  {'mode': 'file', 'hasFile': True}
+  [PASS] ★ 恢复后左栏不再显示「还没有连接数据库」
+  [PASS] 恢复流程无 JS 异常
+
+■ [9] 收尾：自清理后库表计数回到基线
+    （本页 10-09 起会写 tst_db_conn —— 连接后自动存档；收尾按「跑前记 id、跑完差集删」清掉本次造的行，用户自己的连接记录不动）
+    本次自清 2 行存档
+  [PASS] srv 回到基线  2 -> 2
+  [PASS] mdl 回到基线  31 -> 31
+  [PASS] tst_plan 回到基线  1 -> 1
+  [PASS] tst_plan_prompt 回到基线  2 -> 2
+  [PASS] tst_api_key 回到基线  2 -> 2
+  [PASS] tst_rec 回到基线  1 -> 1
+  [PASS] tst_rec_dtl 回到基线  30 -> 30
+  [PASS] tst_db_conn 回到基线  0 -> 0
 
 ==============================================================================
 结果：全部通过

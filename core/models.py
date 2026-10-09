@@ -17,6 +17,7 @@
     tst_api_key       方案的 API_key（一个方案一把，key_name = 「默认」）
     tst_rec           测试记录（本次只映射，不接业务）
     tst_rec_dtl       测试记录明细（本次只映射，不接业务）
+    tst_db_conn       已连接数据库的存档（第四次迭代新增，见下方类注释）
 
 ────────────────────────────────────────────────────────────────
 「提示词方案」在旧库是 tp 单表，本次拆成三张表，字段对照：
@@ -226,3 +227,50 @@ class TstRecDtl(models.Model):
 
     def __str__(self):
         return "dtl#%s" % self.id
+
+
+# ================================================================== 已连接数据库存档（第四次迭代）
+class TstDbConn(models.Model):
+    """已连接数据库的存档（新库的 tst_db_conn，第四次迭代新增）。
+
+    一条记录 = 「数据库表结构提取」页上**已经连好的一个库**。
+    存的是「连得上哪儿」+「这个库长什么样」，让用户下次进来左栏还是那些库，
+    不用重新导入 / 重连。
+
+    字段口径（与前端 sessionStorage 里 pd_db_link_meta 的形状对齐）：
+        conn_name     库名 / 文件名（前端派生出来的展示名）
+        conn_kind     数据库类型（SQLite / MySQL / PostgreSQL / SQL Server / Oracle / Db2 for LUW）
+        conn_mode     host（主机端口）/ url（连接串）/ file（本机文件）
+        host, port, dbname, user_name   连接信息
+        file_path      SQLite 用：服务端落盘副本的**绝对路径**（data/uploads/ 下那份）
+        schema_json    表结构快照 {"tables":[…],"relations":[…]}
+        checked_json   上次勾选了哪些表 ["表名",…]
+        saved_at       保存时间
+
+    ⚠️ **本表没有、也不该有密码列。**
+       前端 pdRememberConn 从设计上就不登记密码（DBeaver 侧用它自己的凭据），
+       所以这里能存的只有「连得上哪儿」，认证相关的一个字都没有。
+       这条与本项目「密码不过我们的手」是同一道地基 —— store.save_db_conn
+       还会再做一次显式丢弃，双保险。
+    """
+
+    id = models.AutoField(primary_key=True)
+    conn_name = models.TextField()                       # 库名 / 文件名
+    conn_kind = models.TextField()                       # 数据库类型
+    conn_mode = models.TextField(null=True, blank=True)  # host / url / file
+    host = models.TextField(null=True, blank=True)
+    port = models.TextField(null=True, blank=True)
+    dbname = models.TextField(null=True, blank=True)
+    user_name = models.TextField(null=True, blank=True)
+    file_path = models.TextField(null=True, blank=True)
+    schema_json = models.TextField(null=True, blank=True)   # 表结构快照
+    checked_json = models.TextField(null=True, blank=True)  # 勾选态
+    saved_at = models.TextField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "tst_db_conn"
+        ordering = ["id"]
+
+    def __str__(self):
+        return "%s (%s)" % (self.conn_name or "", self.conn_kind or "")

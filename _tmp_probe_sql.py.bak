@@ -1,0 +1,58 @@
+# -*- coding: utf-8 -*-
+"""临时手工验证：/api/database/execute-sql 的几条路径（非交付物，验完即删）。"""
+import json
+import os
+import sys
+import tempfile
+import urllib.error
+import urllib.request
+
+B = "http://127.0.0.1:8502"
+
+
+def post(p, d):
+    r = urllib.request.Request(
+        B + p, data=json.dumps(d).encode("utf-8"),
+        headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(r) as f:
+            return f.status, json.loads(f.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return e.code, json.loads(e.read().decode("utf-8"))
+
+
+db = os.path.join(tempfile.gettempdir(), "pd_sqltest.db")
+
+code, res = post("/api/database/execute-sql",
+                 {"kind": "SQLite", "meta": {"file": db},
+                  "sql": "SELECT gid, gname, glevel FROM member_group ORDER BY gid LIMIT 3"})
+print("1 正常查询 HTTP=%s" % code)
+print("   行数=%s 列=%s" % (res.get("rowCount"), [c["title"] for c in res.get("columns", [])]))
+print("   数据=%s" % (res.get("rows"),))
+
+print()
+print("2 写语句被拒:", post("/api/database/execute-sql",
+      {"kind": "SQLite", "meta": {"file": db}, "sql": "DELETE FROM member_group"})[1])
+
+print()
+print("3 表不存在:", post("/api/database/execute-sql",
+      {"kind": "SQLite", "meta": {"file": db}, "sql": "SELECT * FROM nope"})[1])
+
+print()
+print("4 连接信息不全:", post("/api/database/execute-sql",
+      {"kind": "MySQL", "meta": {}, "sql": "SELECT 1"})[1])
+
+print()
+print("5 带密码字段（验证不落库、不回显）:",
+      post("/api/database/execute-sql",
+           {"kind": "SQLite", "meta": {"file": db}, "pwd": "SECRET_PWD_123",
+            "sql": "SELECT 1 AS a"})[1])
+
+print()
+r = urllib.request.Request(B + "/api/database/execute-sql", method="PUT")
+try:
+    urllib.request.urlopen(r)
+except urllib.error.HTTPError as e:
+    print("6 PUT ->", e.code)
+
+sys.stdout.flush()

@@ -5,10 +5,10 @@ PromptDeck · 打包产物「容器语义」彩排（直接执行产物里的 st
 ==============================================================================
 
 ■ [1] 上传包静态检查（复用 verify_upload.check_local）
-    · 种子库：17 服务器 / 45 模型 / 密钥 0 行
+    · 种子库：2 服务器 / 31 模型 / 密钥 0 行 / 连接存档 0 行
     · 已用开发目录 settings.py 里读到的 1 个密钥值做全包比对
     · 仓库根目录 12 项：.gitignore  .pd_modelscope_pack  Dockerfile  README.md  config  core  data  manage.py  ms_deploy.json  requirements.txt  start.sh  static
-    · 共 34 个文件，最大文件 158.9 KB
+    · 共 36 个文件，最大文件 158.9 KB
   [PASS] 上传包口径全通过（结构 / 上线补丁 / 9 页 / 种子 / 无密钥）
   [PASS] 能从开发目录 settings.py 读到密钥做比对（否则「无泄漏」是空断言）
 
@@ -17,32 +17,32 @@ PromptDeck · 打包产物「容器语义」彩排（直接执行产物里的 st
   [PASS] 服务在 90 秒内起来（/api/health 返回 200）
   [PASS] 持久化库已建出：prompt_test_DB.db
   [PASS] 建出的库表结构完整（7 张业务表都在）
-  [PASS] 库里就是种子数据：srv=17 / mdl=45 / 密钥 0 行
-  [PASS] 库旁写下了种子版本标记 = d2ed42bb6714
+  [PASS] 库里就是种子数据：srv=2 / mdl=31 / 密钥 0 行
+  [PASS] 库旁写下了种子版本标记 = 1736315affb9
 
 ■ [3] 应用：首页跳转 + 9 个页面 + 6 个接口
   [PASS] 「/」是跳到页面的重定向（3xx）
   [PASS] 跳转目标是**相对**路径 prompt.html（平台子路径前缀下才不错）
   [PASS] 9 个页面全部 200 且 Content-Type 是 text/html、内容含关键词
   [PASS] /api/health = ok
-  [PASS] /api/srv 返回 17 条且字段齐全
-  [PASS] /api/mdl 返回 45 条且字段齐全
+  [PASS] /api/srv 返回 2 条且字段齐全
+  [PASS] /api/mdl 返回 31 条且字段齐全
   [PASS] /api/tp 可访问（方案表；种子为空则给空列表）
   [PASS] /api/rec 可访问（测试记录表）
   [PASS] /api/schema 读到真实库结构（7 张业务表都在）
-  [PASS] /api/schema 报的行数与库内一致（srv=17 / mdl=45）
+  [PASS] /api/schema 报的行数与库内一致（srv=2 / mdl=31）
   [PASS] 9 个页面的响应里没有任何明文密钥
   [PASS] 运行日志显示监听 0.0.0.0:7861
 
 ■ [4] 子路径反代（模拟创空间把应用挂在 /studio/app/… 前缀下）
   [PASS] 带前缀能打开页面（/studio/app/prompt.html）
-  [PASS] 带前缀能调接口（/studio/app/api/srv 返回 17 条）
+  [PASS] 带前缀能调接口（/studio/app/api/srv 返回 2 条）
   [PASS] 带前缀时首页跳转仍是相对路径（浏览器会解析成 /studio/app/prompt.html）
   [PASS] 页面里的接口地址确实是相对的（fetch("api/…）
 
 ■ [5] 旧版库自愈：只有 srv/mdl 的 Starlette 遗留库 -> 用种子重建
   [PASS] 已就位一个旧版库（1 平台 / 1 模型 / 无 tst_* 表）
-  [PASS] 旧版库被判不可用并换成种子数据（srv 1->17 / mdl 1->45）
+  [PASS] 旧版库被判不可用并换成种子数据（srv 1->2 / mdl 1->31）
   [PASS] start.sh 日志里说明了重建原因
 
 ■ [6] 种子版本变化 -> 刷新持久化库 + 旧库备份 .bak
